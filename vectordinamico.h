@@ -1,15 +1,35 @@
 
-
+/* Tipo base almacenado por el vector dinamico. */
 typedef int TELEMENTO;
 
-typedef void * vectorP;
+/* Puntero opaco a la estructura interna del vector. */
+typedef struct STVECTOR *vectorP;
 
-void crear(vectorP *v1,unsigned long tam1);
+/*
+ * Reserva memoria para un vector de tam1 elementos.
+ * Inicializa cada posicion a 0.
+ */
+void crear(vectorP *v1, unsigned long tam1);
 
-void asignar(vectorP v1,unsigned long posicion, TELEMENTO valor);
+/*
+ * Asigna un valor en una posicion concreta.
+ * Si v1 es nulo o posicion esta fuera de rango, no hace nada.
+ */
+void asignar(vectorP v1, unsigned long posicion, TELEMENTO valor);
 
-TELEMENTO recuperar (vectorP v1, unsigned long posicion);
+/*
+ * Recupera el valor de una posicion.
+ * Devuelve 0 si v1 es nulo o la posicion es invalida.
+ */
+TELEMENTO recuperar(vectorP v1, unsigned long posicion);
 
-void liberar (vectorP *v1);
+/*
+ * Libera la memoria del vector y deja el puntero a NULL.
+ */
+void liberar(vectorP *v1);
 
-unsigned long tamano (vectorP *v1);
+/*
+ * Devuelve la cantidad de elementos reservados en el vector.
+ * Si no existe, devuelve 0.
+ */
+unsigned long tamano(vectorP *v1);
