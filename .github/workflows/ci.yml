@@ -9,7 +9,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -18,17 +18,30 @@ jobs:
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
-        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c monedagestion.c bigint.c -o progvoraz
+        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c moneda_gestion.c bigint.c -o progvoraz
+
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c moneda_gestion.c bigint.c -o progvoraz
+
+      - name: Build GUI (macOS Swift)
+        if: runner.os == 'macOS'
+        run: swiftc gui_macos.swift -o progvoraz_gui
 
       - name: Smoke test (Linux)
         if: runner.os == 'Linux'
         run: |
           printf "a\neuro\n0\nsalir\n" | ./progvoraz
 
+      - name: Smoke test (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          printf "a\neuro\n0\nsalir\n" | ./progvoraz
+
       - name: Build (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c monedagestion.c bigint.c -o progvoraz.exe
+        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c moneda_gestion.c bigint.c -o progvoraz.exe
 
       - name: Smoke test (Windows)
         if: runner.os == 'Windows'
@@ -40,3 +53,4 @@ jobs:
           0
           salir
           "@ | .\progvoraz.exe | Out-String
+
