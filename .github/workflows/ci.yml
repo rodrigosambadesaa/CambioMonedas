@@ -1,5 +1,8 @@
 name: C CI
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   push:
   pull_request:
@@ -14,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
@@ -28,9 +31,15 @@ jobs:
         if: runner.os == 'macOS'
         run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c moneda_gestion.c bigint.c -o progvoraz
 
+      - name: Swift toolchain info (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          xcode-select -p
+          xcrun swift --version
+
       - name: Build GUI (macOS Swift)
         if: runner.os == 'macOS'
-        run: swiftc gui_macos.swift -o progvoraz_gui
+        run: xcrun --sdk macosx swiftc gui_macos.swift -o progvoraz_gui
 
       - name: Smoke test (Linux)
         if: runner.os == 'Linux'
