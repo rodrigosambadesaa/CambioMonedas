@@ -1,5 +1,5 @@
 APP := progvoraz
-SRC := main.c vectordinamico.c
+SRC := main.c vectordinamico.c monedagestion.c bigint.c
 
 CC ?= gcc
 CFLAGS ?= -std=c11 -Wall -Wextra -Wpedantic
