@@ -479,7 +479,7 @@ int main(void)
             limpiarArreglo(&stock);
             limpiarArreglo(&monedas);
 
-            printf("Nombre de la moneda (ej: euro, dolar, yen), 'modo' o 'salir': ");
+            printf("Nombre de la moneda (ej: euro, dolar, yen), 'modo', 'volver' o 'salir': ");
             if (!leerLinea(moneda, sizeof(moneda)))
             {
                 printf("Entrada finalizada.\n");
@@ -500,7 +500,7 @@ int main(void)
                 break;
             }
 
-            if (strcmp(monedaCmd, "modo") == 0)
+            if (strcmp(monedaCmd, "modo") == 0 || strcmp(monedaCmd, "volver") == 0)
             {
                 opcion = 0;
                 break;
