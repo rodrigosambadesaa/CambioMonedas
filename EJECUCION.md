@@ -225,3 +225,13 @@ Mismo orden de bloques que `monedas.txt`:
 - La actualizacion de stock reescribe `stock.txt` en el mismo archivo abierto (`r+`) sin temporales.
 - Se modernizo el flujo para GitHub con `Makefile`, `.gitignore` y CI en `.github/workflows/ci.yml`.
 
+## Nota sobre Windows Phone
+
+Windows Phone / Windows 10 Mobile no dispone de runner oficial ni toolchain mantenida en GitHub Actions para este proyecto C/Win32.
+
+Como cobertura equivalente en CI se ejecutan pruebas en `windows-latest` para:
+
+- Consola: flujos de usuario en modo `a` y `b`.
+- Consola: flujo de administrador en modo `c`.
+- Ventana (Win32): compilacion y prueba de arranque de la GUI.
+
