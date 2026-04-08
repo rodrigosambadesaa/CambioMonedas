@@ -14,11 +14,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
         run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c moneda_gestion.c bigint.c -o progvoraz
+
+      - name: Build GUI (Linux portable)
+        if: runner.os == 'Linux'
+        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 gui_portable.c moneda_gestion.c bigint.c -o progvoraz_gui
 
       - name: Build (macOS)
         if: runner.os == 'macOS'
@@ -42,6 +46,11 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c moneda_gestion.c bigint.c -o progvoraz.exe
+
+      - name: Build GUI (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 gui_window.c moneda_gestion.c bigint.c -o progvoraz_gui.exe -mwindows
 
       - name: Smoke test (Windows)
         if: runner.os == 'Windows'
