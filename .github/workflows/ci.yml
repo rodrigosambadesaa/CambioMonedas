@@ -14,21 +14,21 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
-        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c vectordinamico.c -o progvoraz
+        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c monedagestion.c bigint.c -o progvoraz
 
       - name: Smoke test (Linux)
         if: runner.os == 'Linux'
         run: |
-          printf "a\neuro\n0\n" | ./progvoraz
+          printf "a\neuro\n0\nsalir\n" | ./progvoraz
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c vectordinamico.c -o progvoraz.exe
+        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c monedagestion.c bigint.c -o progvoraz.exe
 
       - name: Smoke test (Windows)
         if: runner.os == 'Windows'
@@ -38,4 +38,5 @@ jobs:
           a
           euro
           0
+          salir
           "@ | .\progvoraz.exe | Out-String
