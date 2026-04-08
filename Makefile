@@ -51,7 +51,7 @@ GUI_TARGET := $(GUI_APP)
 gui: $(GUI_TARGET)
 
 $(GUI_TARGET): $(GUI_SRC_MAC)
-	swiftc $(GUI_SRC_MAC) -o $(GUI_TARGET)
+	swiftc -parse-as-library $(GUI_SRC_MAC) -o $(GUI_TARGET)
 
 run-gui: $(GUI_TARGET)
 	./$(GUI_TARGET)

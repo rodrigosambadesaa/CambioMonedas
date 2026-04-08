@@ -39,7 +39,7 @@ jobs:
 
       - name: Build GUI (macOS Swift)
         if: runner.os == 'macOS'
-        run: xcrun --sdk macosx swiftc gui_macos.swift -o progvoraz_gui
+        run: xcrun --sdk macosx swiftc -parse-as-library gui_macos.swift -o progvoraz_gui
 
       - name: Smoke test (Linux)
         if: runner.os == 'Linux'

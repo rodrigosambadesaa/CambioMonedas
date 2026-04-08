@@ -97,6 +97,7 @@
             "type": "shell",
             "command": "swiftc",
             "args": [
+                "-parse-as-library",
                 "gui_macos.swift",
                 "-o",
                 "progvoraz_gui"
