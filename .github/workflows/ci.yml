@@ -99,6 +99,44 @@ jobs:
           salir
           "@ | .\progvoraz.exe | Out-String
 
+      - name: Test user flow (Windows, modo a)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          @"
+          a
+          euro
+          50
+          0
+          salir
+          "@ | .\progvoraz.exe | Out-String
+
+      - name: Test user flow (Windows, modo b)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          @"
+          b
+          euro
+          50
+          0
+          salir
+          "@ | .\progvoraz.exe | Out-String
+
+      - name: Test admin flow (Windows, modo c)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          @"
+          c
+          euro
+          anadir
+          1
+          1
+          volver
+          salir
+          "@ | .\progvoraz.exe | Out-String
+
       - name: Smoke launch GUI (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -111,4 +149,11 @@ jobs:
           if (-not $proc.HasExited) {
             Stop-Process -Id $proc.Id
           }
+
+      - name: Nota Windows Phone (CI)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Host "Windows Phone/Windows 10 Mobile no tiene runner oficial ni SDK soportado en GitHub Actions."
+          Write-Host "La cobertura equivalente se valida en windows-latest para consola (usuario/admin) y arranque GUI Win32."
 
