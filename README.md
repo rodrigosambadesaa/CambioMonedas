@@ -12,7 +12,7 @@ Proyecto de cambio de monedas escrito en C, originalmente creado en 2014 con Net
 ## Modernizacion aplicada
 
 - Build simplificado y portable mediante Makefile de una sola capa.
-- CI automatizada en GitHub Actions para Linux y Windows.
+- CI automatizada en GitHub Actions para Linux, macOS y Windows.
 - Limpieza de artefactos con .gitignore para evitar ruido en commits.
 - Documentacion de uso y compilacion actualizada.
 - Modularizacion de la gestion de moneda en un modulo dedicado.
@@ -103,7 +103,7 @@ Ejecucion:
 - main.c: logica principal y TUI en consola.
 - gui_window.c: interfaz grafica de ventana (Windows).
 - gui_macos.swift: interfaz grafica nativa para macOS (Swift/AppKit).
-- gui_portable.c: interfaz GUI portable para Linux (panel administrador en terminal).
+- gui_portable.c: interfaz GUI portable para Linux y otros Unix-like (panel administrador en terminal).
 - bigint.c / bigint.h: enteros de precision arbitraria.
 - moneda_gestion.c / moneda_gestion.h: carga y persistencia de monedas/stock.
 - monedas.txt: denominaciones por moneda.
