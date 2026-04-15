@@ -255,4 +255,3 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
 
     return ok ? 1 : 0;
 }
-
