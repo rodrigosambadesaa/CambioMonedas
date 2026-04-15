@@ -77,6 +77,66 @@ func subBig(_ a: String, _ b: String) -> String? {
     return normalize(res)
 }
 
+func mulBig(_ a: String, _ b: String) -> String {
+    let x = Array(normalize(a).reversed())
+    let y = Array(normalize(b).reversed())
+
+    if x.count == 1 && x[0] == "0" { return "0" }
+    if y.count == 1 && y[0] == "0" { return "0" }
+
+    var out = Array(repeating: 0, count: x.count + y.count)
+
+    for i in 0..<x.count {
+        let da = Int(String(x[i]))!
+        for j in 0..<y.count {
+            let db = Int(String(y[j]))!
+            out[i + j] += da * db
+        }
+    }
+
+    for k in 0..<(out.count - 1) {
+        if out[k] >= 10 {
+            out[k + 1] += out[k] / 10
+            out[k] %= 10
+        }
+    }
+
+    while out.count > 1 && out.last == 0 {
+        out.removeLast()
+    }
+
+    return out.reversed().map(String.init).joined()
+}
+
+func divmodBig(_ a: String, _ b: String) -> (q: String, r: String)? {
+    let dividend = normalize(a)
+    let divisor = normalize(b)
+
+    if divisor == "0" { return nil }
+    if compareBig(dividend, divisor) < 0 { return ("0", dividend) }
+
+    var qChars: [Character] = []
+    var current = "0"
+
+    for ch in dividend {
+        current = addBig(mulBig(current, "10"), String(ch))
+
+        var digit = 0
+        for d in stride(from: 9, through: 0, by: -1) {
+            let prod = mulBig(divisor, String(d))
+            if compareBig(prod, current) <= 0 {
+                digit = d
+                current = subBig(current, prod)!
+                break
+            }
+        }
+
+        qChars.append(Character(String(digit)))
+    }
+
+    return (normalize(String(qChars)), normalize(current))
+}
+
 func readTokens(from path: String) -> [String]? {
     guard let txt = try? String(contentsOfFile: path, encoding: .utf8) else { return nil }
     return txt.split { $0.isWhitespace }.map(String.init)
@@ -138,13 +198,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
     var coinPopup: NSPopUpButton!
     var denomPopup: NSPopUpButton!
     var qtyField: NSTextField!
+    var amountField: NSTextField!
     var table: NSTableView!
+    var resultView: NSTextView!
     var statusLabel: NSTextField!
+    var modeLimitedBtn: NSButton!
+    var modeUnlimitedBtn: NSButton!
+    var addBtn: NSButton!
+    var subBtn: NSButton!
 
     var coinNames: [String] = []
     var activeCoin: String?
     var denoms: [String] = []
     var stock: [String] = []
+    var limitedMode = true
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupUI()
@@ -153,7 +220,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
 
     func setupUI() {
         window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 640, height: 460),
+            contentRect: NSRect(x: 0, y: 0, width: 780, height: 640),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -163,36 +230,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
 
         let content = window.contentView!
 
-        let title = NSTextField(labelWithString: "Panel Administrador (macOS)")
-        title.frame = NSRect(x: 20, y: 420, width: 300, height: 24)
+        let title = NSTextField(labelWithString: "Panel GUI (macOS) - Modos")
+        title.frame = NSRect(x: 20, y: 600, width: 360, height: 24)
         title.font = NSFont.boldSystemFont(ofSize: 16)
         content.addSubview(title)
 
         let coinLabel = NSTextField(labelWithString: "Moneda")
-        coinLabel.frame = NSRect(x: 20, y: 388, width: 60, height: 22)
+        coinLabel.frame = NSRect(x: 20, y: 568, width: 60, height: 22)
         content.addSubview(coinLabel)
 
-        coinPopup = NSPopUpButton(frame: NSRect(x: 85, y: 385, width: 180, height: 26), pullsDown: false)
+        coinPopup = NSPopUpButton(frame: NSRect(x: 85, y: 565, width: 180, height: 26), pullsDown: false)
         content.addSubview(coinPopup)
 
         let loadBtn = NSButton(title: "Cargar", target: self, action: #selector(loadCoin))
-        loadBtn.frame = NSRect(x: 275, y: 384, width: 90, height: 28)
+        loadBtn.frame = NSRect(x: 275, y: 564, width: 90, height: 28)
         content.addSubview(loadBtn)
 
         let reloadBtn = NSButton(title: "Recargar", target: self, action: #selector(reloadCoinsAction))
-        reloadBtn.frame = NSRect(x: 375, y: 384, width: 90, height: 28)
+        reloadBtn.frame = NSRect(x: 375, y: 564, width: 90, height: 28)
         content.addSubview(reloadBtn)
 
-        let scroll = NSScrollView(frame: NSRect(x: 20, y: 150, width: 600, height: 220))
+        modeLimitedBtn = NSButton(radioButtonWithTitle: "Stock limitado", target: self, action: #selector(modeChanged(_:)))
+        modeLimitedBtn.frame = NSRect(x: 20, y: 532, width: 140, height: 22)
+        modeLimitedBtn.state = .on
+        content.addSubview(modeLimitedBtn)
+
+        modeUnlimitedBtn = NSButton(radioButtonWithTitle: "Stock ilimitado", target: self, action: #selector(modeChanged(_:)))
+        modeUnlimitedBtn.frame = NSRect(x: 170, y: 532, width: 150, height: 22)
+        content.addSubview(modeUnlimitedBtn)
+
+        let scroll = NSScrollView(frame: NSRect(x: 20, y: 290, width: 740, height: 230))
         table = NSTableView(frame: scroll.bounds)
 
         let col1 = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("denom"))
         col1.title = "Denominacion"
-        col1.width = 260
+        col1.width = 300
 
         let col2 = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("stock"))
         col2.title = "Stock"
-        col2.width = 320
+        col2.width = 420
 
         table.addTableColumn(col1)
         table.addTableColumn(col2)
@@ -203,32 +279,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         content.addSubview(scroll)
 
         let denomLabel = NSTextField(labelWithString: "Denominacion")
-        denomLabel.frame = NSRect(x: 20, y: 110, width: 90, height: 22)
+        denomLabel.frame = NSRect(x: 20, y: 250, width: 90, height: 22)
         content.addSubview(denomLabel)
 
-        denomPopup = NSPopUpButton(frame: NSRect(x: 115, y: 107, width: 180, height: 26), pullsDown: false)
+        denomPopup = NSPopUpButton(frame: NSRect(x: 115, y: 247, width: 180, height: 26), pullsDown: false)
         content.addSubview(denomPopup)
 
         let qtyLabel = NSTextField(labelWithString: "Cantidad")
-        qtyLabel.frame = NSRect(x: 310, y: 110, width: 70, height: 22)
+        qtyLabel.frame = NSRect(x: 310, y: 250, width: 70, height: 22)
         content.addSubview(qtyLabel)
 
-        qtyField = NSTextField(frame: NSRect(x: 385, y: 106, width: 160, height: 26))
+        qtyField = NSTextField(frame: NSRect(x: 385, y: 246, width: 160, height: 26))
         content.addSubview(qtyField)
 
-        let addBtn = NSButton(title: "Anadir", target: self, action: #selector(addStock))
-        addBtn.frame = NSRect(x: 230, y: 62, width: 100, height: 30)
+        addBtn = NSButton(title: "Anadir", target: self, action: #selector(addStock))
+        addBtn.frame = NSRect(x: 230, y: 204, width: 100, height: 30)
         content.addSubview(addBtn)
 
-        let subBtn = NSButton(title: "Quitar", target: self, action: #selector(subStock))
-        subBtn.frame = NSRect(x: 340, y: 62, width: 100, height: 30)
+        subBtn = NSButton(title: "Quitar", target: self, action: #selector(subStock))
+        subBtn.frame = NSRect(x: 340, y: 204, width: 100, height: 30)
         content.addSubview(subBtn)
 
+        let amountLabel = NSTextField(labelWithString: "Monto (centimos)")
+        amountLabel.frame = NSRect(x: 20, y: 160, width: 110, height: 22)
+        content.addSubview(amountLabel)
+
+        amountField = NSTextField(frame: NSRect(x: 140, y: 156, width: 220, height: 26))
+        content.addSubview(amountField)
+
+        let calcBtn = NSButton(title: "Calcular devolucion", target: self, action: #selector(calculateChange))
+        calcBtn.frame = NSRect(x: 370, y: 154, width: 170, height: 30)
+        content.addSubview(calcBtn)
+
+        let resultTitle = NSTextField(labelWithString: "Resultado")
+        resultTitle.frame = NSRect(x: 20, y: 132, width: 120, height: 22)
+        content.addSubview(resultTitle)
+
+        let resultScroll = NSScrollView(frame: NSRect(x: 20, y: 44, width: 740, height: 90))
+        resultView = NSTextView(frame: resultScroll.bounds)
+        resultView.isEditable = false
+        resultView.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+        resultScroll.documentView = resultView
+        resultScroll.hasVerticalScroller = true
+        content.addSubview(resultScroll)
+
         statusLabel = NSTextField(labelWithString: "")
-        statusLabel.frame = NSRect(x: 20, y: 20, width: 600, height: 24)
+        statusLabel.frame = NSRect(x: 20, y: 12, width: 740, height: 24)
         content.addSubview(statusLabel)
 
         window.makeKeyAndOrderFront(nil)
+        applyModeToUI()
     }
 
     func numberOfRows(in tableView: NSTableView) -> Int {
@@ -240,7 +340,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         if tableColumn?.identifier.rawValue == "denom" {
             return denoms[row] + " c"
         }
-        return stock[row]
+        return limitedMode ? stock[row] : "Ilimitado"
     }
 
     func setStatus(_ text: String, error: Bool = false) {
@@ -256,6 +356,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         stock = []
         denomPopup.removeAllItems()
         table.reloadData()
+        resultView.string = ""
 
         if coinNames.isEmpty {
             setStatus("No se pudieron leer monedas desde monedas.txt", error: true)
@@ -266,6 +367,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
 
     @objc func reloadCoinsAction() {
         reloadCoins()
+    }
+
+    func applyModeToUI() {
+        addBtn.isEnabled = limitedMode
+        subBtn.isEnabled = limitedMode
+        denomPopup.isEnabled = limitedMode
+        qtyField.isEnabled = limitedMode
+        table.reloadData()
+    }
+
+    @objc func modeChanged(_ sender: NSButton) {
+        limitedMode = (sender == modeLimitedBtn)
+        modeLimitedBtn.state = limitedMode ? .on : .off
+        modeUnlimitedBtn.state = limitedMode ? .off : .on
+        resultView.string = ""
+        applyModeToUI()
+        setStatus(limitedMode ? "Modo stock limitado activo." : "Modo stock ilimitado activo.")
     }
 
     @objc func loadCoin() {
@@ -287,10 +405,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         denomPopup.removeAllItems()
         denomPopup.addItems(withTitles: denoms)
         table.reloadData()
+        resultView.string = ""
         setStatus("Moneda \(coin) cargada.")
     }
 
     func applyChange(isAdd: Bool) {
+        if !limitedMode {
+            setStatus("Panel administrador disponible solo en modo stock limitado.", error: true)
+            return
+        }
+
         guard let coin = activeCoin else {
             setStatus("Primero carga una moneda.", error: true)
             return
@@ -328,6 +452,116 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         qtyField.stringValue = ""
         table.reloadData()
         setStatus(isAdd ? "Stock actualizado (suma)." : "Stock actualizado (resta).")
+    }
+
+    func calculateLimitedChange(amount: String) -> [String]? {
+        var remain = normalize(amount)
+        var solution = Array(repeating: "0", count: denoms.count)
+
+        for i in 0..<denoms.count {
+            guard let div = divmodBig(remain, denoms[i]) else { return nil }
+            var take = div.q
+            if compareBig(take, stock[i]) > 0 {
+                take = stock[i]
+            }
+            solution[i] = take
+
+            let used = mulBig(denoms[i], take)
+            guard let next = subBig(remain, used) else { return nil }
+            remain = next
+
+            if remain == "0" { break }
+        }
+
+        return remain == "0" ? solution : nil
+    }
+
+    func calculateUnlimitedChange(amount: String) -> [String]? {
+        var remain = normalize(amount)
+        var solution = Array(repeating: "0", count: denoms.count)
+
+        for i in 0..<denoms.count {
+            guard let div = divmodBig(remain, denoms[i]) else { return nil }
+            solution[i] = div.q
+            remain = div.r
+            if remain == "0" { break }
+        }
+
+        return remain == "0" ? solution : nil
+    }
+
+    func renderResult(amount: String, solution: [String]) {
+        var lines: [String] = ["Cambio solicitado: \(amount) c"]
+        var hasItems = false
+
+        for i in 0..<solution.count {
+            if normalize(solution[i]) == "0" { continue }
+            lines.append("\(denoms[i]) c -> \(solution[i])")
+            hasItems = true
+        }
+
+        if !hasItems {
+            lines.append("No se requieren monedas para devolver 0.")
+        }
+
+        resultView.string = lines.joined(separator: "\n")
+    }
+
+    @objc func calculateChange() {
+        guard let coin = activeCoin else {
+            setStatus("Primero carga una moneda.", error: true)
+            return
+        }
+
+        let amount = normalize(amountField.stringValue)
+        if !isDigits(amount) {
+            setStatus("Monto invalido: usa entero no negativo en centimos.", error: true)
+            return
+        }
+
+        let solution: [String]?
+        if limitedMode {
+            solution = calculateLimitedChange(amount: amount)
+        } else {
+            solution = calculateUnlimitedChange(amount: amount)
+        }
+
+        guard let solved = solution else {
+            if limitedMode {
+                setStatus("No existe devolucion exacta con el stock actual.", error: true)
+            } else {
+                setStatus("No existe devolucion exacta con denominaciones actuales.", error: true)
+            }
+            resultView.string = ""
+            return
+        }
+
+        renderResult(amount: amount, solution: solved)
+
+        if !limitedMode {
+            amountField.stringValue = ""
+            setStatus("Devolucion calculada en modo ilimitado.")
+            return
+        }
+
+        var newStock = stock
+        for i in 0..<newStock.count {
+            guard let v = subBig(newStock[i], solved[i]) else {
+                setStatus("No se pudo aplicar la devolucion al stock.", error: true)
+                return
+            }
+            newStock[i] = v
+        }
+
+        if !updateStockSection(coin: coin, stock: newStock) {
+            setStatus("No se pudo persistir la devolucion en stock.txt", error: true)
+            return
+        }
+
+        stock = newStock
+        table.reloadData()
+        amountField.stringValue = ""
+        setStatus("Devolucion aplicada y stock persistido.")
     }
 
     @objc func addStock() {

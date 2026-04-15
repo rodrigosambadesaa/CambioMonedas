@@ -16,6 +16,7 @@
 #include "moneda_gestion.h"
 
 #define MAX_MONEDA_NOMBRE 20
+#define MAX_MONEDAS_DISPONIBLES 512
 
 static void limpiar_pantalla(void)
 {
@@ -121,6 +122,162 @@ static void normalizar_clave(const char *origen, char *destino, size_t tamDestin
     }
 
     destino[j] = '\0';
+}
+
+static int es_token_denominacion(const char *token)
+{
+    size_t i;
+
+    if (token == NULL || token[0] == '\0')
+        return 0;
+
+    if (strcmp(token, "-1") == 0)
+        return 1;
+
+    for (i = 0; token[i] != '\0'; i++)
+    {
+        if (token[i] < '0' || token[i] > '9')
+            return 0;
+    }
+
+    return 1;
+}
+
+static int clave_ya_existe(char claves[][MAX_MONEDA_NOMBRE + 1], size_t cantidad, const char *clave)
+{
+    size_t i;
+
+    for (i = 0; i < cantidad; i++)
+    {
+        if (strcmp(claves[i], clave) == 0)
+            return 1;
+    }
+
+    return 0;
+}
+
+static void copiar_clave(char destino[MAX_MONEDA_NOMBRE + 1], const char *origen)
+{
+    size_t i = 0;
+
+    if (origen == NULL)
+    {
+        destino[0] = '\0';
+        return;
+    }
+
+    while (i < MAX_MONEDA_NOMBRE && origen[i] != '\0')
+    {
+        destino[i] = origen[i];
+        i++;
+    }
+
+    destino[i] = '\0';
+}
+
+static int cargar_claves_monedas(const char *archivo, char claves[][MAX_MONEDA_NOMBRE + 1], size_t maxClaves, size_t *cantidad)
+{
+    FILE *fp;
+    char token[256];
+
+    if (archivo == NULL || claves == NULL || cantidad == NULL)
+        return 0;
+
+    *cantidad = 0;
+    fp = fopen(archivo, "r");
+    if (fp == NULL)
+        return 0;
+
+    while (fscanf(fp, "%255s", token) == 1)
+    {
+        char clave[MAX_MONEDA_NOMBRE + 1];
+
+        if (es_token_denominacion(token))
+            continue;
+
+        normalizar_clave(token, clave, sizeof(clave));
+        if (clave[0] == '\0')
+            continue;
+        if (clave_ya_existe(claves, *cantidad, clave))
+            continue;
+
+        if (*cantidad >= maxClaves)
+        {
+            fclose(fp);
+            return 0;
+        }
+
+        copiar_clave(claves[*cantidad], clave);
+        (*cantidad)++;
+    }
+
+    fclose(fp);
+    return 1;
+}
+
+static void imprimir_lista_monedas(const char claves[][MAX_MONEDA_NOMBRE + 1], size_t cantidad)
+{
+    size_t i;
+
+    if (cantidad == 0)
+    {
+        printf("Monedas disponibles: (sin datos)\n");
+        return;
+    }
+
+    printf("Monedas disponibles:\n");
+    for (i = 0; i < cantidad; i++)
+    {
+        printf("%s", claves[i]);
+        if (i + 1 < cantidad)
+            printf(", ");
+        if ((i + 1) % 8 == 0 || i + 1 == cantidad)
+            printf("\n");
+    }
+}
+
+static void mostrar_monedas_disponibles(int opcion)
+{
+    char desdeMonedas[MAX_MONEDAS_DISPONIBLES][MAX_MONEDA_NOMBRE + 1];
+    char desdeStock[MAX_MONEDAS_DISPONIBLES][MAX_MONEDA_NOMBRE + 1];
+    char visibles[MAX_MONEDAS_DISPONIBLES][MAX_MONEDA_NOMBRE + 1];
+    size_t nMonedas = 0;
+    size_t nStock = 0;
+    size_t nVisibles = 0;
+    size_t i;
+
+    if (opcion == 'a')
+    {
+        if (!cargar_claves_monedas("monedas.txt", desdeMonedas, MAX_MONEDAS_DISPONIBLES, &nMonedas))
+        {
+            printf("No se pudieron leer monedas disponibles desde monedas.txt.\n");
+            return;
+        }
+
+        imprimir_lista_monedas((const char (*)[MAX_MONEDA_NOMBRE + 1]) desdeMonedas, nMonedas);
+        return;
+    }
+
+    if (!cargar_claves_monedas("monedas.txt", desdeMonedas, MAX_MONEDAS_DISPONIBLES, &nMonedas) ||
+        !cargar_claves_monedas("stock.txt", desdeStock, MAX_MONEDAS_DISPONIBLES, &nStock))
+    {
+        printf("No se pudieron leer monedas/stock disponibles.\n");
+        return;
+    }
+
+    for (i = 0; i < nMonedas; i++)
+    {
+        if (clave_ya_existe(desdeStock, nStock, desdeMonedas[i]))
+        {
+            if (nVisibles >= MAX_MONEDAS_DISPONIBLES)
+                break;
+
+            copiar_clave(visibles[nVisibles], desdeMonedas[i]);
+            nVisibles++;
+        }
+    }
+
+    imprimir_lista_monedas((const char (*)[MAX_MONEDA_NOMBRE + 1]) visibles, nVisibles);
 }
 
 /*
@@ -592,7 +749,8 @@ int main(void)
             limpiar_arreglo(&stock);
             limpiar_arreglo(&monedas);
 
-            printf("Nombre de la moneda (ej: euro, dolar, yen), 'modo', 'volver' o 'salir': ");
+            mostrar_monedas_disponibles(opcion);
+            printf("Nombre de la moneda ('modo', 'volver' o 'salir'): ");
             if (!leer_linea(moneda, sizeof(moneda)))
             {
                 printf("Entrada finalizada.\n");
@@ -843,4 +1001,3 @@ int main(void)
     printf("Gracias por utilizar este programa.\n");
     return EXIT_SUCCESS;
 }
-
