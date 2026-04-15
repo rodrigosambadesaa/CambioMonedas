@@ -23,6 +23,9 @@
 #define ID_LIST_RESULTADO 1011
 #define ID_RADIO_LIMITADO 1012
 #define ID_RADIO_ILIMITADO 1013
+#define ID_EDIT_LOTE 1014
+#define ID_BTN_AGREGAR_LOTE 1015
+#define ID_BTN_QUITAR_LOTE 1016
 
 static HWND g_comboMoneda;
 static HWND g_listStock;
@@ -37,6 +40,9 @@ static HWND g_btnCalcular;
 static HWND g_listResultado;
 static HWND g_radioLimitado;
 static HWND g_radioIlimitado;
+static HWND g_editLote;
+static HWND g_btnAgregarLote;
+static HWND g_btnQuitarLote;
 
 static char g_monedas[MAX_MONEDAS][MAX_NOMBRE];
 static int g_monedasCount = 0;
@@ -146,6 +152,119 @@ static void configurar_modo_stock(int limitado)
     EnableWindow(g_editCantidad, g_modo_stock_limitado);
     EnableWindow(g_btnAgregar, g_modo_stock_limitado);
     EnableWindow(g_btnQuitar, g_modo_stock_limitado);
+    EnableWindow(g_editLote, g_modo_stock_limitado);
+    EnableWindow(g_btnAgregarLote, g_modo_stock_limitado);
+    EnableWindow(g_btnQuitarLote, g_modo_stock_limitado);
+}
+
+static void precargar_cantidades_lote(void)
+{
+    char texto[4096];
+    size_t pos = 0;
+
+    texto[0] = '\0';
+    if (g_editLote == NULL)
+        return;
+
+    if (!g_modo_stock_limitado || g_denom.items == NULL || g_denom.len == 0)
+    {
+        SetWindowTextA(g_editLote, "");
+        return;
+    }
+
+    for (size_t i = 0; i < g_denom.len; i++)
+    {
+        int escritos;
+        size_t restante = sizeof(texto) - pos;
+
+        if (restante <= 1)
+            break;
+
+        escritos = snprintf(texto + pos, restante, "%s%s", (i == 0) ? "" : "\r\n", "0");
+        if (escritos < 0)
+            break;
+
+        if ((size_t)escritos >= restante)
+        {
+            pos = sizeof(texto) - 1;
+            break;
+        }
+
+        pos += (size_t)escritos;
+    }
+
+    texto[pos] = '\0';
+    SetWindowTextA(g_editLote, texto);
+}
+
+static int leer_cantidades_lote(BigIntArray *deltas)
+{
+    int len;
+    char *buffer;
+    char *ctx;
+    char *token;
+    size_t idx = 0;
+
+    if (deltas == NULL)
+        return 0;
+
+    len = GetWindowTextLengthA(g_editLote);
+    if (len <= 0)
+        return 0;
+
+    buffer = (char *)malloc((size_t)len + 1);
+    if (buffer == NULL)
+        return 0;
+
+    GetWindowTextA(g_editLote, buffer, len + 1);
+
+    if (!bigint_array_create(deltas, g_denom.len))
+    {
+        free(buffer);
+        return 0;
+    }
+
+    token = strtok_s(buffer, " \t\r\n", &ctx);
+    while (token != NULL)
+    {
+        BigInt delta = {0};
+
+        if (idx >= g_denom.len)
+        {
+            bigint_array_free(deltas);
+            free(buffer);
+            return 0;
+        }
+
+        if (!bigint_init(&delta, token))
+        {
+            bigint_array_free(deltas);
+            free(buffer);
+            return 0;
+        }
+
+        if (!bigint_array_set(deltas, idx, &delta))
+        {
+            bigint_free(&delta);
+            bigint_array_free(deltas);
+            free(buffer);
+            return 0;
+        }
+
+        bigint_free(&delta);
+        idx++;
+        token = strtok_s(NULL, " \t\r\n", &ctx);
+    }
+
+    free(buffer);
+
+    if (idx != g_denom.len)
+    {
+        bigint_array_free(deltas);
+        return 0;
+    }
+
+    return 1;
 }
 
 static void ajustar_scroll_horizontal_lista(HWND lista, int max_chars)
@@ -205,6 +324,8 @@ static void refrescar_lista_stock(void)
 
     if (g_denom.len > 0)
         SendMessageA(g_comboDenom, CB_SETCURSEL, 0, 0);
+
+    precargar_cantidades_lote();
 
     limpiar_resultado_cambio();
 }
@@ -635,6 +756,94 @@ static int aplicar_cambio_stock(int esSuma)
     return 1;
 }
 
+static int aplicar_cambio_stock_lote(int esSuma)
+{
+    BigIntArray deltas = {0};
+    BigIntArray stock_nuevo = {0};
+
+    if (!g_modo_stock_limitado)
+    {
+        mostrar_error("Administrador", "El panel administrador solo aplica en modo stock limitado.");
+        return 0;
+    }
+
+    if (g_monedaActiva < 0 || g_stock.items == NULL || g_denom.len != g_stock.len)
+    {
+        mostrar_error("Administrador", "Primero carga una moneda valida.");
+        return 0;
+    }
+
+    if (!leer_cantidades_lote(&deltas))
+    {
+        mostrar_error("Administrador", "Lote invalido. Introduce exactamente una cantidad por denominacion (linea por linea).");
+        return 0;
+    }
+
+    if (!copiar_arreglo_bigint(&g_stock, &stock_nuevo))
+    {
+        bigint_array_free(&deltas);
+        mostrar_error("Administrador", "No se pudo preparar actualizacion de stock.");
+        return 0;
+    }
+
+    for (size_t i = 0; i < stock_nuevo.len; i++)
+    {
+        BigInt nuevo = {0};
+
+        if (bigint_is_zero(&deltas.items[i]))
+            continue;
+
+        if (esSuma)
+        {
+            if (!bigint_add(&stock_nuevo.items[i], &deltas.items[i], &nuevo))
+            {
+                bigint_array_free(&deltas);
+                bigint_array_free(&stock_nuevo);
+                mostrar_error("Administrador", "No se pudo sumar una o mas cantidades del lote.");
+                return 0;
+            }
+        }
+        else
+        {
+            if (bigint_compare(&stock_nuevo.items[i], &deltas.items[i]) < 0 ||
+                !bigint_subtract(&stock_nuevo.items[i], &deltas.items[i], &nuevo))
+            {
+                bigint_array_free(&deltas);
+                bigint_array_free(&stock_nuevo);
+                mostrar_error("Administrador", "No se pudo quitar lote: falta stock en alguna denominacion.");
+                return 0;
+            }
+        }
+
+        if (!bigint_array_set(&stock_nuevo, i, &nuevo))
+        {
+            bigint_free(&nuevo);
+            bigint_array_free(&deltas);
+            bigint_array_free(&stock_nuevo);
+            mostrar_error("Administrador", "No se pudo actualizar stock en memoria.");
+            return 0;
+        }
+
+        bigint_free(&nuevo);
+    }
+
+    if (!actualizar_stock_moneda(g_monedas[g_monedaActiva], &stock_nuevo))
+    {
+        bigint_array_free(&deltas);
+        bigint_array_free(&stock_nuevo);
+        mostrar_error("Administrador", "No se pudo persistir el lote en stock.txt.");
+        return 0;
+    }
+
+    bigint_array_free(&g_stock);
+    g_stock = stock_nuevo;
+    bigint_array_free(&deltas);
+
+    refrescar_lista_stock();
+    mostrar_info("Administrador", esSuma ? "Lote aplicado correctamente (suma)." : "Lote aplicado correctamente (resta).");
+    return 1;
+}
+
 static void crear_controles(HWND hwnd)
 {
     CreateWindowA("STATIC", "Panel Principal", WS_CHILD | WS_VISIBLE | SS_LEFT,
@@ -684,20 +893,32 @@ static void crear_controles(HWND hwnd)
     g_btnQuitar = CreateWindowA("BUTTON", "Quitar", WS_CHILD | WS_VISIBLE,
                                 320, 320, 120, 30, hwnd, (HMENU)ID_BTN_QUITAR, NULL, NULL);
 
+    CreateWindowA("STATIC", "Lote (una cantidad por linea en orden de denominaciones):", WS_CHILD | WS_VISIBLE,
+                  20, 360, 330, 20, hwnd, NULL, NULL, NULL);
+
+    g_editLote = CreateWindowA("EDIT", "", WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL,
+                               20, 382, 290, 76, hwnd, (HMENU)ID_EDIT_LOTE, NULL, NULL);
+
+    g_btnAgregarLote = CreateWindowA("BUTTON", "Anadir lote", WS_CHILD | WS_VISIBLE,
+                                     320, 392, 120, 28, hwnd, (HMENU)ID_BTN_AGREGAR_LOTE, NULL, NULL);
+
+    g_btnQuitarLote = CreateWindowA("BUTTON", "Quitar lote", WS_CHILD | WS_VISIBLE,
+                                    320, 428, 120, 28, hwnd, (HMENU)ID_BTN_QUITAR_LOTE, NULL, NULL);
+
     CreateWindowA("STATIC", "Panel Devolucion", WS_CHILD | WS_VISIBLE | SS_LEFT,
-                  20, 365, 220, 20, hwnd, NULL, NULL, NULL);
+                  20, 470, 220, 20, hwnd, NULL, NULL, NULL);
 
     CreateWindowA("STATIC", "Monto (centimos):", WS_CHILD | WS_VISIBLE,
-                  20, 395, 100, 20, hwnd, NULL, NULL, NULL);
+                  20, 500, 100, 20, hwnd, NULL, NULL, NULL);
 
     g_editMonto = CreateWindowA("EDIT", "", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
-                                125, 392, 190, 24, hwnd, (HMENU)ID_EDIT_MONTO, NULL, NULL);
+                                125, 497, 190, 24, hwnd, (HMENU)ID_EDIT_MONTO, NULL, NULL);
 
     g_btnCalcular = CreateWindowA("BUTTON", "Calcular devolucion", WS_CHILD | WS_VISIBLE,
-                                  325, 391, 135, 26, hwnd, (HMENU)ID_BTN_CALCULAR, NULL, NULL);
+                                  325, 496, 135, 26, hwnd, (HMENU)ID_BTN_CALCULAR, NULL, NULL);
 
     g_listResultado = CreateWindowA("LISTBOX", "", WS_CHILD | WS_VISIBLE | WS_BORDER | WS_HSCROLL | WS_VSCROLL | LBS_NOTIFY,
-                                    20, 425, 440, 110, hwnd, (HMENU)ID_LIST_RESULTADO, NULL, NULL);
+                                    20, 530, 440, 110, hwnd, (HMENU)ID_LIST_RESULTADO, NULL, NULL);
 }
 
 static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -759,6 +980,18 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
             return 0;
         }
 
+        if (id == ID_BTN_AGREGAR_LOTE)
+        {
+            aplicar_cambio_stock_lote(1);
+            return 0;
+        }
+
+        if (id == ID_BTN_QUITAR_LOTE)
+        {
+            aplicar_cambio_stock_lote(0);
+            return 0;
+        }
+
         if (id == ID_BTN_CALCULAR)
         {
             calcular_y_mostrar_cambio();
@@ -812,7 +1045,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     hwnd = CreateWindowA("ProgVorazGUI", "ProgVoraz - Interfaz Grafica",
                          WS_OVERLAPPEDWINDOW & ~WS_THICKFRAME & ~WS_MAXIMIZEBOX,
-                         CW_USEDEFAULT, CW_USEDEFAULT, 500, 590,
+                         CW_USEDEFAULT, CW_USEDEFAULT, 500, 700,
                          NULL, NULL, hInstance, NULL);
 
     if (hwnd == NULL)

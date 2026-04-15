@@ -159,6 +159,11 @@ Comandos de navegacion disponibles:
 3. Introducir cantidad (entero no negativo).
 4. Pulsar `Anadir` o `Quitar`.
 
+Tambien puedes operar por lote (como flujo administrador en consola, moneda por moneda):
+
+1. En el cuadro de lote, escribir una cantidad por linea, respetando el orden de denominaciones mostrado en stock.
+2. Pulsar `Anadir lote` o `Quitar lote` para aplicar todas las denominaciones en una sola operacion.
+
 El panel persiste los cambios en `stock.txt` al instante.
 
 ## Modos en GUI
