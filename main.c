@@ -704,6 +704,211 @@ static int aplicar_cambio_administrador(BigIntArray *stock, size_t idx, const Bi
     return 1;
 }
 
+static int pedir_subopcion_stock_limitado(void)
+{
+    char buffer[32];
+    char comando[32];
+
+    printf("Subopcion stock (tradicional/especifico, volver, modo o salir): ");
+    if (!leer_linea(buffer, sizeof(buffer)))
+        return -1;
+
+    if (buffer[0] == '\0')
+        return 0;
+
+    strncpy(comando, buffer, sizeof(comando) - 1);
+    comando[sizeof(comando) - 1] = '\0';
+    a_minusculas(comando);
+
+    if (strcmp(comando, "salir") == 0)
+        return 4;
+    if (strcmp(comando, "modo") == 0)
+        return 3;
+    if (strcmp(comando, "volver") == 0)
+        return 2;
+    if (strcmp(comando, "tradicional") == 0 || strcmp(comando, "t") == 0)
+        return 1;
+    if (strcmp(comando, "especifico") == 0 || strcmp(comando, "e") == 0)
+        return 5;
+
+    return 0;
+}
+
+static int pedir_cantidades_por_denominacion(const BigIntArray *monedas, const char *titulo, BigIntArray *cantidades)
+{
+    size_t i;
+
+    if (monedas == NULL || cantidades == NULL)
+        return 0;
+
+    if (!bigint_array_create(cantidades, monedas->len))
+        return 0;
+
+    printf("%s\n", titulo);
+    for (i = 0; i < monedas->len; i++)
+    {
+        while (1)
+        {
+            char buffer[2048];
+            char comando[2048];
+            BigInt cantidad = {0};
+
+            printf("Cantidad para %s c (volver/modo/salir): ", monedas->items[i].digits);
+            if (!leer_linea(buffer, sizeof(buffer)))
+            {
+                limpiar_arreglo(cantidades);
+                return -1;
+            }
+
+            if (buffer[0] == '\0')
+            {
+                printf("Entrada vacia. Intente de nuevo.\n");
+                continue;
+            }
+
+            strncpy(comando, buffer, sizeof(comando) - 1);
+            comando[sizeof(comando) - 1] = '\0';
+            a_minusculas(comando);
+
+            if (strcmp(comando, "salir") == 0)
+            {
+                limpiar_arreglo(cantidades);
+                return 4;
+            }
+            if (strcmp(comando, "modo") == 0)
+            {
+                limpiar_arreglo(cantidades);
+                return 3;
+            }
+            if (strcmp(comando, "volver") == 0)
+            {
+                limpiar_arreglo(cantidades);
+                return 2;
+            }
+
+            if (!bigint_init(&cantidad, buffer))
+            {
+                printf("Cantidad invalida. Debe ser entero no negativo.\n");
+                continue;
+            }
+
+            if (!bigint_array_set(cantidades, i, &cantidad))
+            {
+                bigint_free(&cantidad);
+                limpiar_arreglo(cantidades);
+                return 0;
+            }
+
+            bigint_free(&cantidad);
+            break;
+        }
+    }
+
+    return 1;
+}
+
+static int calcular_total_valor(const BigIntArray *monedas, const BigIntArray *cantidades, BigInt *total)
+{
+    BigInt acumulado = {0};
+
+    if (monedas == NULL || cantidades == NULL || total == NULL)
+        return 0;
+    if (monedas->len != cantidades->len)
+        return 0;
+
+    if (!bigint_init(&acumulado, "0"))
+        return 0;
+
+    for (size_t i = 0; i < monedas->len; i++)
+    {
+        BigInt parcial = {0};
+        BigInt nuevoTotal = {0};
+
+        if (bigint_is_zero(&cantidades->items[i]))
+            continue;
+
+        if (!bigint_multiply(&monedas->items[i], &cantidades->items[i], &parcial))
+        {
+            bigint_free(&acumulado);
+            return 0;
+        }
+
+        if (!bigint_add(&acumulado, &parcial, &nuevoTotal))
+        {
+            bigint_free(&parcial);
+            bigint_free(&acumulado);
+            return 0;
+        }
+
+        bigint_free(&parcial);
+        bigint_free(&acumulado);
+        acumulado = nuevoTotal;
+    }
+
+    bigint_free(total);
+    *total = acumulado;
+    return 1;
+}
+
+static int aplicar_cambio_especifico_stock(const BigIntArray *monedas,
+                                           const BigIntArray *stockActual,
+                                           const BigIntArray *entregadas,
+                                           const BigIntArray *devolucion,
+                                           BigIntArray *stockNuevo,
+                                           BigInt *totalEntregado,
+                                           BigInt *totalDevolucion)
+{
+    if (monedas == NULL || stockActual == NULL || entregadas == NULL || devolucion == NULL ||
+        stockNuevo == NULL || totalEntregado == NULL || totalDevolucion == NULL)
+        return 0;
+
+    if (monedas->len != stockActual->len || monedas->len != entregadas->len || monedas->len != devolucion->len)
+        return 0;
+
+    if (!calcular_total_valor(monedas, entregadas, totalEntregado) ||
+        !calcular_total_valor(monedas, devolucion, totalDevolucion))
+        return 0;
+
+    if (bigint_compare(totalEntregado, totalDevolucion) != 0)
+        return 0;
+
+    if (!copiar_arreglo_bigint(stockActual, stockNuevo))
+        return 0;
+
+    for (size_t i = 0; i < stockNuevo->len; i++)
+    {
+        BigInt trasEntrada = {0};
+        BigInt trasSalida = {0};
+
+        if (!bigint_add(&stockNuevo->items[i], &entregadas->items[i], &trasEntrada))
+        {
+            limpiar_arreglo(stockNuevo);
+            return 0;
+        }
+
+        if (bigint_compare(&trasEntrada, &devolucion->items[i]) < 0 ||
+            !bigint_subtract(&trasEntrada, &devolucion->items[i], &trasSalida))
+        {
+            bigint_free(&trasEntrada);
+            limpiar_arreglo(stockNuevo);
+            return 0;
+        }
+
+        if (!bigint_array_set(stockNuevo, i, &trasSalida))
+        {
+            bigint_free(&trasEntrada);
+            bigint_free(&trasSalida);
+            limpiar_arreglo(stockNuevo);
+            return 0;
+        }
+
+        bigint_free(&trasEntrada);
+        bigint_free(&trasSalida);
+    }
+
+    return 1;
+}
+
 int main(void)
 {
     char moneda[MAX_MONEDA_NOMBRE + 1];
@@ -924,6 +1129,140 @@ int main(void)
                 int estadoCantidad;
                 int resultado;
                 BigIntArray solucion = {0};
+                int subopcionStock = 1;
+
+                if (opcion == 'b')
+                {
+                    subopcionStock = pedir_subopcion_stock_limitado();
+
+                    if (subopcionStock == -1)
+                    {
+                        printf("Entrada finalizada.\n");
+                        ejecutando = 0;
+                        break;
+                    }
+                    if (subopcionStock == 4)
+                    {
+                        ejecutando = 0;
+                        break;
+                    }
+                    if (subopcionStock == 3)
+                    {
+                        opcion = 0;
+                        break;
+                    }
+                    if (subopcionStock == 2)
+                        break;
+                    if (subopcionStock == 0)
+                    {
+                        printf("Subopcion invalida.\n");
+                        continue;
+                    }
+                }
+
+                if (opcion == 'b' && subopcionStock == 5)
+                {
+                    BigIntArray entregadas = {0};
+                    BigIntArray devolucion = {0};
+                    BigIntArray stockNuevo = {0};
+                    BigInt totalEntregado = {0};
+                    BigInt totalDevolucion = {0};
+                    int estadoEntrada;
+                    int estadoDevolucion;
+
+                    estadoEntrada = pedir_cantidades_por_denominacion(&monedas, "Monedas/Billetes entregados por el usuario:", &entregadas);
+                    if (estadoEntrada == -1)
+                    {
+                        printf("Entrada finalizada.\n");
+                        ejecutando = 0;
+                        break;
+                    }
+                    if (estadoEntrada == 4)
+                    {
+                        ejecutando = 0;
+                        break;
+                    }
+                    if (estadoEntrada == 3)
+                    {
+                        opcion = 0;
+                        break;
+                    }
+                    if (estadoEntrada == 2)
+                        continue;
+                    if (estadoEntrada == 0)
+                    {
+                        printf("No se pudieron leer cantidades entregadas.\n");
+                        continue;
+                    }
+
+                    estadoDevolucion = pedir_cantidades_por_denominacion(&monedas, "Cambio especifico solicitado (cantidades a devolver):", &devolucion);
+                    if (estadoDevolucion == -1)
+                    {
+                        printf("Entrada finalizada.\n");
+                        limpiar_arreglo(&entregadas);
+                        ejecutando = 0;
+                        break;
+                    }
+                    if (estadoDevolucion == 4)
+                    {
+                        limpiar_arreglo(&entregadas);
+                        ejecutando = 0;
+                        break;
+                    }
+                    if (estadoDevolucion == 3)
+                    {
+                        limpiar_arreglo(&entregadas);
+                        opcion = 0;
+                        break;
+                    }
+                    if (estadoDevolucion == 2)
+                    {
+                        limpiar_arreglo(&entregadas);
+                        continue;
+                    }
+                    if (estadoDevolucion == 0)
+                    {
+                        printf("No se pudieron leer cantidades de cambio solicitado.\n");
+                        limpiar_arreglo(&entregadas);
+                        continue;
+                    }
+
+                    if (!aplicar_cambio_especifico_stock(&monedas, &stock, &entregadas, &devolucion, &stockNuevo,
+                                                         &totalEntregado, &totalDevolucion))
+                    {
+                        printf("No se pudo aplicar cambio especifico. Verifica que el total entregado sea igual al total solicitado y que el stock alcance.\n");
+                        limpiar_arreglo(&entregadas);
+                        limpiar_arreglo(&devolucion);
+                        limpiar_arreglo(&stockNuevo);
+                        bigint_free(&totalEntregado);
+                        bigint_free(&totalDevolucion);
+                        continue;
+                    }
+
+                    if (!actualizar_stock_moneda(monedaClave, &stockNuevo))
+                    {
+                        printf("No se pudo actualizar el archivo de stock.\n");
+                        limpiar_arreglo(&entregadas);
+                        limpiar_arreglo(&devolucion);
+                        limpiar_arreglo(&stockNuevo);
+                        bigint_free(&totalEntregado);
+                        bigint_free(&totalDevolucion);
+                        continue;
+                    }
+
+                    limpiar_arreglo(&stock);
+                    stock = stockNuevo;
+
+                    printf("Cambio especifico aplicado. Total entregado: %s c | Total devuelto: %s c\n",
+                           totalEntregado.digits, totalDevolucion.digits);
+                    imprimir_resultado(&monedas, &devolucion, &stock, 1);
+
+                    limpiar_arreglo(&entregadas);
+                    limpiar_arreglo(&devolucion);
+                    bigint_free(&totalEntregado);
+                    bigint_free(&totalDevolucion);
+                    continue;
+                }
 
                 estadoCantidad = pedir_cantidad(&cantidad);
                 if (estadoCantidad == -1)

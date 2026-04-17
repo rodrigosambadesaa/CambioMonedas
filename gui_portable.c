@@ -331,6 +331,169 @@ static int calcular_cambio_ilimitado(const BigInt *monto, const BigIntArray *den
     return 1;
 }
 
+static int pedir_cantidades_por_denominacion(const BigIntArray *denom, const char *titulo, BigIntArray *cantidades)
+{
+    if (denom == NULL || cantidades == NULL)
+        return 0;
+
+    if (!bigint_array_create(cantidades, denom->len))
+        return 0;
+
+    printf("%s\n", titulo);
+    for (size_t i = 0; i < denom->len; i++)
+    {
+        while (1)
+        {
+            char buffer[2048];
+            BigInt tmp = {0};
+
+            printf("Cantidad para %s c: ", denom->items[i].digits);
+            if (!leer_linea(buffer, sizeof(buffer)))
+            {
+                bigint_array_free(cantidades);
+                return 0;
+            }
+
+            if (!bigint_init(&tmp, buffer))
+            {
+                printf("Cantidad invalida. Usa entero no negativo.\n");
+                continue;
+            }
+
+            if (!bigint_array_set(cantidades, i, &tmp))
+            {
+                bigint_free(&tmp);
+                bigint_array_free(cantidades);
+                return 0;
+            }
+
+            bigint_free(&tmp);
+            break;
+        }
+    }
+
+    return 1;
+}
+
+static int calcular_total_valor(const BigIntArray *denom, const BigIntArray *cantidades, BigInt *total)
+{
+    BigInt acumulado = {0};
+
+    if (denom == NULL || cantidades == NULL || total == NULL)
+        return 0;
+    if (denom->len != cantidades->len)
+        return 0;
+
+    if (!bigint_init(&acumulado, "0"))
+        return 0;
+
+    for (size_t i = 0; i < denom->len; i++)
+    {
+        BigInt parcial = {0};
+        BigInt nuevo = {0};
+
+        if (bigint_is_zero(&cantidades->items[i]))
+            continue;
+
+        if (!bigint_multiply(&denom->items[i], &cantidades->items[i], &parcial) ||
+            !bigint_add(&acumulado, &parcial, &nuevo))
+        {
+            bigint_free(&parcial);
+            bigint_free(&acumulado);
+            return 0;
+        }
+
+        bigint_free(&parcial);
+        bigint_free(&acumulado);
+        acumulado = nuevo;
+    }
+
+    bigint_free(total);
+    *total = acumulado;
+    return 1;
+}
+
+static int aplicar_cambio_especifico(const char *moneda,
+                                     const BigIntArray *denom,
+                                     BigIntArray *stock,
+                                     const BigIntArray *entregadas,
+                                     const BigIntArray *devolucion)
+{
+    BigInt totalEntregado = {0};
+    BigInt totalDevolucion = {0};
+    BigIntArray stockNuevo = {0};
+
+    if (moneda == NULL || denom == NULL || stock == NULL || entregadas == NULL || devolucion == NULL)
+        return 0;
+    if (denom->len != stock->len || denom->len != entregadas->len || denom->len != devolucion->len)
+        return 0;
+
+    if (!calcular_total_valor(denom, entregadas, &totalEntregado) ||
+        !calcular_total_valor(denom, devolucion, &totalDevolucion))
+    {
+        bigint_free(&totalEntregado);
+        bigint_free(&totalDevolucion);
+        return 0;
+    }
+
+    if (bigint_compare(&totalEntregado, &totalDevolucion) != 0)
+    {
+        printf("Total entregado (%s c) y total solicitado (%s c) deben ser iguales.\n",
+               totalEntregado.digits, totalDevolucion.digits);
+        bigint_free(&totalEntregado);
+        bigint_free(&totalDevolucion);
+        return 0;
+    }
+
+    if (!copiar_arreglo_bigint(stock, &stockNuevo))
+    {
+        bigint_free(&totalEntregado);
+        bigint_free(&totalDevolucion);
+        return 0;
+    }
+
+    for (size_t i = 0; i < stockNuevo.len; i++)
+    {
+        BigInt trasEntrada = {0};
+        BigInt trasSalida = {0};
+
+        if (!bigint_add(&stockNuevo.items[i], &entregadas->items[i], &trasEntrada) ||
+            bigint_compare(&trasEntrada, &devolucion->items[i]) < 0 ||
+            !bigint_subtract(&trasEntrada, &devolucion->items[i], &trasSalida) ||
+            !bigint_array_set(&stockNuevo, i, &trasSalida))
+        {
+            bigint_free(&trasEntrada);
+            bigint_free(&trasSalida);
+            bigint_array_free(&stockNuevo);
+            bigint_free(&totalEntregado);
+            bigint_free(&totalDevolucion);
+            printf("No se pudo aplicar cambio especifico (stock insuficiente o error de calculo).\n");
+            return 0;
+        }
+
+        bigint_free(&trasEntrada);
+        bigint_free(&trasSalida);
+    }
+
+    if (!actualizar_stock_moneda(moneda, &stockNuevo))
+    {
+        bigint_array_free(&stockNuevo);
+        bigint_free(&totalEntregado);
+        bigint_free(&totalDevolucion);
+        printf("No se pudo persistir cambio especifico en stock.txt.\n");
+        return 0;
+    }
+
+    bigint_array_free(stock);
+    *stock = stockNuevo;
+
+    printf("Cambio especifico aplicado. Total entregado/devuelto: %s c\n", totalEntregado.digits);
+
+    bigint_free(&totalEntregado);
+    bigint_free(&totalDevolucion);
+    return 1;
+}
+
 static void imprimir_resultado_cambio(const BigInt *monto, const BigIntArray *denom, const BigIntArray *solucion)
 {
     int hayItems = 0;
@@ -578,7 +741,7 @@ int main(void)
 
             imprimir_panel(monedas[idxMoneda], &denom, &stock);
             if (requiereAdmin)
-                printf("Accion (calcular/anadir/quitar/modo/volver/salir): ");
+                printf("Accion (calcular/especifico/anadir/quitar/modo/volver/salir): ");
             else
                 printf("Accion (calcular/modo/volver/salir): ");
             if (!leer_linea(accion, sizeof(accion)))
@@ -611,6 +774,45 @@ int main(void)
             if (strcmp(accion, "calcular") == 0)
             {
                 calcular_y_aplicar_cambio(modoActual, monedas[idxMoneda], &denom, &stock);
+                bigint_free(&delta);
+                continue;
+            }
+
+            if (strcmp(accion, "especifico") == 0)
+            {
+                BigIntArray entregadas = {0};
+                BigIntArray devolucion = {0};
+
+                if (!requiereAdmin)
+                {
+                    printf("Cambio especifico disponible solo en modo stock limitado.\n");
+                    bigint_free(&delta);
+                    continue;
+                }
+
+                if (!pedir_cantidades_por_denominacion(&denom, "Monedas/Billetes entregados por el usuario:", &entregadas) ||
+                    !pedir_cantidades_por_denominacion(&denom, "Cambio especifico solicitado (cantidades a devolver):", &devolucion))
+                {
+                    printf("No se pudieron leer cantidades para cambio especifico.\n");
+                    bigint_array_free(&entregadas);
+                    bigint_array_free(&devolucion);
+                    bigint_free(&delta);
+                    continue;
+                }
+
+                if (aplicar_cambio_especifico(monedas[idxMoneda], &denom, &stock, &entregadas, &devolucion))
+                {
+                    printf("Cambio especifico entregado:\n");
+                    for (size_t i = 0; i < denom.len; i++)
+                    {
+                        if (bigint_is_zero(&devolucion.items[i]))
+                            continue;
+                        printf("  %s c -> %s\n", denom.items[i].digits, devolucion.items[i].digits);
+                    }
+                }
+
+                bigint_array_free(&entregadas);
+                bigint_array_free(&devolucion);
                 bigint_free(&delta);
                 continue;
             }
