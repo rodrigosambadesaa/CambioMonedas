@@ -1,6 +1,6 @@
 # ProgVoraz - Guia de ejecucion
 
-Este proyecto calcula cambio de monedas en dos modos:
+Este proyecto calcula el cambio de monedas en dos modos:
 
 - Modo `a`: monedas infinitas.
 - Modo `b`: monedas limitadas por stock (actualiza `stock.txt`).
