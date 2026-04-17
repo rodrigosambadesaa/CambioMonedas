@@ -26,6 +26,9 @@
 #define ID_EDIT_LOTE 1014
 #define ID_BTN_AGREGAR_LOTE 1015
 #define ID_BTN_QUITAR_LOTE 1016
+#define ID_EDIT_ENTRADA_CAMBIO 1017
+#define ID_EDIT_DEVOLUCION_CAMBIO 1018
+#define ID_BTN_CAMBIO_ESPECIFICO 1019
 
 static HWND g_comboMoneda;
 static HWND g_listStock;
@@ -43,6 +46,9 @@ static HWND g_radioIlimitado;
 static HWND g_editLote;
 static HWND g_btnAgregarLote;
 static HWND g_btnQuitarLote;
+static HWND g_editEntradaCambio;
+static HWND g_editDevolucionCambio;
+static HWND g_btnCambioEspecifico;
 
 static char g_monedas[MAX_MONEDAS][MAX_NOMBRE];
 static int g_monedasCount = 0;
@@ -155,20 +161,23 @@ static void configurar_modo_stock(int limitado)
     EnableWindow(g_editLote, g_modo_stock_limitado);
     EnableWindow(g_btnAgregarLote, g_modo_stock_limitado);
     EnableWindow(g_btnQuitarLote, g_modo_stock_limitado);
+    EnableWindow(g_editEntradaCambio, g_modo_stock_limitado);
+    EnableWindow(g_editDevolucionCambio, g_modo_stock_limitado);
+    EnableWindow(g_btnCambioEspecifico, g_modo_stock_limitado);
 }
 
-static void precargar_cantidades_lote(void)
+static void precargar_ceros_en_edit(HWND edit)
 {
     char texto[4096];
     size_t pos = 0;
 
     texto[0] = '\0';
-    if (g_editLote == NULL)
+    if (edit == NULL)
         return;
 
     if (!g_modo_stock_limitado || g_denom.items == NULL || g_denom.len == 0)
     {
-        SetWindowTextA(g_editLote, "");
+        SetWindowTextA(edit, "");
         return;
     }
 
@@ -194,10 +203,17 @@ static void precargar_cantidades_lote(void)
     }
 
     texto[pos] = '\0';
-    SetWindowTextA(g_editLote, texto);
+    SetWindowTextA(edit, texto);
 }
 
-static int leer_cantidades_lote(BigIntArray *deltas)
+static void precargar_cantidades_lote(void)
+{
+    precargar_ceros_en_edit(g_editLote);
+    precargar_ceros_en_edit(g_editEntradaCambio);
+    precargar_ceros_en_edit(g_editDevolucionCambio);
+}
+
+static int leer_cantidades_desde_edit(HWND edit, BigIntArray *deltas)
 {
     int len;
     char *buffer;
@@ -208,7 +224,7 @@ static int leer_cantidades_lote(BigIntArray *deltas)
     if (deltas == NULL)
         return 0;
 
-    len = GetWindowTextLengthA(g_editLote);
+    len = GetWindowTextLengthA(edit);
     if (len <= 0)
         return 0;
 
@@ -216,7 +232,7 @@ static int leer_cantidades_lote(BigIntArray *deltas)
     if (buffer == NULL)
         return 0;
 
-    GetWindowTextA(g_editLote, buffer, len + 1);
+    GetWindowTextA(edit, buffer, len + 1);
 
     if (!bigint_array_create(deltas, g_denom.len))
     {
@@ -265,6 +281,11 @@ static int leer_cantidades_lote(BigIntArray *deltas)
     }
 
     return 1;
+}
+
+static int leer_cantidades_lote(BigIntArray *deltas)
+{
+    return leer_cantidades_desde_edit(g_editLote, deltas);
 }
 
 static void ajustar_scroll_horizontal_lista(HWND lista, int max_chars)
@@ -844,6 +865,171 @@ static int aplicar_cambio_stock_lote(int esSuma)
     return 1;
 }
 
+static int calcular_total_valor(const BigIntArray *denom, const BigIntArray *cantidades, BigInt *total)
+{
+    BigInt acumulado = {0};
+
+    if (denom == NULL || cantidades == NULL || total == NULL)
+        return 0;
+    if (denom->len != cantidades->len)
+        return 0;
+
+    if (!bigint_init(&acumulado, "0"))
+        return 0;
+
+    for (size_t i = 0; i < denom->len; i++)
+    {
+        BigInt parcial = {0};
+        BigInt nuevo = {0};
+
+        if (bigint_is_zero(&cantidades->items[i]))
+            continue;
+
+        if (!bigint_multiply(&denom->items[i], &cantidades->items[i], &parcial) ||
+            !bigint_add(&acumulado, &parcial, &nuevo))
+        {
+            bigint_free(&parcial);
+            bigint_free(&acumulado);
+            return 0;
+        }
+
+        bigint_free(&parcial);
+        bigint_free(&acumulado);
+        acumulado = nuevo;
+    }
+
+    bigint_free(total);
+    *total = acumulado;
+    return 1;
+}
+
+static int aplicar_cambio_especifico(void)
+{
+    BigIntArray entradas = {0};
+    BigIntArray devolucion = {0};
+    BigIntArray stock_nuevo = {0};
+    BigInt totalEntrada = {0};
+    BigInt totalDevolucion = {0};
+    char linea[512];
+    int max_chars = 0;
+
+    if (!g_modo_stock_limitado)
+    {
+        mostrar_error("Cambio especifico", "Solo disponible en modo stock limitado.");
+        return 0;
+    }
+
+    if (g_monedaActiva < 0 || g_stock.items == NULL || g_denom.len != g_stock.len)
+    {
+        mostrar_error("Cambio especifico", "Primero carga una moneda valida.");
+        return 0;
+    }
+
+    if (!leer_cantidades_desde_edit(g_editEntradaCambio, &entradas) ||
+        !leer_cantidades_desde_edit(g_editDevolucionCambio, &devolucion))
+    {
+        mostrar_error("Cambio especifico", "Entrada invalida. Usa una cantidad por linea y por denominacion en ambos cuadros.");
+        bigint_array_free(&entradas);
+        bigint_array_free(&devolucion);
+        return 0;
+    }
+
+    if (!calcular_total_valor(&g_denom, &entradas, &totalEntrada) ||
+        !calcular_total_valor(&g_denom, &devolucion, &totalDevolucion))
+    {
+        mostrar_error("Cambio especifico", "No se pudieron calcular los totales.");
+        bigint_array_free(&entradas);
+        bigint_array_free(&devolucion);
+        bigint_free(&totalEntrada);
+        bigint_free(&totalDevolucion);
+        return 0;
+    }
+
+    if (bigint_compare(&totalEntrada, &totalDevolucion) != 0)
+    {
+        mostrar_error("Cambio especifico", "El total entregado debe ser igual al total solicitado como devolucion.");
+        bigint_array_free(&entradas);
+        bigint_array_free(&devolucion);
+        bigint_free(&totalEntrada);
+        bigint_free(&totalDevolucion);
+        return 0;
+    }
+
+    if (!copiar_arreglo_bigint(&g_stock, &stock_nuevo))
+    {
+        mostrar_error("Cambio especifico", "No se pudo preparar la actualizacion de stock.");
+        bigint_array_free(&entradas);
+        bigint_array_free(&devolucion);
+        bigint_free(&totalEntrada);
+        bigint_free(&totalDevolucion);
+        return 0;
+    }
+
+    for (size_t i = 0; i < stock_nuevo.len; i++)
+    {
+        BigInt trasEntrada = {0};
+        BigInt trasSalida = {0};
+
+        if (!bigint_add(&stock_nuevo.items[i], &entradas.items[i], &trasEntrada) ||
+            bigint_compare(&trasEntrada, &devolucion.items[i]) < 0 ||
+            !bigint_subtract(&trasEntrada, &devolucion.items[i], &trasSalida) ||
+            !bigint_array_set(&stock_nuevo, i, &trasSalida))
+        {
+            bigint_free(&trasEntrada);
+            bigint_free(&trasSalida);
+            bigint_array_free(&entradas);
+            bigint_array_free(&devolucion);
+            bigint_array_free(&stock_nuevo);
+            bigint_free(&totalEntrada);
+            bigint_free(&totalDevolucion);
+            mostrar_error("Cambio especifico", "No se puede aplicar la devolucion especifica con el stock disponible.");
+            return 0;
+        }
+
+        bigint_free(&trasEntrada);
+        bigint_free(&trasSalida);
+    }
+
+    if (!actualizar_stock_moneda(g_monedas[g_monedaActiva], &stock_nuevo))
+    {
+        bigint_array_free(&entradas);
+        bigint_array_free(&devolucion);
+        bigint_array_free(&stock_nuevo);
+        bigint_free(&totalEntrada);
+        bigint_free(&totalDevolucion);
+        mostrar_error("Cambio especifico", "No se pudo persistir el cambio especifico en stock.txt.");
+        return 0;
+    }
+
+    bigint_array_free(&g_stock);
+    g_stock = stock_nuevo;
+
+    refrescar_lista_stock();
+
+    limpiar_resultado_cambio();
+    snprintf(linea, sizeof(linea), "Cambio especifico aplicado: %s c", totalEntrada.digits);
+    max_chars = (int)strlen(linea);
+    SendMessageA(g_listResultado, LB_ADDSTRING, 0, (LPARAM)linea);
+    for (size_t i = 0; i < g_denom.len; i++)
+    {
+        if (bigint_is_zero(&devolucion.items[i]))
+            continue;
+
+        snprintf(linea, sizeof(linea), "%s c -> %s", g_denom.items[i].digits, devolucion.items[i].digits);
+        if ((int)strlen(linea) > max_chars)
+            max_chars = (int)strlen(linea);
+        SendMessageA(g_listResultado, LB_ADDSTRING, 0, (LPARAM)linea);
+    }
+    ajustar_scroll_horizontal_lista(g_listResultado, max_chars + 4);
+
+    bigint_array_free(&entradas);
+    bigint_array_free(&devolucion);
+    bigint_free(&totalEntrada);
+    bigint_free(&totalDevolucion);
+    mostrar_info("Cambio especifico", "Operacion aplicada y stock actualizado.");
+    return 1;
+}
+
 static void crear_controles(HWND hwnd)
 {
     CreateWindowA("STATIC", "Panel Principal", WS_CHILD | WS_VISIBLE | SS_LEFT,
@@ -905,20 +1091,38 @@ static void crear_controles(HWND hwnd)
     g_btnQuitarLote = CreateWindowA("BUTTON", "Quitar lote", WS_CHILD | WS_VISIBLE,
                                     320, 428, 120, 28, hwnd, (HMENU)ID_BTN_QUITAR_LOTE, NULL, NULL);
 
+    CreateWindowA("STATIC", "Cambio especifico (una cantidad por linea, en orden de denominaciones):", WS_CHILD | WS_VISIBLE,
+                  20, 468, 430, 20, hwnd, NULL, NULL, NULL);
+
+    CreateWindowA("STATIC", "Entregado", WS_CHILD | WS_VISIBLE,
+                  20, 492, 90, 20, hwnd, NULL, NULL, NULL);
+
+    g_editEntradaCambio = CreateWindowA("EDIT", "", WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL,
+                                        20, 514, 190, 72, hwnd, (HMENU)ID_EDIT_ENTRADA_CAMBIO, NULL, NULL);
+
+    CreateWindowA("STATIC", "Devolucion", WS_CHILD | WS_VISIBLE,
+                  220, 492, 90, 20, hwnd, NULL, NULL, NULL);
+
+    g_editDevolucionCambio = CreateWindowA("EDIT", "", WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL,
+                                           220, 514, 190, 72, hwnd, (HMENU)ID_EDIT_DEVOLUCION_CAMBIO, NULL, NULL);
+
+    g_btnCambioEspecifico = CreateWindowA("BUTTON", "Aplicar cambio especifico", WS_CHILD | WS_VISIBLE,
+                                          420, 538, 170, 30, hwnd, (HMENU)ID_BTN_CAMBIO_ESPECIFICO, NULL, NULL);
+
     CreateWindowA("STATIC", "Panel Devolucion", WS_CHILD | WS_VISIBLE | SS_LEFT,
-                  20, 470, 220, 20, hwnd, NULL, NULL, NULL);
+                  20, 598, 220, 20, hwnd, NULL, NULL, NULL);
 
     CreateWindowA("STATIC", "Monto (centimos):", WS_CHILD | WS_VISIBLE,
-                  20, 500, 100, 20, hwnd, NULL, NULL, NULL);
+                  20, 628, 100, 20, hwnd, NULL, NULL, NULL);
 
     g_editMonto = CreateWindowA("EDIT", "", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
-                                125, 497, 190, 24, hwnd, (HMENU)ID_EDIT_MONTO, NULL, NULL);
+                                125, 625, 190, 24, hwnd, (HMENU)ID_EDIT_MONTO, NULL, NULL);
 
     g_btnCalcular = CreateWindowA("BUTTON", "Calcular devolucion", WS_CHILD | WS_VISIBLE,
-                                  325, 496, 135, 26, hwnd, (HMENU)ID_BTN_CALCULAR, NULL, NULL);
+                                  325, 624, 135, 26, hwnd, (HMENU)ID_BTN_CALCULAR, NULL, NULL);
 
     g_listResultado = CreateWindowA("LISTBOX", "", WS_CHILD | WS_VISIBLE | WS_BORDER | WS_HSCROLL | WS_VSCROLL | LBS_NOTIFY,
-                                    20, 530, 440, 110, hwnd, (HMENU)ID_LIST_RESULTADO, NULL, NULL);
+                                    20, 658, 570, 110, hwnd, (HMENU)ID_LIST_RESULTADO, NULL, NULL);
 }
 
 static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -998,6 +1202,12 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
             return 0;
         }
 
+        if (id == ID_BTN_CAMBIO_ESPECIFICO)
+        {
+            aplicar_cambio_especifico();
+            return 0;
+        }
+
         if (id == ID_RADIO_LIMITADO || id == ID_RADIO_ILIMITADO)
         {
             int nuevo_limitado = (id == ID_RADIO_LIMITADO) ? 1 : 0;
@@ -1045,7 +1255,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     hwnd = CreateWindowA("ProgVorazGUI", "ProgVoraz - Interfaz Grafica",
                          WS_OVERLAPPEDWINDOW & ~WS_THICKFRAME & ~WS_MAXIMIZEBOX,
-                         CW_USEDEFAULT, CW_USEDEFAULT, 500, 700,
+                         CW_USEDEFAULT, CW_USEDEFAULT, 640, 840,
                          NULL, NULL, hInstance, NULL);
 
     if (hwnd == NULL)
