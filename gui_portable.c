@@ -16,8 +16,12 @@ typedef enum
     MODO_ILIMITADO = 1
 } ModoGUI;
 
+/* leer_linea: documenta el comportamiento principal y validaciones de entrada. */
 static int leer_linea(char *buffer, size_t tam)
 {
+    if (buffer == NULL || tam == 0)
+        return 0;
+
     if (fgets(buffer, (int)tam, stdin) == NULL)
         return 0;
 
@@ -25,6 +29,7 @@ static int leer_linea(char *buffer, size_t tam)
     return 1;
 }
 
+/* a_minusculas: documenta el comportamiento principal y validaciones de entrada. */
 static void a_minusculas(char *texto)
 {
     size_t i;
@@ -36,6 +41,7 @@ static void a_minusculas(char *texto)
         texto[i] = (char)tolower((unsigned char)texto[i]);
 }
 
+/* es_numero: documenta el comportamiento principal y validaciones de entrada. */
 static int es_numero(const char *s)
 {
     size_t i;
@@ -52,6 +58,7 @@ static int es_numero(const char *s)
     return 1;
 }
 
+/* cargar_nombres_moneda: documenta el comportamiento principal y validaciones de entrada. */
 static int cargar_nombres_moneda(char monedas[MAX_MONEDAS][MAX_NOMBRE], int *cantidad)
 {
     FILE *fp = fopen("monedas.txt", "r");
@@ -62,6 +69,7 @@ static int cargar_nombres_moneda(char monedas[MAX_MONEDAS][MAX_NOMBRE], int *can
 
     *cantidad = 0;
 
+    /* while: documenta el comportamiento principal y validaciones de entrada. */
     while (fscanf(fp, "%255s", token) == 1)
     {
         int existe = 0;
@@ -70,6 +78,7 @@ static int cargar_nombres_moneda(char monedas[MAX_MONEDAS][MAX_NOMBRE], int *can
 
         for (int i = 0; i < *cantidad; i++)
         {
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (strcmp(monedas[i], token) == 0)
             {
                 existe = 1;
@@ -77,6 +86,7 @@ static int cargar_nombres_moneda(char monedas[MAX_MONEDAS][MAX_NOMBRE], int *can
             }
         }
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!existe && *cantidad < MAX_MONEDAS)
         {
             size_t n = strlen(token);
@@ -92,6 +102,7 @@ static int cargar_nombres_moneda(char monedas[MAX_MONEDAS][MAX_NOMBRE], int *can
     return *cantidad > 0;
 }
 
+/* imprimir_panel: documenta el comportamiento principal y validaciones de entrada. */
 static void imprimir_panel(const char *moneda, const BigIntArray *denom, const BigIntArray *stock)
 {
     printf("\n==============================================\n");
@@ -102,11 +113,15 @@ static void imprimir_panel(const char *moneda, const BigIntArray *denom, const B
     printf("==============================================\n");
 }
 
+/* pedir_indice: documenta el comportamiento principal y validaciones de entrada. */
 static int pedir_indice(size_t max, size_t *indice)
 {
     char buffer[64];
     char *fin;
     long v;
+
+    if (indice == NULL || max == 0)
+        return 0;
 
     printf("Indice (1-%zu): ", max);
     if (!leer_linea(buffer, sizeof(buffer)))
@@ -120,10 +135,14 @@ static int pedir_indice(size_t max, size_t *indice)
     return 1;
 }
 
+/* pedir_cantidad: documenta el comportamiento principal y validaciones de entrada. */
 static int pedir_cantidad(BigInt *delta)
 {
     char buffer[2048];
     BigInt tmp = {0};
+
+    if (delta == NULL)
+        return 0;
 
     printf("Cantidad (entero no negativo): ");
     if (!leer_linea(buffer, sizeof(buffer)))
@@ -137,10 +156,14 @@ static int pedir_cantidad(BigInt *delta)
     return 1;
 }
 
+/* pedir_monto: documenta el comportamiento principal y validaciones de entrada. */
 static int pedir_monto(BigInt *monto)
 {
     char buffer[2048];
     BigInt tmp = {0};
+
+    if (monto == NULL)
+        return 0;
 
     printf("Monto (entero no negativo en centimos): ");
     if (!leer_linea(buffer, sizeof(buffer)))
@@ -154,6 +177,7 @@ static int pedir_monto(BigInt *monto)
     return 1;
 }
 
+/* copiar_arreglo_bigint: documenta el comportamiento principal y validaciones de entrada. */
 static int copiar_arreglo_bigint(const BigIntArray *origen, BigIntArray *destino)
 {
     if (origen == NULL || destino == NULL)
@@ -164,6 +188,7 @@ static int copiar_arreglo_bigint(const BigIntArray *origen, BigIntArray *destino
 
     for (size_t i = 0; i < origen->len; i++)
     {
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!bigint_array_set(destino, i, &origen->items[i]))
         {
             bigint_array_free(destino);
@@ -174,6 +199,7 @@ static int copiar_arreglo_bigint(const BigIntArray *origen, BigIntArray *destino
     return 1;
 }
 
+/* calcular_cambio_stock: documenta el comportamiento principal y validaciones de entrada. */
 static int calcular_cambio_stock(const BigInt *monto, const BigIntArray *denominaciones, const BigIntArray *stock, BigIntArray *solucion)
 {
     BigInt restante = {0};
@@ -186,6 +212,7 @@ static int calcular_cambio_stock(const BigInt *monto, const BigIntArray *denomin
     if (!bigint_array_create(solucion, denominaciones->len))
         return 0;
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!bigint_set(&restante, monto) && !bigint_init(&restante, monto->digits))
     {
         bigint_array_free(solucion);
@@ -204,6 +231,7 @@ static int calcular_cambio_stock(const BigInt *monto, const BigIntArray *denomin
         if (!bigint_divmod(&restante, &denominaciones->items[i], &max_usables, &r))
             goto fallo;
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (bigint_compare(&max_usables, &stock->items[i]) > 0)
         {
             if (!bigint_set(&tomar, &stock->items[i]) && !bigint_init(&tomar, stock->items[i].digits))
@@ -218,17 +246,20 @@ static int calcular_cambio_stock(const BigInt *monto, const BigIntArray *denomin
         if (!bigint_array_set(solucion, i, &tomar))
             goto fallo;
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!bigint_is_zero(&tomar))
         {
             BigInt uso = {0};
             BigInt nuevo_restante = {0};
 
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (!bigint_multiply(&denominaciones->items[i], &tomar, &uso))
             {
                 bigint_free(&uso);
                 goto fallo;
             }
 
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (!bigint_subtract(&restante, &uso, &nuevo_restante))
             {
                 bigint_free(&uso);
@@ -259,6 +290,7 @@ static int calcular_cambio_stock(const BigInt *monto, const BigIntArray *denomin
         return 0;
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!bigint_is_zero(&restante))
     {
         bigint_free(&restante);
@@ -270,6 +302,7 @@ static int calcular_cambio_stock(const BigInt *monto, const BigIntArray *denomin
     return 1;
 }
 
+/* calcular_cambio_ilimitado: documenta el comportamiento principal y validaciones de entrada. */
 static int calcular_cambio_ilimitado(const BigInt *monto, const BigIntArray *denominaciones, BigIntArray *solucion)
 {
     BigInt restante = {0};
@@ -280,6 +313,7 @@ static int calcular_cambio_ilimitado(const BigInt *monto, const BigIntArray *den
     if (!bigint_array_create(solucion, denominaciones->len))
         return 0;
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!bigint_set(&restante, monto) && !bigint_init(&restante, monto->digits))
     {
         bigint_array_free(solucion);
@@ -294,6 +328,7 @@ static int calcular_cambio_ilimitado(const BigInt *monto, const BigIntArray *den
         if (bigint_is_zero(&denominaciones->items[i]))
             continue;
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!bigint_divmod(&restante, &denominaciones->items[i], &q, &r))
         {
             bigint_free(&q);
@@ -303,6 +338,7 @@ static int calcular_cambio_ilimitado(const BigInt *monto, const BigIntArray *den
             return 0;
         }
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!bigint_array_set(solucion, i, &q))
         {
             bigint_free(&q);
@@ -320,6 +356,7 @@ static int calcular_cambio_ilimitado(const BigInt *monto, const BigIntArray *den
             break;
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!bigint_is_zero(&restante))
     {
         bigint_free(&restante);
@@ -331,6 +368,7 @@ static int calcular_cambio_ilimitado(const BigInt *monto, const BigIntArray *den
     return 1;
 }
 
+/* pedir_cantidades_por_denominacion: documenta el comportamiento principal y validaciones de entrada. */
 static int pedir_cantidades_por_denominacion(const BigIntArray *denom, const char *titulo, BigIntArray *cantidades)
 {
     if (denom == NULL || cantidades == NULL)
@@ -342,24 +380,28 @@ static int pedir_cantidades_por_denominacion(const BigIntArray *denom, const cha
     printf("%s\n", titulo);
     for (size_t i = 0; i < denom->len; i++)
     {
+        /* while: documenta el comportamiento principal y validaciones de entrada. */
         while (1)
         {
             char buffer[2048];
             BigInt tmp = {0};
 
             printf("Cantidad para %s c: ", denom->items[i].digits);
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (!leer_linea(buffer, sizeof(buffer)))
             {
                 bigint_array_free(cantidades);
                 return 0;
             }
 
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (!bigint_init(&tmp, buffer))
             {
                 printf("Cantidad invalida. Usa entero no negativo.\n");
                 continue;
             }
 
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (!bigint_array_set(cantidades, i, &tmp))
             {
                 bigint_free(&tmp);
@@ -375,6 +417,7 @@ static int pedir_cantidades_por_denominacion(const BigIntArray *denom, const cha
     return 1;
 }
 
+/* calcular_total_valor: documenta el comportamiento principal y validaciones de entrada. */
 static int calcular_total_valor(const BigIntArray *denom, const BigIntArray *cantidades, BigInt *total)
 {
     BigInt acumulado = {0};
@@ -436,6 +479,7 @@ static int aplicar_cambio_especifico(const char *moneda,
         return 0;
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (bigint_compare(&totalEntregado, &totalDevolucion) != 0)
     {
         printf("Total entregado (%s c) y total solicitado (%s c) deben ser iguales.\n",
@@ -445,6 +489,7 @@ static int aplicar_cambio_especifico(const char *moneda,
         return 0;
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!copiar_arreglo_bigint(stock, &stockNuevo))
     {
         bigint_free(&totalEntregado);
@@ -475,6 +520,7 @@ static int aplicar_cambio_especifico(const char *moneda,
         bigint_free(&trasSalida);
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!actualizar_stock_moneda(moneda, &stockNuevo))
     {
         bigint_array_free(&stockNuevo);
@@ -525,6 +571,7 @@ static int validar_cambio_especifico_ilimitado(const BigIntArray *denom,
     return ok;
 }
 
+/* imprimir_resultado_cambio: documenta el comportamiento principal y validaciones de entrada. */
 static void imprimir_resultado_cambio(const BigInt *monto, const BigIntArray *denom, const BigIntArray *solucion)
 {
     int hayItems = 0;
@@ -543,6 +590,7 @@ static void imprimir_resultado_cambio(const BigInt *monto, const BigIntArray *de
         printf("  No se requieren monedas para devolver 0.\n");
 }
 
+/* calcular_y_aplicar_cambio: documenta el comportamiento principal y validaciones de entrada. */
 static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const BigIntArray *denom, BigIntArray *stock)
 {
     BigInt monto = {0};
@@ -550,6 +598,7 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
     BigIntArray stockNuevo = {0};
 
     int okMonto = pedir_monto(&monto);
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (okMonto <= 0)
     {
         printf("Monto invalido.\n");
@@ -557,8 +606,10 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
         return 0;
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (modo == MODO_LIMITADO)
     {
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!calcular_cambio_stock(&monto, denom, stock, &solucion))
         {
             printf("No existe devolucion exacta con el stock actual.\n");
@@ -569,6 +620,7 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
     }
     else
     {
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!calcular_cambio_ilimitado(&monto, denom, &solucion))
         {
             printf("No existe devolucion exacta con denominaciones actuales.\n");
@@ -580,6 +632,7 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
 
     imprimir_resultado_cambio(&monto, denom, &solucion);
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (modo == MODO_ILIMITADO)
     {
         bigint_free(&monto);
@@ -587,6 +640,7 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
         return 1;
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!copiar_arreglo_bigint(stock, &stockNuevo))
     {
         printf("No se pudo preparar actualizacion de stock.\n");
@@ -602,6 +656,7 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
         if (bigint_is_zero(&solucion.items[i]))
             continue;
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!bigint_subtract(&stockNuevo.items[i], &solucion.items[i], &nuevoStock))
         {
             bigint_array_free(&stockNuevo);
@@ -611,6 +666,7 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
             return 0;
         }
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!bigint_array_set(&stockNuevo, i, &nuevoStock))
         {
             bigint_free(&nuevoStock);
@@ -624,6 +680,7 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
         bigint_free(&nuevoStock);
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!actualizar_stock_moneda(moneda, &stockNuevo))
     {
         bigint_array_free(&stockNuevo);
@@ -642,6 +699,7 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
     return 1;
 }
 
+/* pedir_modo: documenta el comportamiento principal y validaciones de entrada. */
 static int pedir_modo(ModoGUI *modo)
 {
     char entrada[32];
@@ -653,11 +711,13 @@ static int pedir_modo(ModoGUI *modo)
     a_minusculas(entrada);
     if (strcmp(entrada, "salir") == 0)
         return 0;
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (strcmp(entrada, "limitado") == 0 || strcmp(entrada, "b") == 0)
     {
         *modo = MODO_LIMITADO;
         return 1;
     }
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (strcmp(entrada, "ilimitado") == 0 || strcmp(entrada, "a") == 0)
     {
         *modo = MODO_ILIMITADO;
@@ -668,6 +728,7 @@ static int pedir_modo(ModoGUI *modo)
     return -1;
 }
 
+/* main: documenta el comportamiento principal y validaciones de entrada. */
 int main(void)
 {
 #if defined(__APPLE__)
@@ -692,12 +753,14 @@ int main(void)
     printf("ProgVoraz GUI portable iniciado en %s\n", so);
     printf("Nota: en este SO se usa panel administrador y calculo de devolucion en terminal (sin WinAPI).\n");
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!cargar_nombres_moneda(monedas, &nMonedas))
     {
         printf("No se pudieron cargar monedas desde monedas.txt\n");
         return 1;
     }
 
+    /* while: documenta el comportamiento principal y validaciones de entrada. */
     while (1)
     {
         char entrada[128];
@@ -735,10 +798,12 @@ int main(void)
                 idxMoneda = (int)(v - 1);
         }
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (idxMoneda < 0)
         {
             for (int i = 0; i < nMonedas; i++)
             {
+                /* if: documenta el comportamiento principal y validaciones de entrada. */
                 if (strcmp(monedas[i], entrada) == 0)
                 {
                     idxMoneda = i;
@@ -747,12 +812,14 @@ int main(void)
             }
         }
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (idxMoneda < 0)
         {
             printf("Moneda invalida.\n");
             continue;
         }
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!cargar_denominaciones_moneda(monedas[idxMoneda], &denom) || !cargar_stock_moneda(monedas[idxMoneda], &stock) || denom.len != stock.len)
         {
             printf("No se pudo cargar denominaciones/stock para esa moneda.\n");
@@ -761,6 +828,7 @@ int main(void)
             continue;
         }
 
+        /* while: documenta el comportamiento principal y validaciones de entrada. */
         while (1)
         {
             char accion[32];
@@ -775,6 +843,7 @@ int main(void)
                 printf("Accion (calcular/especifico/anadir/quitar/modo/volver/salir): ");
             else
                 printf("Accion (calcular/especifico/modo/volver/salir): ");
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (!leer_linea(accion, sizeof(accion)))
             {
                 bigint_free(&delta);
@@ -784,6 +853,7 @@ int main(void)
             }
 
             a_minusculas(accion);
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (strcmp(accion, "salir") == 0)
             {
                 bigint_free(&delta);
@@ -791,17 +861,20 @@ int main(void)
                 bigint_array_free(&stock);
                 return 0;
             }
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (strcmp(accion, "volver") == 0)
             {
                 bigint_free(&delta);
                 break;
             }
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (strcmp(accion, "modo") == 0)
             {
                 bigint_free(&delta);
                 break;
             }
 
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (strcmp(accion, "calcular") == 0)
             {
                 calcular_y_aplicar_cambio(modoActual, monedas[idxMoneda], &denom, &stock);
@@ -809,6 +882,7 @@ int main(void)
                 continue;
             }
 
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (strcmp(accion, "especifico") == 0)
             {
                 BigIntArray entregadas = {0};
@@ -845,6 +919,7 @@ int main(void)
                 continue;
             }
 
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (!requiereAdmin)
             {
                 printf("Accion invalida para modo stock ilimitado.\n");
@@ -863,6 +938,7 @@ int main(void)
                 continue;
             }
 
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (pedir_indice(denom.len, &idxDen) <= 0)
             {
                 printf("Indice invalido.\n");
@@ -870,6 +946,7 @@ int main(void)
                 continue;
             }
 
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (pedir_cantidad(&delta) <= 0)
             {
                 printf("Cantidad invalida.\n");
@@ -877,8 +954,10 @@ int main(void)
                 continue;
             }
 
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (esSuma)
             {
+                /* if: documenta el comportamiento principal y validaciones de entrada. */
                 if (!bigint_add(&stock.items[idxDen], &delta, &nuevo))
                 {
                     printf("No se pudo sumar stock.\n");
@@ -889,6 +968,7 @@ int main(void)
             }
             else
             {
+                /* if: documenta el comportamiento principal y validaciones de entrada. */
                 if (bigint_compare(&stock.items[idxDen], &delta) < 0 || !bigint_subtract(&stock.items[idxDen], &delta, &nuevo))
                 {
                     printf("No se pudo quitar stock (insuficiente o error).\n");
@@ -898,6 +978,7 @@ int main(void)
                 }
             }
 
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (!bigint_array_set(&stock, idxDen, &nuevo))
             {
                 printf("No se pudo aplicar cambio en memoria.\n");
@@ -923,6 +1004,7 @@ int main(void)
 }
 
 #else
+/* main: documenta el comportamiento principal y validaciones de entrada. */
 int main(void)
 {
     return 0;

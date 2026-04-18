@@ -29,6 +29,13 @@ void crear(vectorP *v1, unsigned long tam1)
     if (v1 == NULL)
         return;
 
+    /* Tamano 0 no se considera vector util para esta API. */
+    if (tam1 == 0)
+    {
+        *v1 = NULL;
+        return;
+    }
+
     /* Reserva estructura principal. */
     *v1 = (vectorP)malloc(sizeof(struct STVECTOR));
     if (*v1 == NULL)
@@ -38,12 +45,9 @@ void crear(vectorP *v1, unsigned long tam1)
     (*v1)->datos = NULL;
     (*v1)->tam = tam1;
 
-    /* Vector de tamano cero: estructura valida sin buffer interno. */
-    if (tam1 == 0)
-        return;
-
     /* Reserva almacenamiento de elementos. */
     (*v1)->datos = (TELEMENTO *)malloc(tam1 * sizeof(TELEMENTO));
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if ((*v1)->datos == NULL)
     {
         /* Si falla reserva interna, libera cabecera para evitar fuga. */
@@ -60,7 +64,7 @@ void crear(vectorP *v1, unsigned long tam1)
 /* Asigna un valor en posicion si el vector y el indice son validos. */
 void asignar(vectorP v1, unsigned long posicion, TELEMENTO valor)
 {
-    if (v1 == NULL || posicion >= v1->tam)
+    if (v1 == NULL || v1->datos == NULL || posicion >= v1->tam)
         return;
 
     v1->datos[posicion] = valor;
@@ -81,7 +85,7 @@ void liberar(vectorP *v1)
 /* Obtiene valor en posicion; retorna 0 si indice/puntero es invalido. */
 TELEMENTO recuperar(vectorP v1, unsigned long posicion)
 {
-    if (v1 == NULL || posicion >= v1->tam)
+    if (v1 == NULL || v1->datos == NULL || posicion >= v1->tam)
         return 0;
 
     return v1->datos[posicion];
@@ -95,4 +99,3 @@ unsigned long tamano(vectorP *v1)
 
     return (*v1)->tam;
 }
-
