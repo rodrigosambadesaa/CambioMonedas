@@ -494,6 +494,37 @@ static int aplicar_cambio_especifico(const char *moneda,
     return 1;
 }
 
+static int validar_cambio_especifico_ilimitado(const BigIntArray *denom,
+                                               const BigIntArray *entregadas,
+                                               const BigIntArray *devolucion)
+{
+    BigInt totalEntregado = {0};
+    BigInt totalDevolucion = {0};
+    int ok;
+
+    if (denom == NULL || entregadas == NULL || devolucion == NULL)
+        return 0;
+    if (denom->len != entregadas->len || denom->len != devolucion->len)
+        return 0;
+
+    if (!calcular_total_valor(denom, entregadas, &totalEntregado) ||
+        !calcular_total_valor(denom, devolucion, &totalDevolucion))
+    {
+        bigint_free(&totalEntregado);
+        bigint_free(&totalDevolucion);
+        return 0;
+    }
+
+    ok = bigint_compare(&totalEntregado, &totalDevolucion) == 0;
+    if (!ok)
+        printf("Total entregado (%s c) y total solicitado (%s c) deben ser iguales.\n",
+               totalEntregado.digits, totalDevolucion.digits);
+
+    bigint_free(&totalEntregado);
+    bigint_free(&totalDevolucion);
+    return ok;
+}
+
 static void imprimir_resultado_cambio(const BigInt *monto, const BigIntArray *denom, const BigIntArray *solucion)
 {
     int hayItems = 0;
@@ -743,7 +774,7 @@ int main(void)
             if (requiereAdmin)
                 printf("Accion (calcular/especifico/anadir/quitar/modo/volver/salir): ");
             else
-                printf("Accion (calcular/modo/volver/salir): ");
+                printf("Accion (calcular/especifico/modo/volver/salir): ");
             if (!leer_linea(accion, sizeof(accion)))
             {
                 bigint_free(&delta);
@@ -783,13 +814,6 @@ int main(void)
                 BigIntArray entregadas = {0};
                 BigIntArray devolucion = {0};
 
-                if (!requiereAdmin)
-                {
-                    printf("Cambio especifico disponible solo en modo stock limitado.\n");
-                    bigint_free(&delta);
-                    continue;
-                }
-
                 if (!pedir_cantidades_por_denominacion(&denom, "Monedas/Billetes entregados por el usuario:", &entregadas) ||
                     !pedir_cantidades_por_denominacion(&denom, "Cambio especifico solicitado (cantidades a devolver):", &devolucion))
                 {
@@ -800,8 +824,12 @@ int main(void)
                     continue;
                 }
 
-                if (aplicar_cambio_especifico(monedas[idxMoneda], &denom, &stock, &entregadas, &devolucion))
+                if ((requiereAdmin && aplicar_cambio_especifico(monedas[idxMoneda], &denom, &stock, &entregadas, &devolucion)) ||
+                    (!requiereAdmin && validar_cambio_especifico_ilimitado(&denom, &entregadas, &devolucion)))
                 {
+                    if (!requiereAdmin)
+                        printf("Cambio especifico aplicado en modo ilimitado.\n");
+
                     printf("Cambio especifico entregado:\n");
                     for (size_t i = 0; i < denom.len; i++)
                     {

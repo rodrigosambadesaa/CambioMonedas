@@ -161,9 +161,9 @@ static void configurar_modo_stock(int limitado)
     EnableWindow(g_editLote, g_modo_stock_limitado);
     EnableWindow(g_btnAgregarLote, g_modo_stock_limitado);
     EnableWindow(g_btnQuitarLote, g_modo_stock_limitado);
-    EnableWindow(g_editEntradaCambio, g_modo_stock_limitado);
-    EnableWindow(g_editDevolucionCambio, g_modo_stock_limitado);
-    EnableWindow(g_btnCambioEspecifico, g_modo_stock_limitado);
+    EnableWindow(g_editEntradaCambio, TRUE);
+    EnableWindow(g_editDevolucionCambio, TRUE);
+    EnableWindow(g_btnCambioEspecifico, TRUE);
 }
 
 static void precargar_ceros_en_edit(HWND edit)
@@ -175,7 +175,7 @@ static void precargar_ceros_en_edit(HWND edit)
     if (edit == NULL)
         return;
 
-    if (!g_modo_stock_limitado || g_denom.items == NULL || g_denom.len == 0)
+    if (g_denom.items == NULL || g_denom.len == 0)
     {
         SetWindowTextA(edit, "");
         return;
@@ -913,13 +913,7 @@ static int aplicar_cambio_especifico(void)
     char linea[512];
     int max_chars = 0;
 
-    if (!g_modo_stock_limitado)
-    {
-        mostrar_error("Cambio especifico", "Solo disponible en modo stock limitado.");
-        return 0;
-    }
-
-    if (g_monedaActiva < 0 || g_stock.items == NULL || g_denom.len != g_stock.len)
+    if (g_monedaActiva < 0 || g_denom.items == NULL || g_denom.len == 0)
     {
         mostrar_error("Cambio especifico", "Primero carga una moneda valida.");
         return 0;
@@ -948,6 +942,42 @@ static int aplicar_cambio_especifico(void)
     if (bigint_compare(&totalEntrada, &totalDevolucion) != 0)
     {
         mostrar_error("Cambio especifico", "El total entregado debe ser igual al total solicitado como devolucion.");
+        bigint_array_free(&entradas);
+        bigint_array_free(&devolucion);
+        bigint_free(&totalEntrada);
+        bigint_free(&totalDevolucion);
+        return 0;
+    }
+
+    if (!g_modo_stock_limitado)
+    {
+        limpiar_resultado_cambio();
+        snprintf(linea, sizeof(linea), "Cambio especifico aplicado (ilimitado): %s c", totalEntrada.digits);
+        max_chars = (int)strlen(linea);
+        SendMessageA(g_listResultado, LB_ADDSTRING, 0, (LPARAM)linea);
+        for (size_t i = 0; i < g_denom.len; i++)
+        {
+            if (bigint_is_zero(&devolucion.items[i]))
+                continue;
+
+            snprintf(linea, sizeof(linea), "%s c -> %s", g_denom.items[i].digits, devolucion.items[i].digits);
+            if ((int)strlen(linea) > max_chars)
+                max_chars = (int)strlen(linea);
+            SendMessageA(g_listResultado, LB_ADDSTRING, 0, (LPARAM)linea);
+        }
+        ajustar_scroll_horizontal_lista(g_listResultado, max_chars + 4);
+
+        bigint_array_free(&entradas);
+        bigint_array_free(&devolucion);
+        bigint_free(&totalEntrada);
+        bigint_free(&totalDevolucion);
+        mostrar_info("Cambio especifico", "Operacion aplicada en modo ilimitado.");
+        return 1;
+    }
+
+    if (g_stock.items == NULL || g_denom.len != g_stock.len)
+    {
+        mostrar_error("Cambio especifico", "No hay stock cargado para modo limitado.");
         bigint_array_free(&entradas);
         bigint_array_free(&devolucion);
         bigint_free(&totalEntrada);

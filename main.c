@@ -704,12 +704,12 @@ static int aplicar_cambio_administrador(BigIntArray *stock, size_t idx, const Bi
     return 1;
 }
 
-static int pedir_subopcion_stock_limitado(void)
+static int pedir_subopcion_cambio(void)
 {
     char buffer[32];
     char comando[32];
 
-    printf("Subopcion stock (tradicional/especifico, volver, modo o salir): ");
+    printf("Subopcion cambio (tradicional/especifico, volver, modo o salir): ");
     if (!leer_linea(buffer, sizeof(buffer)))
         return -1;
 
@@ -732,6 +732,28 @@ static int pedir_subopcion_stock_limitado(void)
         return 5;
 
     return 0;
+}
+
+static int calcular_total_valor(const BigIntArray *monedas, const BigIntArray *cantidades, BigInt *total);
+
+static int validar_cambio_especifico_ilimitado(const BigIntArray *monedas,
+                                               const BigIntArray *entregadas,
+                                               const BigIntArray *devolucion,
+                                               BigInt *totalEntregado,
+                                               BigInt *totalDevolucion)
+{
+    if (monedas == NULL || entregadas == NULL || devolucion == NULL ||
+        totalEntregado == NULL || totalDevolucion == NULL)
+        return 0;
+
+    if (monedas->len != entregadas->len || monedas->len != devolucion->len)
+        return 0;
+
+    if (!calcular_total_valor(monedas, entregadas, totalEntregado) ||
+        !calcular_total_valor(monedas, devolucion, totalDevolucion))
+        return 0;
+
+    return bigint_compare(totalEntregado, totalDevolucion) == 0;
 }
 
 static int pedir_cantidades_por_denominacion(const BigIntArray *monedas, const char *titulo, BigIntArray *cantidades)
@@ -1131,9 +1153,9 @@ int main(void)
                 BigIntArray solucion = {0};
                 int subopcionStock = 1;
 
-                if (opcion == 'b')
+                if (opcion == 'a' || opcion == 'b')
                 {
-                    subopcionStock = pedir_subopcion_stock_limitado();
+                    subopcionStock = pedir_subopcion_cambio();
 
                     if (subopcionStock == -1)
                     {
@@ -1158,6 +1180,94 @@ int main(void)
                         printf("Subopcion invalida.\n");
                         continue;
                     }
+                }
+
+                if (opcion == 'a' && subopcionStock == 5)
+                {
+                    BigIntArray entregadas = {0};
+                    BigIntArray devolucion = {0};
+                    BigInt totalEntregado = {0};
+                    BigInt totalDevolucion = {0};
+                    int estadoEntrada;
+                    int estadoDevolucion;
+
+                    estadoEntrada = pedir_cantidades_por_denominacion(&monedas, "Monedas/Billetes entregados por el usuario:", &entregadas);
+                    if (estadoEntrada == -1)
+                    {
+                        printf("Entrada finalizada.\n");
+                        ejecutando = 0;
+                        break;
+                    }
+                    if (estadoEntrada == 4)
+                    {
+                        ejecutando = 0;
+                        break;
+                    }
+                    if (estadoEntrada == 3)
+                    {
+                        opcion = 0;
+                        break;
+                    }
+                    if (estadoEntrada == 2)
+                        continue;
+                    if (estadoEntrada == 0)
+                    {
+                        printf("No se pudieron leer cantidades entregadas.\n");
+                        continue;
+                    }
+
+                    estadoDevolucion = pedir_cantidades_por_denominacion(&monedas, "Cambio especifico solicitado (cantidades a devolver):", &devolucion);
+                    if (estadoDevolucion == -1)
+                    {
+                        printf("Entrada finalizada.\n");
+                        limpiar_arreglo(&entregadas);
+                        ejecutando = 0;
+                        break;
+                    }
+                    if (estadoDevolucion == 4)
+                    {
+                        limpiar_arreglo(&entregadas);
+                        ejecutando = 0;
+                        break;
+                    }
+                    if (estadoDevolucion == 3)
+                    {
+                        limpiar_arreglo(&entregadas);
+                        opcion = 0;
+                        break;
+                    }
+                    if (estadoDevolucion == 2)
+                    {
+                        limpiar_arreglo(&entregadas);
+                        continue;
+                    }
+                    if (estadoDevolucion == 0)
+                    {
+                        printf("No se pudieron leer cantidades de cambio solicitado.\n");
+                        limpiar_arreglo(&entregadas);
+                        continue;
+                    }
+
+                    if (!validar_cambio_especifico_ilimitado(&monedas, &entregadas, &devolucion,
+                                                             &totalEntregado, &totalDevolucion))
+                    {
+                        printf("No se pudo aplicar cambio especifico en modo ilimitado. Verifica que el total entregado sea igual al total solicitado.\n");
+                        limpiar_arreglo(&entregadas);
+                        limpiar_arreglo(&devolucion);
+                        bigint_free(&totalEntregado);
+                        bigint_free(&totalDevolucion);
+                        continue;
+                    }
+
+                    printf("Cambio especifico aplicado en modo ilimitado. Total entregado: %s c | Total devuelto: %s c\n",
+                           totalEntregado.digits, totalDevolucion.digits);
+                    imprimir_resultado(&monedas, &devolucion, NULL, 0);
+
+                    limpiar_arreglo(&entregadas);
+                    limpiar_arreglo(&devolucion);
+                    bigint_free(&totalEntregado);
+                    bigint_free(&totalDevolucion);
+                    continue;
                 }
 
                 if (opcion == 'b' && subopcionStock == 5)

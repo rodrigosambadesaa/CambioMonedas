@@ -206,6 +206,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
     var modeUnlimitedBtn: NSButton!
     var addBtn: NSButton!
     var subBtn: NSButton!
+    var specificInField: NSTextField!
+    var specificOutField: NSTextField!
+    var specificBtn: NSButton!
 
     var coinNames: [String] = []
     var activeCoin: String?
@@ -220,7 +223,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
 
     func setupUI() {
         window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 780, height: 640),
+            contentRect: NSRect(x: 0, y: 0, width: 780, height: 760),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -300,19 +303,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         subBtn.frame = NSRect(x: 340, y: 204, width: 100, height: 30)
         content.addSubview(subBtn)
 
+        let specificTitle = NSTextField(labelWithString: "Cambio especifico (cantidades separadas por espacios, en orden de denominaciones)")
+        specificTitle.frame = NSRect(x: 20, y: 168, width: 720, height: 22)
+        content.addSubview(specificTitle)
+
+        let specificInLabel = NSTextField(labelWithString: "Entregado")
+        specificInLabel.frame = NSRect(x: 20, y: 142, width: 80, height: 22)
+        content.addSubview(specificInLabel)
+
+        specificInField = NSTextField(frame: NSRect(x: 105, y: 138, width: 560, height: 26))
+        content.addSubview(specificInField)
+
+        let specificOutLabel = NSTextField(labelWithString: "Devolucion")
+        specificOutLabel.frame = NSRect(x: 20, y: 112, width: 80, height: 22)
+        content.addSubview(specificOutLabel)
+
+        specificOutField = NSTextField(frame: NSRect(x: 105, y: 108, width: 560, height: 26))
+        content.addSubview(specificOutField)
+
+        specificBtn = NSButton(title: "Aplicar cambio especifico", target: self, action: #selector(applySpecificChange))
+        specificBtn.frame = NSRect(x: 670, y: 108, width: 90, height: 56)
+        content.addSubview(specificBtn)
+
         let amountLabel = NSTextField(labelWithString: "Monto (centimos)")
-        amountLabel.frame = NSRect(x: 20, y: 160, width: 110, height: 22)
+        amountLabel.frame = NSRect(x: 20, y: 70, width: 110, height: 22)
         content.addSubview(amountLabel)
 
-        amountField = NSTextField(frame: NSRect(x: 140, y: 156, width: 220, height: 26))
+        amountField = NSTextField(frame: NSRect(x: 140, y: 66, width: 220, height: 26))
         content.addSubview(amountField)
 
         let calcBtn = NSButton(title: "Calcular devolucion", target: self, action: #selector(calculateChange))
-        calcBtn.frame = NSRect(x: 370, y: 154, width: 170, height: 30)
+        calcBtn.frame = NSRect(x: 370, y: 64, width: 170, height: 30)
         content.addSubview(calcBtn)
 
         let resultTitle = NSTextField(labelWithString: "Resultado")
-        resultTitle.frame = NSRect(x: 20, y: 132, width: 120, height: 22)
+        resultTitle.frame = NSRect(x: 20, y: 42, width: 120, height: 22)
         content.addSubview(resultTitle)
 
         let resultScroll = NSScrollView(frame: NSRect(x: 20, y: 44, width: 740, height: 90))
@@ -357,6 +382,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         denomPopup.removeAllItems()
         table.reloadData()
         resultView.string = ""
+        specificInField?.stringValue = ""
+        specificOutField?.stringValue = ""
 
         if coinNames.isEmpty {
             setStatus("No se pudieron leer monedas desde monedas.txt", error: true)
@@ -374,6 +401,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         subBtn.isEnabled = limitedMode
         denomPopup.isEnabled = limitedMode
         qtyField.isEnabled = limitedMode
+        specificInField.isEnabled = true
+        specificOutField.isEnabled = true
+        specificBtn.isEnabled = true
         table.reloadData()
     }
 
@@ -406,7 +436,87 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         denomPopup.addItems(withTitles: denoms)
         table.reloadData()
         resultView.string = ""
+        let zeros = Array(repeating: "0", count: denoms.count).joined(separator: " ")
+        specificInField.stringValue = zeros
+        specificOutField.stringValue = zeros
         setStatus("Moneda \(coin) cargada.")
+    }
+
+    func parseSpecificList(_ text: String, expected: Int) -> [String]? {
+        let tokens = text.split { $0.isWhitespace }.map(String.init)
+        if tokens.count != expected { return nil }
+        if tokens.contains(where: { !isDigits(normalize($0)) }) { return nil }
+        return tokens.map { normalize($0) }
+    }
+
+    func totalValue(_ quantities: [String]) -> String {
+        var total = "0"
+        for i in 0..<min(denoms.count, quantities.count) {
+            if normalize(quantities[i]) == "0" { continue }
+            total = addBig(total, mulBig(denoms[i], quantities[i]))
+        }
+        return normalize(total)
+    }
+
+    func renderSpecificResult(total: String, requested: [String], unlimited: Bool) {
+        var lines: [String] = []
+        lines.append(unlimited ? "Cambio especifico aplicado (ilimitado): \(total) c" : "Cambio especifico aplicado (limitado): \(total) c")
+        var hasItems = false
+        for i in 0..<requested.count {
+            if normalize(requested[i]) == "0" { continue }
+            lines.append("\(denoms[i]) c -> \(requested[i])")
+            hasItems = true
+        }
+        if !hasItems {
+            lines.append("No se requieren monedas para devolver 0.")
+        }
+        resultView.string = lines.joined(separator: "\n")
+    }
+
+    @objc func applySpecificChange() {
+        guard let coin = activeCoin else {
+            setStatus("Primero carga una moneda.", error: true)
+            return
+        }
+
+        guard let given = parseSpecificList(specificInField.stringValue, expected: denoms.count),
+              let requested = parseSpecificList(specificOutField.stringValue, expected: denoms.count) else {
+            setStatus("Formato invalido: usa exactamente una cantidad por denominacion en ambos campos.", error: true)
+            return
+        }
+
+        let totalGiven = totalValue(given)
+        let totalRequested = totalValue(requested)
+        if compareBig(totalGiven, totalRequested) != 0 {
+            setStatus("Total entregado (\(totalGiven) c) y total solicitado (\(totalRequested) c) deben ser iguales.", error: true)
+            return
+        }
+
+        if !limitedMode {
+            renderSpecificResult(total: totalGiven, requested: requested, unlimited: true)
+            setStatus("Cambio especifico aplicado en modo ilimitado.")
+            return
+        }
+
+        var newStock = stock
+        for i in 0..<newStock.count {
+            let afterIn = addBig(newStock[i], given[i])
+            guard let afterOut = subBig(afterIn, requested[i]) else {
+                setStatus("No se puede aplicar la devolucion especifica con el stock disponible.", error: true)
+                return
+            }
+            newStock[i] = afterOut
+        }
+
+        if !updateStockSection(coin: coin, stock: newStock) {
+            setStatus("No se pudo persistir el cambio especifico en stock.txt", error: true)
+            return
+        }
+
+        stock = newStock
+        table.reloadData()
+        renderSpecificResult(total: totalGiven, requested: requested, unlimited: false)
+        setStatus("Cambio especifico aplicado y stock persistido.")
     }
 
     func applyChange(isAdd: Bool) {
