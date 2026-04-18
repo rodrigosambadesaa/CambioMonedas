@@ -142,3 +142,5 @@ Flujo sugerido en VS Code:
 
 Consulta EJECUCION.md para ejemplos y flujo paso a paso.
 
+Para referencia tecnica de todas las funciones implementadas en archivos C, consulta FUNCIONES_C.md.
+
