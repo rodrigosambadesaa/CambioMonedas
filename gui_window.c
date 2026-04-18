@@ -58,6 +58,7 @@ static int g_modo_stock_limitado = 1;
 static BigIntArray g_denom = {0};
 static BigIntArray g_stock = {0};
 
+/* es_numero: documenta el comportamiento principal y validaciones de entrada. */
 static int es_numero(const char *s)
 {
     size_t i;
@@ -74,6 +75,7 @@ static int es_numero(const char *s)
     return 1;
 }
 
+/* liberar_datos_moneda: documenta el comportamiento principal y validaciones de entrada. */
 static void liberar_datos_moneda(void)
 {
     bigint_array_free(&g_denom);
@@ -81,6 +83,7 @@ static void liberar_datos_moneda(void)
     g_monedaActiva = -1;
 }
 
+/* cargar_nombres_moneda: documenta el comportamiento principal y validaciones de entrada. */
 static int cargar_nombres_moneda(void)
 {
     FILE *fp = fopen("monedas.txt", "r");
@@ -90,13 +93,16 @@ static int cargar_nombres_moneda(void)
     if (fp == NULL)
         return 0;
 
+    /* while: documenta el comportamiento principal y validaciones de entrada. */
     while (fscanf(fp, "%255s", token) == 1)
     {
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!es_numero(token))
         {
             int yaExiste = 0;
             for (int i = 0; i < g_monedasCount; i++)
             {
+                /* if: documenta el comportamiento principal y validaciones de entrada. */
                 if (strcmp(g_monedas[i], token) == 0)
                 {
                     yaExiste = 1;
@@ -104,6 +110,7 @@ static int cargar_nombres_moneda(void)
                 }
             }
 
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (!yaExiste && g_monedasCount < MAX_MONEDAS)
             {
                 size_t n = strlen(token);
@@ -120,6 +127,7 @@ static int cargar_nombres_moneda(void)
     return g_monedasCount > 0;
 }
 
+/* refrescar_combo_monedas: documenta el comportamiento principal y validaciones de entrada. */
 static void refrescar_combo_monedas(void)
 {
     SendMessageA(g_comboMoneda, CB_RESETCONTENT, 0, 0);
@@ -131,22 +139,26 @@ static void refrescar_combo_monedas(void)
         SendMessageA(g_comboMoneda, CB_SETCURSEL, 0, 0);
 }
 
+/* mostrar_error: documenta el comportamiento principal y validaciones de entrada. */
 static void mostrar_error(const char *titulo, const char *mensaje)
 {
     MessageBoxA(NULL, mensaje, titulo, MB_ICONERROR | MB_OK);
 }
 
+/* mostrar_info: documenta el comportamiento principal y validaciones de entrada. */
 static void mostrar_info(const char *titulo, const char *mensaje)
 {
     MessageBoxA(NULL, mensaje, titulo, MB_ICONINFORMATION | MB_OK);
 }
 
+/* limpiar_resultado_cambio: documenta el comportamiento principal y validaciones de entrada. */
 static void limpiar_resultado_cambio(void)
 {
     SendMessageA(g_listResultado, LB_RESETCONTENT, 0, 0);
     SendMessageA(g_listResultado, LB_SETHORIZONTALEXTENT, 0, 0);
 }
 
+/* configurar_modo_stock: documenta el comportamiento principal y validaciones de entrada. */
 static void configurar_modo_stock(int limitado)
 {
     g_modo_stock_limitado = limitado ? 1 : 0;
@@ -166,6 +178,7 @@ static void configurar_modo_stock(int limitado)
     EnableWindow(g_btnCambioEspecifico, TRUE);
 }
 
+/* precargar_ceros_en_edit: documenta el comportamiento principal y validaciones de entrada. */
 static void precargar_ceros_en_edit(HWND edit)
 {
     char texto[4096];
@@ -175,6 +188,7 @@ static void precargar_ceros_en_edit(HWND edit)
     if (edit == NULL)
         return;
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (g_denom.items == NULL || g_denom.len == 0)
     {
         SetWindowTextA(edit, "");
@@ -193,6 +207,7 @@ static void precargar_ceros_en_edit(HWND edit)
         if (escritos < 0)
             break;
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if ((size_t)escritos >= restante)
         {
             pos = sizeof(texto) - 1;
@@ -206,6 +221,7 @@ static void precargar_ceros_en_edit(HWND edit)
     SetWindowTextA(edit, texto);
 }
 
+/* precargar_cantidades_lote: documenta el comportamiento principal y validaciones de entrada. */
 static void precargar_cantidades_lote(void)
 {
     precargar_ceros_en_edit(g_editLote);
@@ -213,6 +229,7 @@ static void precargar_cantidades_lote(void)
     precargar_ceros_en_edit(g_editDevolucionCambio);
 }
 
+/* leer_cantidades_desde_edit: documenta el comportamiento principal y validaciones de entrada. */
 static int leer_cantidades_desde_edit(HWND edit, BigIntArray *deltas)
 {
     int len;
@@ -221,7 +238,7 @@ static int leer_cantidades_desde_edit(HWND edit, BigIntArray *deltas)
     char *token;
     size_t idx = 0;
 
-    if (deltas == NULL)
+    if (edit == NULL || deltas == NULL || g_denom.items == NULL || g_denom.len == 0)
         return 0;
 
     len = GetWindowTextLengthA(edit);
@@ -234,6 +251,7 @@ static int leer_cantidades_desde_edit(HWND edit, BigIntArray *deltas)
 
     GetWindowTextA(edit, buffer, len + 1);
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!bigint_array_create(deltas, g_denom.len))
     {
         free(buffer);
@@ -241,10 +259,12 @@ static int leer_cantidades_desde_edit(HWND edit, BigIntArray *deltas)
     }
 
     token = strtok_s(buffer, " \t\r\n", &ctx);
+    /* while: documenta el comportamiento principal y validaciones de entrada. */
     while (token != NULL)
     {
         BigInt delta = {0};
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (idx >= g_denom.len)
         {
             bigint_array_free(deltas);
@@ -252,6 +272,7 @@ static int leer_cantidades_desde_edit(HWND edit, BigIntArray *deltas)
             return 0;
         }
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!bigint_init(&delta, token))
         {
             bigint_array_free(deltas);
@@ -259,6 +280,7 @@ static int leer_cantidades_desde_edit(HWND edit, BigIntArray *deltas)
             return 0;
         }
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!bigint_array_set(deltas, idx, &delta))
         {
             bigint_free(&delta);
@@ -274,6 +296,7 @@ static int leer_cantidades_desde_edit(HWND edit, BigIntArray *deltas)
 
     free(buffer);
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (idx != g_denom.len)
     {
         bigint_array_free(deltas);
@@ -283,19 +306,24 @@ static int leer_cantidades_desde_edit(HWND edit, BigIntArray *deltas)
     return 1;
 }
 
+/* leer_cantidades_lote: documenta el comportamiento principal y validaciones de entrada. */
 static int leer_cantidades_lote(BigIntArray *deltas)
 {
     return leer_cantidades_desde_edit(g_editLote, deltas);
 }
 
+/* ajustar_scroll_horizontal_lista: documenta el comportamiento principal y validaciones de entrada. */
 static void ajustar_scroll_horizontal_lista(HWND lista, int max_chars)
 {
     int extent = max_chars * 8;
+    if (lista == NULL)
+        return;
     if (extent < 0)
         extent = 0;
     SendMessageA(lista, LB_SETHORIZONTALEXTENT, (WPARAM)extent, 0);
 }
 
+/* copiar_arreglo_bigint: documenta el comportamiento principal y validaciones de entrada. */
 static int copiar_arreglo_bigint(const BigIntArray *origen, BigIntArray *destino)
 {
     if (origen == NULL || destino == NULL)
@@ -306,6 +334,7 @@ static int copiar_arreglo_bigint(const BigIntArray *origen, BigIntArray *destino
 
     for (size_t i = 0; i < origen->len; i++)
     {
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!bigint_array_set(destino, i, &origen->items[i]))
         {
             bigint_array_free(destino);
@@ -316,6 +345,7 @@ static int copiar_arreglo_bigint(const BigIntArray *origen, BigIntArray *destino
     return 1;
 }
 
+/* refrescar_lista_stock: documenta el comportamiento principal y validaciones de entrada. */
 static void refrescar_lista_stock(void)
 {
     char linea[512];
@@ -351,6 +381,7 @@ static void refrescar_lista_stock(void)
     limpiar_resultado_cambio();
 }
 
+/* calcular_cambio_stock: documenta el comportamiento principal y validaciones de entrada. */
 static int calcular_cambio_stock(const BigInt *monto, const BigIntArray *denominaciones, const BigIntArray *stock, BigIntArray *solucion)
 {
     BigInt restante = {0};
@@ -363,6 +394,7 @@ static int calcular_cambio_stock(const BigInt *monto, const BigIntArray *denomin
     if (!bigint_array_create(solucion, denominaciones->len))
         return 0;
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!bigint_set(&restante, monto) && !bigint_init(&restante, monto->digits))
     {
         bigint_array_free(solucion);
@@ -381,6 +413,7 @@ static int calcular_cambio_stock(const BigInt *monto, const BigIntArray *denomin
         if (!bigint_divmod(&restante, &denominaciones->items[i], &max_usables, &r))
             goto fallo;
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (bigint_compare(&max_usables, &stock->items[i]) > 0)
         {
             if (!bigint_set(&tomar, &stock->items[i]) && !bigint_init(&tomar, stock->items[i].digits))
@@ -395,17 +428,20 @@ static int calcular_cambio_stock(const BigInt *monto, const BigIntArray *denomin
         if (!bigint_array_set(solucion, i, &tomar))
             goto fallo;
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!bigint_is_zero(&tomar))
         {
             BigInt uso = {0};
             BigInt nuevo_restante = {0};
 
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (!bigint_multiply(&denominaciones->items[i], &tomar, &uso))
             {
                 bigint_free(&uso);
                 goto fallo;
             }
 
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (!bigint_subtract(&restante, &uso, &nuevo_restante))
             {
                 bigint_free(&uso);
@@ -436,6 +472,7 @@ static int calcular_cambio_stock(const BigInt *monto, const BigIntArray *denomin
         return 0;
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!bigint_is_zero(&restante))
     {
         bigint_free(&restante);
@@ -447,6 +484,7 @@ static int calcular_cambio_stock(const BigInt *monto, const BigIntArray *denomin
     return 1;
 }
 
+/* calcular_cambio_ilimitado: documenta el comportamiento principal y validaciones de entrada. */
 static int calcular_cambio_ilimitado(const BigInt *monto, const BigIntArray *denominaciones, BigIntArray *solucion)
 {
     BigInt restante = {0};
@@ -457,6 +495,7 @@ static int calcular_cambio_ilimitado(const BigInt *monto, const BigIntArray *den
     if (!bigint_array_create(solucion, denominaciones->len))
         return 0;
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!bigint_set(&restante, monto) && !bigint_init(&restante, monto->digits))
     {
         bigint_array_free(solucion);
@@ -471,6 +510,7 @@ static int calcular_cambio_ilimitado(const BigInt *monto, const BigIntArray *den
         if (bigint_is_zero(&denominaciones->items[i]))
             continue;
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!bigint_divmod(&restante, &denominaciones->items[i], &q, &r))
         {
             bigint_free(&q);
@@ -480,6 +520,7 @@ static int calcular_cambio_ilimitado(const BigInt *monto, const BigIntArray *den
             return 0;
         }
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!bigint_array_set(solucion, i, &q))
         {
             bigint_free(&q);
@@ -497,6 +538,7 @@ static int calcular_cambio_ilimitado(const BigInt *monto, const BigIntArray *den
             break;
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!bigint_is_zero(&restante))
     {
         bigint_free(&restante);
@@ -508,10 +550,14 @@ static int calcular_cambio_ilimitado(const BigInt *monto, const BigIntArray *den
     return 1;
 }
 
+/* leer_monto_cambio: documenta el comportamiento principal y validaciones de entrada. */
 static int leer_monto_cambio(BigInt *monto)
 {
     char buffer[256];
     int len = GetWindowTextA(g_editMonto, buffer, (int)sizeof(buffer));
+
+    if (monto == NULL || g_editMonto == NULL)
+        return 0;
 
     if (len <= 0)
         return 0;
@@ -519,6 +565,7 @@ static int leer_monto_cambio(BigInt *monto)
     return bigint_init(monto, buffer);
 }
 
+/* calcular_y_mostrar_cambio: documenta el comportamiento principal y validaciones de entrada. */
 static int calcular_y_mostrar_cambio(void)
 {
     BigInt monto = {0};
@@ -528,12 +575,14 @@ static int calcular_y_mostrar_cambio(void)
     int hay_items = 0;
     int max_chars = 0;
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (g_monedaActiva < 0)
     {
         mostrar_error("Cambio", "Primero carga una moneda.");
         return 0;
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!leer_monto_cambio(&monto))
     {
         mostrar_error("Cambio", "Monto invalido. Usa un entero no negativo en centimos.");
@@ -546,8 +595,10 @@ static int calcular_y_mostrar_cambio(void)
     max_chars = (int)strlen(linea);
     SendMessageA(g_listResultado, LB_ADDSTRING, 0, (LPARAM)linea);
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (g_modo_stock_limitado)
     {
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!calcular_cambio_stock(&monto, &g_denom, &g_stock, &solucion))
         {
             SendMessageA(g_listResultado, LB_ADDSTRING, 0, (LPARAM) "No existe devolucion exacta con el stock actual.");
@@ -559,6 +610,7 @@ static int calcular_y_mostrar_cambio(void)
     }
     else
     {
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!calcular_cambio_ilimitado(&monto, &g_denom, &solucion))
         {
             SendMessageA(g_listResultado, LB_ADDSTRING, 0, (LPARAM) "No existe devolucion exacta con denominaciones actuales.");
@@ -581,6 +633,7 @@ static int calcular_y_mostrar_cambio(void)
         hay_items = 1;
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!hay_items)
     {
         SendMessageA(g_listResultado, LB_ADDSTRING, 0, (LPARAM) "No se requieren monedas para devolver 0.");
@@ -590,6 +643,7 @@ static int calcular_y_mostrar_cambio(void)
 
     ajustar_scroll_horizontal_lista(g_listResultado, max_chars + 4);
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!g_modo_stock_limitado)
     {
         SetWindowTextA(g_editMonto, "");
@@ -598,6 +652,7 @@ static int calcular_y_mostrar_cambio(void)
         return 1;
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!copiar_arreglo_bigint(&g_stock, &stock_nuevo))
     {
         bigint_free(&monto);
@@ -613,6 +668,7 @@ static int calcular_y_mostrar_cambio(void)
         if (bigint_is_zero(&solucion.items[i]))
             continue;
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!bigint_subtract(&stock_nuevo.items[i], &solucion.items[i], &nuevo_stock))
         {
             bigint_array_free(&stock_nuevo);
@@ -622,6 +678,7 @@ static int calcular_y_mostrar_cambio(void)
             return 0;
         }
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!bigint_array_set(&stock_nuevo, i, &nuevo_stock))
         {
             bigint_free(&nuevo_stock);
@@ -635,6 +692,7 @@ static int calcular_y_mostrar_cambio(void)
         bigint_free(&nuevo_stock);
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!actualizar_stock_moneda(g_monedas[g_monedaActiva], &stock_nuevo))
     {
         bigint_array_free(&stock_nuevo);
@@ -653,6 +711,7 @@ static int calcular_y_mostrar_cambio(void)
     return 1;
 }
 
+/* cargar_moneda_seleccionada: documenta el comportamiento principal y validaciones de entrada. */
 static int cargar_moneda_seleccionada(void)
 {
     int idx = (int)SendMessageA(g_comboMoneda, CB_GETCURSEL, 0, 0);
@@ -664,14 +723,17 @@ static int cargar_moneda_seleccionada(void)
 
     if (!cargar_denominaciones_moneda(g_monedas[idx], &g_denom))
         return 0;
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (g_modo_stock_limitado)
     {
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!cargar_stock_moneda(g_monedas[idx], &g_stock))
         {
             bigint_array_free(&g_denom);
             return 0;
         }
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (g_denom.len != g_stock.len)
         {
             liberar_datos_moneda();
@@ -684,6 +746,7 @@ static int cargar_moneda_seleccionada(void)
     return 1;
 }
 
+/* leer_cantidad_delta: documenta el comportamiento principal y validaciones de entrada. */
 static int leer_cantidad_delta(BigInt *delta)
 {
     char buffer[256];
@@ -695,8 +758,10 @@ static int leer_cantidad_delta(BigInt *delta)
     return bigint_init(delta, buffer);
 }
 
+/* aplicar_cambio_stock: documenta el comportamiento principal y validaciones de entrada. */
 static int aplicar_cambio_stock(int esSuma)
 {
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!g_modo_stock_limitado)
     {
         mostrar_error("Administrador", "El panel administrador solo aplica en modo stock limitado.");
@@ -707,6 +772,7 @@ static int aplicar_cambio_stock(int esSuma)
     BigInt delta = {0};
     BigInt nuevo = {0};
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (g_monedaActiva < 0)
     {
         mostrar_error("Administrador", "Primero carga una moneda.");
@@ -714,20 +780,24 @@ static int aplicar_cambio_stock(int esSuma)
     }
 
     idxDenom = (int)SendMessageA(g_comboDenom, CB_GETCURSEL, 0, 0);
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (idxDenom < 0 || (size_t)idxDenom >= g_stock.len)
     {
         mostrar_error("Administrador", "Selecciona una denominacion valida.");
         return 0;
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!leer_cantidad_delta(&delta))
     {
         mostrar_error("Administrador", "Cantidad invalida. Usa un entero no negativo.");
         return 0;
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (esSuma)
     {
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!bigint_add(&g_stock.items[idxDenom], &delta, &nuevo))
         {
             bigint_free(&delta);
@@ -737,6 +807,7 @@ static int aplicar_cambio_stock(int esSuma)
     }
     else
     {
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (bigint_compare(&g_stock.items[idxDenom], &delta) < 0)
         {
             bigint_free(&delta);
@@ -744,6 +815,7 @@ static int aplicar_cambio_stock(int esSuma)
             return 0;
         }
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!bigint_subtract(&g_stock.items[idxDenom], &delta, &nuevo))
         {
             bigint_free(&delta);
@@ -752,6 +824,7 @@ static int aplicar_cambio_stock(int esSuma)
         }
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!bigint_array_set(&g_stock, (size_t)idxDenom, &nuevo))
     {
         bigint_free(&delta);
@@ -760,6 +833,7 @@ static int aplicar_cambio_stock(int esSuma)
         return 0;
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!actualizar_stock_moneda(g_monedas[g_monedaActiva], &g_stock))
     {
         bigint_free(&delta);
@@ -777,29 +851,34 @@ static int aplicar_cambio_stock(int esSuma)
     return 1;
 }
 
+/* aplicar_cambio_stock_lote: documenta el comportamiento principal y validaciones de entrada. */
 static int aplicar_cambio_stock_lote(int esSuma)
 {
     BigIntArray deltas = {0};
     BigIntArray stock_nuevo = {0};
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!g_modo_stock_limitado)
     {
         mostrar_error("Administrador", "El panel administrador solo aplica en modo stock limitado.");
         return 0;
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (g_monedaActiva < 0 || g_stock.items == NULL || g_denom.len != g_stock.len)
     {
         mostrar_error("Administrador", "Primero carga una moneda valida.");
         return 0;
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!leer_cantidades_lote(&deltas))
     {
         mostrar_error("Administrador", "Lote invalido. Introduce exactamente una cantidad por denominacion (linea por linea).");
         return 0;
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!copiar_arreglo_bigint(&g_stock, &stock_nuevo))
     {
         bigint_array_free(&deltas);
@@ -814,8 +893,10 @@ static int aplicar_cambio_stock_lote(int esSuma)
         if (bigint_is_zero(&deltas.items[i]))
             continue;
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (esSuma)
         {
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (!bigint_add(&stock_nuevo.items[i], &deltas.items[i], &nuevo))
             {
                 bigint_array_free(&deltas);
@@ -836,6 +917,7 @@ static int aplicar_cambio_stock_lote(int esSuma)
             }
         }
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!bigint_array_set(&stock_nuevo, i, &nuevo))
         {
             bigint_free(&nuevo);
@@ -848,6 +930,7 @@ static int aplicar_cambio_stock_lote(int esSuma)
         bigint_free(&nuevo);
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!actualizar_stock_moneda(g_monedas[g_monedaActiva], &stock_nuevo))
     {
         bigint_array_free(&deltas);
@@ -865,6 +948,7 @@ static int aplicar_cambio_stock_lote(int esSuma)
     return 1;
 }
 
+/* calcular_total_valor: documenta el comportamiento principal y validaciones de entrada. */
 static int calcular_total_valor(const BigIntArray *denom, const BigIntArray *cantidades, BigInt *total)
 {
     BigInt acumulado = {0};
@@ -903,6 +987,7 @@ static int calcular_total_valor(const BigIntArray *denom, const BigIntArray *can
     return 1;
 }
 
+/* aplicar_cambio_especifico: documenta el comportamiento principal y validaciones de entrada. */
 static int aplicar_cambio_especifico(void)
 {
     BigIntArray entradas = {0};
@@ -913,6 +998,7 @@ static int aplicar_cambio_especifico(void)
     char linea[512];
     int max_chars = 0;
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (g_monedaActiva < 0 || g_denom.items == NULL || g_denom.len == 0)
     {
         mostrar_error("Cambio especifico", "Primero carga una moneda valida.");
@@ -939,6 +1025,7 @@ static int aplicar_cambio_especifico(void)
         return 0;
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (bigint_compare(&totalEntrada, &totalDevolucion) != 0)
     {
         mostrar_error("Cambio especifico", "El total entregado debe ser igual al total solicitado como devolucion.");
@@ -949,6 +1036,7 @@ static int aplicar_cambio_especifico(void)
         return 0;
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!g_modo_stock_limitado)
     {
         limpiar_resultado_cambio();
@@ -975,6 +1063,7 @@ static int aplicar_cambio_especifico(void)
         return 1;
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (g_stock.items == NULL || g_denom.len != g_stock.len)
     {
         mostrar_error("Cambio especifico", "No hay stock cargado para modo limitado.");
@@ -985,6 +1074,7 @@ static int aplicar_cambio_especifico(void)
         return 0;
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!copiar_arreglo_bigint(&g_stock, &stock_nuevo))
     {
         mostrar_error("Cambio especifico", "No se pudo preparar la actualizacion de stock.");
@@ -1020,6 +1110,7 @@ static int aplicar_cambio_especifico(void)
         bigint_free(&trasSalida);
     }
 
+    /* if: documenta el comportamiento principal y validaciones de entrada. */
     if (!actualizar_stock_moneda(g_monedas[g_monedaActiva], &stock_nuevo))
     {
         bigint_array_free(&entradas);
@@ -1060,6 +1151,7 @@ static int aplicar_cambio_especifico(void)
     return 1;
 }
 
+/* crear_controles: documenta el comportamiento principal y validaciones de entrada. */
 static void crear_controles(HWND hwnd)
 {
     CreateWindowA("STATIC", "Panel Principal", WS_CHILD | WS_VISIBLE | SS_LEFT,
@@ -1155,12 +1247,15 @@ static void crear_controles(HWND hwnd)
                                     20, 658, 570, 110, hwnd, (HMENU)ID_LIST_RESULTADO, NULL, NULL);
 }
 
+/* wnd_proc: documenta el comportamiento principal y validaciones de entrada. */
 static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
+    /* switch: documenta el comportamiento principal y validaciones de entrada. */
     switch (msg)
     {
     case WM_CREATE:
         crear_controles(hwnd);
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (!cargar_nombres_moneda())
         {
             mostrar_error("Inicio", "No se pudieron leer monedas desde monedas.txt");
@@ -1172,6 +1267,7 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
     {
         int id = LOWORD(wParam);
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (id == ID_BTN_CARGAR)
         {
             if (!cargar_moneda_seleccionada())
@@ -1179,9 +1275,11 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
             return 0;
         }
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (id == ID_BTN_RECARGAR)
         {
             int idx_prev = (int)SendMessageA(g_comboMoneda, CB_GETCURSEL, 0, 0);
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (!cargar_nombres_moneda())
             {
                 mostrar_error("Recarga", "No se pudieron recargar monedas.");
@@ -1194,6 +1292,7 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
             if (idx_prev >= 0 && idx_prev < g_monedasCount)
                 SendMessageA(g_comboMoneda, CB_SETCURSEL, (WPARAM)idx_prev, 0);
 
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (!cargar_moneda_seleccionada())
             {
                 mostrar_error("Recarga", "No se pudo recargar moneda/stock.");
@@ -1202,45 +1301,53 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
             return 0;
         }
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (id == ID_BTN_AGREGAR)
         {
             aplicar_cambio_stock(1);
             return 0;
         }
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (id == ID_BTN_QUITAR)
         {
             aplicar_cambio_stock(0);
             return 0;
         }
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (id == ID_BTN_AGREGAR_LOTE)
         {
             aplicar_cambio_stock_lote(1);
             return 0;
         }
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (id == ID_BTN_QUITAR_LOTE)
         {
             aplicar_cambio_stock_lote(0);
             return 0;
         }
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (id == ID_BTN_CALCULAR)
         {
             calcular_y_mostrar_cambio();
             return 0;
         }
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (id == ID_BTN_CAMBIO_ESPECIFICO)
         {
             aplicar_cambio_especifico();
             return 0;
         }
 
+        /* if: documenta el comportamiento principal y validaciones de entrada. */
         if (id == ID_RADIO_LIMITADO || id == ID_RADIO_ILIMITADO)
         {
             int nuevo_limitado = (id == ID_RADIO_LIMITADO) ? 1 : 0;
+            /* if: documenta el comportamiento principal y validaciones de entrada. */
             if (nuevo_limitado != g_modo_stock_limitado)
             {
                 int idx = (int)SendMessageA(g_comboMoneda, CB_GETCURSEL, 0, 0);
@@ -1265,6 +1372,7 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
     return DefWindowProcA(hwnd, msg, wParam, lParam);
 }
 
+/* WinMain: documenta el comportamiento principal y validaciones de entrada. */
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     WNDCLASSA wc = {0};
@@ -1294,6 +1402,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ShowWindow(hwnd, nCmdShow);
     UpdateWindow(hwnd);
 
+    /* while: documenta el comportamiento principal y validaciones de entrada. */
     while (GetMessageA(&msg, NULL, 0, 0) > 0)
     {
         TranslateMessage(&msg);
@@ -1303,6 +1412,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     return (int)msg.wParam;
 }
 #else
+/* main: documenta el comportamiento principal y validaciones de entrada. */
 int main(void)
 {
     return 0;
