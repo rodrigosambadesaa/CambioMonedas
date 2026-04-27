@@ -1,9 +1,9 @@
 APP := progvoraz
-SRC := main.c vector_dinamico.c moneda_gestion.c bigint.c
+SRC := main.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c
 GUI_APP := progvoraz_gui
-GUI_SRC_WIN := gui_window.c moneda_gestion.c bigint.c
+GUI_SRC_WIN := gui_window.c moneda_gestion.c bigint.c algoritmo_cambio.c
 GUI_SRC_MAC := gui_macos.swift
-GUI_SRC_PORTABLE := gui_portable.c moneda_gestion.c bigint.c
+GUI_SRC_PORTABLE := gui_portable.c moneda_gestion.c bigint.c algoritmo_cambio.c
 
 CC ?= gcc
 CFLAGS ?= -std=c11 -Wall -Wextra -Wpedantic
@@ -25,7 +25,7 @@ all: debug
 debug: CFLAGS += -O0 -g
 debug: $(TARGET)
 
-release: CFLAGS += -O2
+release: CFLAGS += -O3 -flto
 release: $(TARGET)
 
 $(TARGET): $(SRC)
@@ -37,7 +37,7 @@ run: $(TARGET)
 ifeq ($(OS),Windows_NT)
 GUI_TARGET := $(GUI_APP).exe
 
-gui: CFLAGS += -O2
+gui: CFLAGS += -O3 -flto
 gui: $(GUI_TARGET)
 
 $(GUI_TARGET): $(GUI_SRC_WIN)
@@ -58,7 +58,7 @@ run-gui: $(GUI_TARGET)
 else
 GUI_TARGET := $(GUI_APP)
 
-gui: CFLAGS += -O2
+gui: CFLAGS += -O3 -flto
 gui: $(GUI_TARGET)
 
 $(GUI_TARGET): $(GUI_SRC_PORTABLE)
