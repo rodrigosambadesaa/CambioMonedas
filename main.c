@@ -14,6 +14,7 @@
 #include <string.h>
 #include "bigint.h"
 #include "moneda_gestion.h"
+#include "algoritmo_cambio.h"
 
 #define MAX_MONEDA_NOMBRE 20
 #define MAX_MONEDAS_DISPONIBLES 512
@@ -483,213 +484,6 @@ static void limpiar_arreglo(BigIntArray *arr)
         bigint_array_free(arr);
 }
 
-/* cambio: documenta el comportamiento principal y validaciones de entrada. */
-static int cambio(const BigInt *monto, const BigIntArray *denominaciones, BigIntArray *solucion)
-{
-    BigInt restante = {0};
-
-    if (monto == NULL || denominaciones == NULL || solucion == NULL)
-        return 0;
-
-    if (!bigint_array_create(solucion, denominaciones->len))
-        return 0;
-
-    /* if: documenta el comportamiento principal y validaciones de entrada. */
-    if (!bigint_set(&restante, monto) && !bigint_init(&restante, monto->digits))
-    {
-        limpiar_arreglo(solucion);
-        return 0;
-    }
-
-    for (size_t i = 0; i < denominaciones->len; i++)
-    {
-        BigInt q = {0};
-        BigInt r = {0};
-
-        if (bigint_is_zero(&denominaciones->items[i]))
-            continue;
-
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
-        if (!bigint_divmod(&restante, &denominaciones->items[i], &q, &r))
-        {
-            bigint_free(&q);
-            bigint_free(&r);
-            bigint_free(&restante);
-            limpiar_arreglo(solucion);
-            return 0;
-        }
-
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
-        if (!bigint_array_set(solucion, i, &q))
-        {
-            bigint_free(&q);
-            bigint_free(&r);
-            bigint_free(&restante);
-            limpiar_arreglo(solucion);
-            return 0;
-        }
-
-        bigint_free(&restante);
-        restante = r;
-        bigint_free(&q);
-
-        if (bigint_is_zero(&restante))
-            break;
-    }
-
-    {
-        int exito = bigint_is_zero(&restante);
-        bigint_free(&restante);
-        return exito;
-    }
-}
-
-/* cambio_stock: documenta el comportamiento principal y validaciones de entrada. */
-static int cambio_stock(const BigInt *monto, const BigIntArray *denominaciones, BigIntArray *solucion, BigIntArray *stock)
-{
-    BigInt restante = {0};
-    BigIntArray stockTrabajo = {0};
-
-    if (monto == NULL || denominaciones == NULL || solucion == NULL || stock == NULL)
-        return 0;
-    if (denominaciones->len != stock->len)
-        return 0;
-
-    if (!bigint_array_create(solucion, denominaciones->len))
-        return 0;
-
-    /* if: documenta el comportamiento principal y validaciones de entrada. */
-    if (!copiar_arreglo_bigint(stock, &stockTrabajo))
-    {
-        limpiar_arreglo(solucion);
-        return 0;
-    }
-
-    /* if: documenta el comportamiento principal y validaciones de entrada. */
-    if (!bigint_set(&restante, monto) && !bigint_init(&restante, monto->digits))
-    {
-        limpiar_arreglo(solucion);
-        limpiar_arreglo(&stockTrabajo);
-        return 0;
-    }
-
-    for (size_t i = 0; i < denominaciones->len; i++)
-    {
-        BigInt maxUsables = {0};
-        BigInt r = {0};
-        BigInt tomar = {0};
-
-        if (bigint_is_zero(&denominaciones->items[i]))
-            continue;
-
-        if (!bigint_divmod(&restante, &denominaciones->items[i], &maxUsables, &r))
-            goto fallo;
-
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
-        if (bigint_compare(&maxUsables, &stockTrabajo.items[i]) > 0)
-        {
-            if (!bigint_set(&tomar, &stockTrabajo.items[i]) && !bigint_init(&tomar, stockTrabajo.items[i].digits))
-                goto fallo;
-        }
-        else
-        {
-            if (!bigint_set(&tomar, &maxUsables) && !bigint_init(&tomar, maxUsables.digits))
-                goto fallo;
-        }
-
-        if (!bigint_array_set(solucion, i, &tomar))
-            goto fallo;
-
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
-        if (!bigint_is_zero(&tomar))
-        {
-            BigInt uso = {0};
-            BigInt nuevoRestante = {0};
-            BigInt nuevoStock = {0};
-
-            /* if: documenta el comportamiento principal y validaciones de entrada. */
-            if (!bigint_multiply(&denominaciones->items[i], &tomar, &uso))
-            {
-                bigint_free(&uso);
-                goto fallo;
-            }
-
-            /* if: documenta el comportamiento principal y validaciones de entrada. */
-            if (!bigint_subtract(&restante, &uso, &nuevoRestante))
-            {
-                bigint_free(&uso);
-                bigint_free(&nuevoRestante);
-                goto fallo;
-            }
-
-            /* if: documenta el comportamiento principal y validaciones de entrada. */
-            if (!bigint_subtract(&stockTrabajo.items[i], &tomar, &nuevoStock))
-            {
-                bigint_free(&uso);
-                bigint_free(&nuevoRestante);
-                bigint_free(&nuevoStock);
-                goto fallo;
-            }
-
-            bigint_free(&restante);
-            restante = nuevoRestante;
-
-            /* if: documenta el comportamiento principal y validaciones de entrada. */
-            if (!bigint_set(&stockTrabajo.items[i], &nuevoStock))
-            {
-                bigint_free(&uso);
-                bigint_free(&nuevoStock);
-                goto fallo;
-            }
-
-            bigint_free(&uso);
-            bigint_free(&nuevoStock);
-        }
-
-        bigint_free(&maxUsables);
-        bigint_free(&r);
-        bigint_free(&tomar);
-
-        if (bigint_is_zero(&restante))
-            break;
-
-        continue;
-
-    fallo:
-        bigint_free(&maxUsables);
-        bigint_free(&r);
-        bigint_free(&tomar);
-        bigint_free(&restante);
-        limpiar_arreglo(solucion);
-        limpiar_arreglo(&stockTrabajo);
-        return 0;
-    }
-
-    /* if: documenta el comportamiento principal y validaciones de entrada. */
-    if (!bigint_is_zero(&restante))
-    {
-        bigint_free(&restante);
-        limpiar_arreglo(solucion);
-        limpiar_arreglo(&stockTrabajo);
-        return 0;
-    }
-
-    for (size_t i = 0; i < stock->len; i++)
-    {
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
-        if (!bigint_array_set(stock, i, &stockTrabajo.items[i]))
-        {
-            bigint_free(&restante);
-            limpiar_arreglo(solucion);
-            limpiar_arreglo(&stockTrabajo);
-            return 0;
-        }
-    }
-
-    bigint_free(&restante);
-    limpiar_arreglo(&stockTrabajo);
-    return 1;
-}
 
 /* imprimir_resultado: documenta el comportamiento principal y validaciones de entrada. */
 static void imprimir_resultado(const BigIntArray *monedas, const BigIntArray *solucion, const BigIntArray *stock, int usarStock)
@@ -1527,7 +1321,7 @@ int main(void)
                 /* if: documenta el comportamiento principal y validaciones de entrada. */
                 if (opcion == 'a')
                 {
-                    resultado = cambio(&cantidad, &monedas, &solucion);
+                    resultado = calcular_cambio_optimo(&cantidad, &monedas, &solucion);
                     if (resultado)
                         imprimir_resultado(&monedas, &solucion, NULL, 0);
                     else
@@ -1535,7 +1329,7 @@ int main(void)
                 }
                 else
                 {
-                    resultado = cambio_stock(&cantidad, &monedas, &solucion, &stock);
+                    resultado = calcular_cambio_optimo_stock(&cantidad, &monedas, &stock, &solucion);
                     /* if: documenta el comportamiento principal y validaciones de entrada. */
                     if (resultado)
                     {
