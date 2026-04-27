@@ -1,0 +1,15 @@
+.git
+.github
+.vscode
+nbproject
+build
+dist
+*.o
+*.obj
+*.exe
+*.log
+*.tmp
+*.swp
+progvoraz
+progvoraz_gui
+progvoraz_*

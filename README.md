@@ -43,6 +43,50 @@ La persistencia de stock mantiene el enfoque sin archivos temporales:
 - GCC en PATH.
 - Archivos monedas.txt y stock.txt en la raiz del proyecto.
 
+Si usas Docker, no necesitas GCC ni toolchain C instalados localmente.
+
+## Docker (sin dependencias locales de C)
+
+Build de imagen:
+
+```bash
+docker compose build
+```
+
+Ejecutar modo consola:
+
+```bash
+docker compose run --rm progvoraz-console
+```
+
+Ejecutar GUI portable (terminal):
+
+```bash
+docker compose run --rm progvoraz-gui-portable
+```
+
+Ejecutar pruebas automáticas de todos los modos soportados en Docker:
+
+```bash
+docker compose run --rm progvoraz-test
+```
+
+En Windows PowerShell (host):
+
+```powershell
+docker compose build
+docker compose run --rm progvoraz-test
+```
+
+En WSL (Ubuntu u otra distro):
+
+```bash
+docker compose build
+docker compose run --rm progvoraz-test
+```
+
+Nota: la GUI Win32 (gui_window.c) y la GUI nativa de macOS (gui_macos.swift) son especificas de su sistema operativo y no se ejecutan dentro del contenedor Linux.
+
 ## Compilar y ejecutar
 
 ### Opcion 1: Make
