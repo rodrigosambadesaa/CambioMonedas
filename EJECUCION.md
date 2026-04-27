@@ -45,6 +45,12 @@ Ejecuta GUI portable (terminal):
 docker compose run --rm progvoraz-gui-portable
 ```
 
+Persistencia de archivos en Docker Compose:
+
+- `monedas.txt` se monta en solo lectura desde la raiz del proyecto.
+- `stock.txt` se monta en modo lectura/escritura desde la raiz del proyecto.
+- Los cambios de stock realizados dentro del contenedor se reflejan en el `stock.txt` local.
+
 Ejecuta pruebas automatizadas de modos `a`, `b`, `c`, GUI limitado y GUI ilimitado:
 
 ```bash
