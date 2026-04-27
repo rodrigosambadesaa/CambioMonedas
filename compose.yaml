@@ -1,0 +1,25 @@
+services:
+  progvoraz-console:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: progvoraz:latest
+    stdin_open: true
+    tty: true
+    command: [ "console" ]
+
+  progvoraz-gui-portable:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: progvoraz:latest
+    stdin_open: true
+    tty: true
+    command: [ "gui" ]
+
+  progvoraz-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: progvoraz:latest
+    command: [ "test" ]
