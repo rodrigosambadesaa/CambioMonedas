@@ -4,6 +4,9 @@ services:
       context: .
       dockerfile: Dockerfile
     image: progvoraz:latest
+    volumes:
+      - ./monedas.txt:/app/monedas.txt:ro
+      - ./stock.txt:/app/stock.txt
     stdin_open: true
     tty: true
     command: [ "console" ]
@@ -13,6 +16,9 @@ services:
       context: .
       dockerfile: Dockerfile
     image: progvoraz:latest
+    volumes:
+      - ./monedas.txt:/app/monedas.txt:ro
+      - ./stock.txt:/app/stock.txt
     stdin_open: true
     tty: true
     command: [ "gui" ]
@@ -22,4 +28,7 @@ services:
       context: .
       dockerfile: Dockerfile
     image: progvoraz:latest
+    volumes:
+      - ./monedas.txt:/app/monedas.txt:ro
+      - ./stock.txt:/app/stock.txt
     command: [ "test" ]
