@@ -66,7 +66,7 @@ make gui
 ### Compilar GUI en Windows (GCC directo)
 
 ```powershell
-gcc -std=c11 -Wall -Wextra -Wpedantic -O2 gui_window.c moneda_gestion.c bigint.c -o progvoraz_gui.exe -mwindows
+gcc -std=c11 -Wall -Wextra -Wpedantic -O3 -flto gui_window.c moneda_gestion.c bigint.c algoritmo_cambio.c vector_dinamico.c -o progvoraz_gui.exe -mwindows
 ```
 
 ### Ejecutar GUI en Windows
@@ -96,13 +96,13 @@ En Linux, `make gui` compila `gui_portable.c`, que ofrece un panel administrador
 ### Opcion alternativa (GCC directo, Linux)
 
 ```bash
-gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c moneda_gestion.c bigint.c -o progvoraz
+gcc -std=c11 -Wall -Wextra -Wpedantic -O3 -flto main.c moneda_gestion.c bigint.c algoritmo_cambio.c vector_dinamico.c -o progvoraz
 ```
 
 ### Opcion alternativa (GCC directo, Windows)
 
 ```powershell
-gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c moneda_gestion.c bigint.c -o progvoraz.exe
+gcc -std=c11 -Wall -Wextra -Wpedantic -O3 -flto main.c moneda_gestion.c bigint.c algoritmo_cambio.c vector_dinamico.c -o progvoraz.exe
 ```
 
 ## Ejecutar
