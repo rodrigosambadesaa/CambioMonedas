@@ -65,6 +65,11 @@ Ejecutar GUI portable (terminal):
 docker compose run --rm progvoraz-gui-portable
 ```
 
+Persistencia de datos con Docker Compose:
+
+- `monedas.txt` y `stock.txt` de la raiz del proyecto se montan dentro del contenedor.
+- Cualquier actualizacion de stock hecha desde consola o GUI portable se guarda en tu `stock.txt` local.
+
 Ejecutar pruebas automáticas de todos los modos soportados en Docker:
 
 ```bash
