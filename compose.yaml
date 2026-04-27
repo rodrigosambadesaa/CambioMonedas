@@ -6,7 +6,7 @@ services:
     image: progvoraz:latest
     stdin_open: true
     tty: true
-    command: ["console"]
+    command: [ "console" ]
 
   progvoraz-gui-portable:
     build:
@@ -15,11 +15,11 @@ services:
     image: progvoraz:latest
     stdin_open: true
     tty: true
-    command: ["gui"]
+    command: [ "gui" ]
 
   progvoraz-test:
     build:
       context: .
       dockerfile: Dockerfile
     image: progvoraz:latest
-    command: ["test"]
+    command: [ "test" ]
