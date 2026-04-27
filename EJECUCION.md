@@ -25,6 +25,46 @@ gcc --version
 
 ## Compilar
 
+### Opcion Docker (recomendada para evitar toolchain local)
+
+Compila y empaqueta consola + GUI portable dentro de contenedor Linux:
+
+```bash
+docker compose build
+```
+
+Ejecuta consola:
+
+```bash
+docker compose run --rm progvoraz-console
+```
+
+Ejecuta GUI portable (terminal):
+
+```bash
+docker compose run --rm progvoraz-gui-portable
+```
+
+Ejecuta pruebas automatizadas de modos `a`, `b`, `c`, GUI limitado y GUI ilimitado:
+
+```bash
+docker compose run --rm progvoraz-test
+```
+
+Prueba en host Windows (PowerShell):
+
+```powershell
+docker compose build
+docker compose run --rm progvoraz-test
+```
+
+Prueba equivalente en WSL:
+
+```bash
+docker compose build
+docker compose run --rm progvoraz-test
+```
+
 ### Visual Studio Code (recomendado en este repositorio)
 
 El proyecto incluye configuracion en `.vscode/`.
@@ -62,6 +102,8 @@ make gui
 ```
 
 ## Modo ventana (GUI) - comandos directos
+
+Nota Docker: el contenedor Linux cubre GUI portable en terminal (gui_portable.c). La GUI Win32 y la GUI nativa macOS se mantienen para ejecucion nativa en su sistema operativo.
 
 ### Compilar GUI en Windows (GCC directo)
 
