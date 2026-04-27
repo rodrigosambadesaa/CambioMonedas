@@ -21,15 +21,15 @@ jobs:
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
-        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c moneda_gestion.c bigint.c -o progvoraz
+        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz
 
       - name: Build GUI (Linux portable)
         if: runner.os == 'Linux'
-        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 gui_portable.c moneda_gestion.c bigint.c -o progvoraz_gui
+        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 gui_portable.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz_gui
 
       - name: Build (macOS)
         if: runner.os == 'macOS'
-        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c moneda_gestion.c bigint.c -o progvoraz
+        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz
 
       - name: Swift toolchain info (macOS)
         if: runner.os == 'macOS'
@@ -43,27 +43,27 @@ jobs:
 
       - name: Build GUI (macOS portable fallback)
         if: runner.os == 'macOS'
-        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 gui_portable.c moneda_gestion.c bigint.c -o progvoraz_gui_portable
+        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 gui_portable.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz_gui_portable
 
       - name: Smoke test (Linux)
         if: runner.os == 'Linux'
         run: |
-          printf "a\neuro\n0\nsalir\n" | ./progvoraz
+          printf "a\neuro\ntradicional\n30\nsalir\n" | ./progvoraz
 
       - name: Smoke test GUI portable (Linux)
         if: runner.os == 'Linux'
         run: |
-          printf "euro\nvolver\nsalir\n" | ./progvoraz_gui
+          printf "limitado\neuro\ncalcular\n30\nsalir\n" | ./progvoraz_gui
 
       - name: Smoke test (macOS)
         if: runner.os == 'macOS'
         run: |
-          printf "a\neuro\n0\nsalir\n" | ./progvoraz
+          printf "a\neuro\ntradicional\n30\nsalir\n" | ./progvoraz
 
       - name: Smoke test GUI portable (macOS)
         if: runner.os == 'macOS'
         run: |
-          printf "euro\nvolver\nsalir\n" | ./progvoraz_gui_portable
+          printf "limitado\neuro\ncalcular\n30\nsalir\n" | ./progvoraz_gui_portable
 
       - name: Smoke launch GUI Swift (macOS)
         if: runner.os == 'macOS'
@@ -81,12 +81,12 @@ jobs:
       - name: Build (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c moneda_gestion.c bigint.c -o progvoraz.exe
+        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz.exe
 
       - name: Build GUI (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 gui_window.c moneda_gestion.c bigint.c -o progvoraz_gui.exe -mwindows
+        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 gui_window.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz_gui.exe -mwindows
 
       - name: Smoke test (Windows)
         if: runner.os == 'Windows'
@@ -95,7 +95,8 @@ jobs:
           @"
           a
           euro
-          0
+          tradicional
+          30
           salir
           "@ | .\progvoraz.exe | Out-String
 
@@ -106,8 +107,8 @@ jobs:
           @"
           a
           euro
+          tradicional
           50
-          0
           salir
           "@ | .\progvoraz.exe | Out-String
 
@@ -118,8 +119,8 @@ jobs:
           @"
           b
           euro
+          tradicional
           50
-          0
           salir
           "@ | .\progvoraz.exe | Out-String
 
@@ -156,4 +157,18 @@ jobs:
         run: |
           Write-Host "Windows Phone/Windows 10 Mobile no tiene runner oficial ni SDK soportado en GitHub Actions."
           Write-Host "La cobertura equivalente se valida en windows-latest para consola (usuario/admin) y arranque GUI Win32."
+
+  docker-branch:
+    if: ${{ (github.event_name == 'push' && github.ref_name == 'feat/dockerizacion-modos') || (github.event_name == 'pull_request' && github.head_ref == 'feat/dockerizacion-modos') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Docker compose build
+        run: docker compose build
+
+      - name: Docker test all modes
+        run: docker compose run --rm progvoraz-test
 
