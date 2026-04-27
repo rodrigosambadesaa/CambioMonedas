@@ -550,7 +550,7 @@ static int pedir_subopcion_cambio(void)
     char buffer[32];
     char comando[32];
 
-    printf("Subopcion cambio (tradicional/especifico, volver, modo o salir): ");
+    printf("Subopcion cambio (tradicional|1 / especifico|2, volver, modo o salir): ");
     if (!leer_linea(buffer, sizeof(buffer)))
         return -1;
 
@@ -567,9 +567,9 @@ static int pedir_subopcion_cambio(void)
         return 3;
     if (strcmp(comando, "volver") == 0)
         return 2;
-    if (strcmp(comando, "tradicional") == 0 || strcmp(comando, "t") == 0)
+    if (strcmp(comando, "tradicional") == 0 || strcmp(comando, "t") == 0 || strcmp(comando, "1") == 0)
         return 1;
-    if (strcmp(comando, "especifico") == 0 || strcmp(comando, "e") == 0)
+    if (strcmp(comando, "especifico") == 0 || strcmp(comando, "e") == 0 || strcmp(comando, "2") == 0)
         return 5;
 
     return 0;
@@ -1333,9 +1333,56 @@ int main(void)
                     /* if: documenta el comportamiento principal y validaciones de entrada. */
                     if (resultado)
                     {
-                        imprimir_resultado(&monedas, &solucion, &stock, 1);
-                        if (!actualizar_stock_moneda(monedaClave, &stock))
+                        BigIntArray stockNuevo = {0};
+                        int okStockNuevo = copiar_arreglo_bigint(&stock, &stockNuevo);
+
+                        if (!okStockNuevo)
+                        {
+                            printf("No se pudo preparar la actualizacion de stock.\n");
+                            limpiar_arreglo(&solucion);
+                            bigint_free(&cantidad);
+                            continue;
+                        }
+
+                        for (size_t i = 0; i < stockNuevo.len; i++)
+                        {
+                            BigInt restante = {0};
+
+                            if (bigint_is_zero(&solucion.items[i]))
+                                continue;
+
+                            if (!bigint_subtract(&stockNuevo.items[i], &solucion.items[i], &restante) ||
+                                !bigint_array_set(&stockNuevo, i, &restante))
+                            {
+                                bigint_free(&restante);
+                                okStockNuevo = 0;
+                                break;
+                            }
+
+                            bigint_free(&restante);
+                        }
+
+                        if (!okStockNuevo)
+                        {
+                            limpiar_arreglo(&stockNuevo);
+                            printf("No se pudo aplicar la devolucion al stock.\n");
+                            limpiar_arreglo(&solucion);
+                            bigint_free(&cantidad);
+                            continue;
+                        }
+
+                        if (!actualizar_stock_moneda(monedaClave, &stockNuevo))
+                        {
+                            limpiar_arreglo(&stockNuevo);
                             printf("No se pudo actualizar el archivo de stock.\n");
+                            limpiar_arreglo(&solucion);
+                            bigint_free(&cantidad);
+                            continue;
+                        }
+
+                        limpiar_arreglo(&stock);
+                        stock = stockNuevo;
+                        imprimir_resultado(&monedas, &solucion, &stock, 1);
                     }
                     else
                     {
