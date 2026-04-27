@@ -6,6 +6,7 @@
 #include <string.h>
 #include "bigint.h"
 #include "moneda_gestion.h"
+#include "algoritmo_cambio.h"
 
 #define MAX_MONEDAS 64
 #define MAX_NOMBRE 64
@@ -199,174 +200,6 @@ static int copiar_arreglo_bigint(const BigIntArray *origen, BigIntArray *destino
     return 1;
 }
 
-/* calcular_cambio_stock: documenta el comportamiento principal y validaciones de entrada. */
-static int calcular_cambio_stock(const BigInt *monto, const BigIntArray *denominaciones, const BigIntArray *stock, BigIntArray *solucion)
-{
-    BigInt restante = {0};
-
-    if (monto == NULL || denominaciones == NULL || stock == NULL || solucion == NULL)
-        return 0;
-    if (denominaciones->len != stock->len)
-        return 0;
-
-    if (!bigint_array_create(solucion, denominaciones->len))
-        return 0;
-
-    /* if: documenta el comportamiento principal y validaciones de entrada. */
-    if (!bigint_set(&restante, monto) && !bigint_init(&restante, monto->digits))
-    {
-        bigint_array_free(solucion);
-        return 0;
-    }
-
-    for (size_t i = 0; i < denominaciones->len; i++)
-    {
-        BigInt max_usables = {0};
-        BigInt r = {0};
-        BigInt tomar = {0};
-
-        if (bigint_is_zero(&denominaciones->items[i]))
-            continue;
-
-        if (!bigint_divmod(&restante, &denominaciones->items[i], &max_usables, &r))
-            goto fallo;
-
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
-        if (bigint_compare(&max_usables, &stock->items[i]) > 0)
-        {
-            if (!bigint_set(&tomar, &stock->items[i]) && !bigint_init(&tomar, stock->items[i].digits))
-                goto fallo;
-        }
-        else
-        {
-            if (!bigint_set(&tomar, &max_usables) && !bigint_init(&tomar, max_usables.digits))
-                goto fallo;
-        }
-
-        if (!bigint_array_set(solucion, i, &tomar))
-            goto fallo;
-
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
-        if (!bigint_is_zero(&tomar))
-        {
-            BigInt uso = {0};
-            BigInt nuevo_restante = {0};
-
-            /* if: documenta el comportamiento principal y validaciones de entrada. */
-            if (!bigint_multiply(&denominaciones->items[i], &tomar, &uso))
-            {
-                bigint_free(&uso);
-                goto fallo;
-            }
-
-            /* if: documenta el comportamiento principal y validaciones de entrada. */
-            if (!bigint_subtract(&restante, &uso, &nuevo_restante))
-            {
-                bigint_free(&uso);
-                bigint_free(&nuevo_restante);
-                goto fallo;
-            }
-
-            bigint_free(&restante);
-            restante = nuevo_restante;
-            bigint_free(&uso);
-        }
-
-        bigint_free(&max_usables);
-        bigint_free(&r);
-        bigint_free(&tomar);
-
-        if (bigint_is_zero(&restante))
-            break;
-
-        continue;
-
-    fallo:
-        bigint_free(&max_usables);
-        bigint_free(&r);
-        bigint_free(&tomar);
-        bigint_free(&restante);
-        bigint_array_free(solucion);
-        return 0;
-    }
-
-    /* if: documenta el comportamiento principal y validaciones de entrada. */
-    if (!bigint_is_zero(&restante))
-    {
-        bigint_free(&restante);
-        bigint_array_free(solucion);
-        return 0;
-    }
-
-    bigint_free(&restante);
-    return 1;
-}
-
-/* calcular_cambio_ilimitado: documenta el comportamiento principal y validaciones de entrada. */
-static int calcular_cambio_ilimitado(const BigInt *monto, const BigIntArray *denominaciones, BigIntArray *solucion)
-{
-    BigInt restante = {0};
-
-    if (monto == NULL || denominaciones == NULL || solucion == NULL)
-        return 0;
-
-    if (!bigint_array_create(solucion, denominaciones->len))
-        return 0;
-
-    /* if: documenta el comportamiento principal y validaciones de entrada. */
-    if (!bigint_set(&restante, monto) && !bigint_init(&restante, monto->digits))
-    {
-        bigint_array_free(solucion);
-        return 0;
-    }
-
-    for (size_t i = 0; i < denominaciones->len; i++)
-    {
-        BigInt q = {0};
-        BigInt r = {0};
-
-        if (bigint_is_zero(&denominaciones->items[i]))
-            continue;
-
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
-        if (!bigint_divmod(&restante, &denominaciones->items[i], &q, &r))
-        {
-            bigint_free(&q);
-            bigint_free(&r);
-            bigint_free(&restante);
-            bigint_array_free(solucion);
-            return 0;
-        }
-
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
-        if (!bigint_array_set(solucion, i, &q))
-        {
-            bigint_free(&q);
-            bigint_free(&r);
-            bigint_free(&restante);
-            bigint_array_free(solucion);
-            return 0;
-        }
-
-        bigint_free(&restante);
-        restante = r;
-        bigint_free(&q);
-
-        if (bigint_is_zero(&restante))
-            break;
-    }
-
-    /* if: documenta el comportamiento principal y validaciones de entrada. */
-    if (!bigint_is_zero(&restante))
-    {
-        bigint_free(&restante);
-        bigint_array_free(solucion);
-        return 0;
-    }
-
-    bigint_free(&restante);
-    return 1;
-}
 
 /* pedir_cantidades_por_denominacion: documenta el comportamiento principal y validaciones de entrada. */
 static int pedir_cantidades_por_denominacion(const BigIntArray *denom, const char *titulo, BigIntArray *cantidades)
@@ -610,7 +443,7 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
     if (modo == MODO_LIMITADO)
     {
         /* if: documenta el comportamiento principal y validaciones de entrada. */
-        if (!calcular_cambio_stock(&monto, denom, stock, &solucion))
+        if (!calcular_cambio_optimo_stock(&monto, denom, stock, &solucion))
         {
             printf("No existe devolucion exacta con el stock actual.\n");
             bigint_free(&monto);
@@ -621,7 +454,7 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
     else
     {
         /* if: documenta el comportamiento principal y validaciones de entrada. */
-        if (!calcular_cambio_ilimitado(&monto, denom, &solucion))
+        if (!calcular_cambio_optimo(&monto, denom, &solucion))
         {
             printf("No existe devolucion exacta con denominaciones actuales.\n");
             bigint_free(&monto);
