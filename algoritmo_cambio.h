@@ -4,13 +4,17 @@
 #include "bigint.h"
 
 /*
- * Calcula el cambio óptimo (modo ilimitado) usando backtracking.
+ * Calcula el cambio con el menor numero de monedas en modo ilimitado cuando
+ * el monto cabe en la ruta de programacion dinamica. Para montos BigInt muy
+ * grandes conserva una busqueda descendente compatible con precision arbitraria.
  * Retorna 1 si encuentra solución, 0 en caso contrario.
  */
 int calcular_cambio_optimo(const BigInt *monto, const BigIntArray *denominaciones, BigIntArray *solucion);
 
 /*
- * Calcula el cambio óptimo respetando el stock disponible usando backtracking.
+ * Calcula el cambio con el menor numero de monedas respetando stock cuando
+ * el monto cabe en la ruta de programacion dinamica. Para montos BigInt muy
+ * grandes conserva una busqueda descendente con poda por stock.
  * Retorna 1 si encuentra solución, 0 en caso contrario.
  */
 int calcular_cambio_optimo_stock(const BigInt *monto, const BigIntArray *denominaciones, const BigIntArray *stock, BigIntArray *solucion);

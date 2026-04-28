@@ -13,6 +13,7 @@ Proyecto de cambio de monedas escrito en C, originalmente creado en 2014 con Net
 
 - Build simplificado y portable mediante Makefile de una sola capa.
 - CI automatizada en GitHub Actions para Linux, macOS y Windows.
+- Pruebas unitarias de BigInt y del algoritmo de cambio.
 - Limpieza de artefactos con .gitignore para evitar ruido en commits.
 - Documentacion de uso y compilacion actualizada.
 - Modularizacion de la gestion de moneda en un modulo dedicado.
@@ -107,6 +108,12 @@ Para release:
 make release
 ```
 
+Pruebas:
+
+```bash
+make test
+```
+
 GUI (solo Windows):
 
 ```bash
@@ -120,14 +127,14 @@ En Linux esos comandos ejecutan GUI portable (panel administrador en terminal).
 ### Opcion 2: GCC directo
 
 ```bash
-gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c moneda_gestion.c bigint.c -o progvoraz
+gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz
 ./progvoraz
 ```
 
 En Windows:
 
 ```powershell
-gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c moneda_gestion.c bigint.c -o progvoraz.exe
+gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz.exe
 .\progvoraz.exe
 ```
 
@@ -138,7 +145,7 @@ En Linux el ejecutable no usa extension `.exe`.
 Compilacion:
 
 ```bash
-gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c moneda_gestion.c bigint.c -o progvoraz
+gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz
 ```
 
 Ejecucion:
@@ -157,6 +164,7 @@ Ejecucion:
 - moneda_gestion.c / moneda_gestion.h: carga y persistencia de monedas/stock.
 - monedas.txt: denominaciones por moneda.
 - stock.txt: stock por denominacion.
+- tests/test_bigint_algoritmo.c: pruebas unitarias de aritmetica y cambio.
 - .github/workflows/ci.yml: pipeline de compilacion y prueba rapida.
 
 ## Panel Administrador (GUI)
@@ -192,4 +200,3 @@ Flujo sugerido en VS Code:
 Consulta EJECUCION.md para ejemplos y flujo paso a paso.
 
 Para referencia tecnica de todas las funciones implementadas en archivos C, consulta FUNCIONES_C.md.
-

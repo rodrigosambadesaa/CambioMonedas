@@ -1,3 +1,5 @@
+#ifndef VECTOR_DINAMICO_H
+#define VECTOR_DINAMICO_H
 
 /* Tipo base almacenado por el vector dinamico. */
 typedef int TELEMENTO;
@@ -33,3 +35,5 @@ void liberar(vectorP *v1);
  * Si no existe, devuelve 0.
  */
 unsigned long tamano(vectorP *v1);
+
+#endif

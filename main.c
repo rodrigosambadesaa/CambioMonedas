@@ -484,7 +484,6 @@ static void limpiar_arreglo(BigIntArray *arr)
         bigint_array_free(arr);
 }
 
-
 /* imprimir_resultado: documenta el comportamiento principal y validaciones de entrada. */
 static void imprimir_resultado(const BigIntArray *monedas, const BigIntArray *solucion, const BigIntArray *stock, int usarStock)
 {
