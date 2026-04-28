@@ -20,6 +20,11 @@ Este documento describe todas las funciones definidas en los archivos `.c` del p
 - `bigint_array_set(BigIntArray *arr, size_t idx, const BigInt *value)`: Asigna un elemento del arreglo en `idx`.
 - `bigint_array_free(BigIntArray *arr)`: Libera el arreglo de `BigInt` y su contenido.
 
+## algoritmo_cambio.c
+
+- `calcular_cambio_optimo(const BigInt *monto, const BigIntArray *denominaciones, BigIntArray *solucion)`: Calcula una solucion de cambio en modo ilimitado. Para importes acotados usa programacion dinamica y minimiza el numero de monedas; para importes BigInt muy grandes conserva la busqueda descendente compatible.
+- `calcular_cambio_optimo_stock(const BigInt *monto, const BigIntArray *denominaciones, const BigIntArray *stock, BigIntArray *solucion)`: Calcula cambio respetando stock. Para importes acotados minimiza el numero de monedas con programacion dinamica y, si el importe excede ese rango, usa la ruta BigInt previa con poda por stock.
+
 ## moneda_gestion.c
 
 - `es_texto_bigint_valido(const char *texto)`: Valida que un token contenga solo digitos decimales.
@@ -50,8 +55,6 @@ Este documento describe todas las funciones definidas en los archivos `.c` del p
 - `pedir_indice_denominacion(size_t maximo, size_t *indice)`: Solicita indice de denominacion valido.
 - `copiar_arreglo_bigint(const BigIntArray *origen, BigIntArray *destino)`: Duplica arreglo de `BigInt`.
 - `limpiar_arreglo(BigIntArray *arr)`: Libera arreglo de `BigInt`.
-- `cambio(const BigInt *monto, const BigIntArray *denominaciones, BigIntArray *solucion)`: Calcula cambio voraz en modo ilimitado.
-- `cambio_stock(const BigInt *monto, const BigIntArray *denominaciones, BigIntArray *solucion, BigIntArray *stock)`: Calcula cambio voraz respetando stock y lo descuenta en memoria.
 - `imprimir_resultado(const BigIntArray *monedas, const BigIntArray *solucion, const BigIntArray *stock, int usarStock)`: Muestra resultado de cambio.
 - `imprimir_stock_administrador(const BigIntArray *monedas, const BigIntArray *stock)`: Muestra panel de stock en consola.
 - `aplicar_cambio_administrador(BigIntArray *stock, size_t idx, const BigInt *delta, int esSuma)`: Suma o resta stock de una denominacion.
