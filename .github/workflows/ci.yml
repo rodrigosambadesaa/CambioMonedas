@@ -27,6 +27,10 @@ jobs:
         if: runner.os == 'Linux'
         run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 gui_portable.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz_gui
 
+      - name: Unit tests (Linux)
+        if: runner.os == 'Linux'
+        run: make test
+
       - name: Build (macOS)
         if: runner.os == 'macOS'
         run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz
@@ -44,6 +48,10 @@ jobs:
       - name: Build GUI (macOS portable fallback)
         if: runner.os == 'macOS'
         run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 gui_portable.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz_gui_portable
+
+      - name: Unit tests (macOS)
+        if: runner.os == 'macOS'
+        run: make test
 
       - name: Smoke test (Linux)
         if: runner.os == 'Linux'
@@ -87,6 +95,14 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 gui_window.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz_gui.exe -mwindows
+
+      - name: Unit tests (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .dist | Out-Null
+          gcc -std=c11 -Wall -Wextra -Wpedantic -O2 -I. tests/test_bigint_algoritmo.c bigint.c algoritmo_cambio.c -o .dist/test_progvoraz.exe
+          .\.dist\test_progvoraz.exe
 
       - name: Smoke test (Windows)
         if: runner.os == 'Windows'
@@ -171,4 +187,3 @@ jobs:
 
       - name: Docker test all modes
         run: docker compose run --rm progvoraz-test
-
