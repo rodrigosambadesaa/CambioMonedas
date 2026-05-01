@@ -24,4 +24,3 @@ int cargar_stock_moneda(const char *nombreMoneda, BigIntArray *resultado);
 int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock);
 
 #endif
-

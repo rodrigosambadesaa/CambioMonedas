@@ -193,12 +193,32 @@ func updateStockSection(coin: String, stock: [String]) -> Bool {
     return writeTokens(tokens, to: "stock.txt")
 }
 
+func registerHistory(_ msg: String) {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+    let dateString = formatter.string(from: Date())
+    let text = "[\(dateString)] \(msg)\n"
+    let file = "historial.txt"
+    if let handle = try? FileHandle(forWritingTo: URL(fileURLWithPath: file)) {
+        handle.seekToEndOfFile()
+        if let data = text.data(using: .utf8) { handle.write(data) }
+        handle.closeFile()
+    } else {
+        try? text.write(toFile: file, atomically: true, encoding: .utf8)
+    }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource {
     var window: NSWindow!
     var coinPopup: NSPopUpButton!
     var denomPopup: NSPopUpButton!
     var qtyField: NSTextField!
     var amountField: NSTextField!
+    var registerCheck: NSButton!
+    var priceField: NSTextField!
+    var paymentField: NSTextField!
+    var limitField: NSTextField!
+    var historyBtn: NSButton!
     var table: NSTableView!
     var resultView: NSTextView!
     var statusLabel: NSTextField!
@@ -325,16 +345,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         specificBtn.frame = NSRect(x: 670, y: 108, width: 90, height: 56)
         content.addSubview(specificBtn)
 
-        let amountLabel = NSTextField(labelWithString: "Monto (centimos)")
-        amountLabel.frame = NSRect(x: 20, y: 70, width: 110, height: 22)
+        registerCheck = NSButton(checkboxWithTitle: "Caja Reg.", target: self, action: #selector(toggleRegister))
+        registerCheck.frame = NSRect(x: 20, y: 70, width: 90, height: 22)
+        content.addSubview(registerCheck)
+
+        let priceLabel = NSTextField(labelWithString: "Precio:")
+        priceLabel.frame = NSRect(x: 115, y: 70, width: 45, height: 22)
+        content.addSubview(priceLabel)
+
+        priceField = NSTextField(frame: NSRect(x: 160, y: 66, width: 60, height: 26))
+        priceField.isEnabled = false
+        content.addSubview(priceField)
+
+        let paymentLabel = NSTextField(labelWithString: "Pago:")
+        paymentLabel.frame = NSRect(x: 225, y: 70, width: 40, height: 22)
+        content.addSubview(paymentLabel)
+
+        paymentField = NSTextField(frame: NSRect(x: 265, y: 66, width: 60, height: 26))
+        paymentField.isEnabled = false
+        content.addSubview(paymentField)
+
+        let amountLabel = NSTextField(labelWithString: "Monto:")
+        amountLabel.frame = NSRect(x: 330, y: 70, width: 50, height: 22)
         content.addSubview(amountLabel)
 
-        amountField = NSTextField(frame: NSRect(x: 140, y: 66, width: 220, height: 26))
+        amountField = NSTextField(frame: NSRect(x: 380, y: 66, width: 60, height: 26))
         content.addSubview(amountField)
 
-        let calcBtn = NSButton(title: "Calcular devolucion", target: self, action: #selector(calculateChange))
-        calcBtn.frame = NSRect(x: 370, y: 64, width: 170, height: 30)
+        let limitLabel = NSTextField(labelWithString: "Limite:")
+        limitLabel.frame = NSRect(x: 445, y: 70, width: 45, height: 22)
+        content.addSubview(limitLabel)
+
+        limitField = NSTextField(frame: NSRect(x: 490, y: 66, width: 50, height: 26))
+        content.addSubview(limitField)
+
+        let calcBtn = NSButton(title: "Calcular", target: self, action: #selector(calculateChange))
+        calcBtn.frame = NSRect(x: 550, y: 64, width: 80, height: 30)
         content.addSubview(calcBtn)
+
+        historyBtn = NSButton(title: "Historial", target: self, action: #selector(showHistory))
+        historyBtn.frame = NSRect(x: 640, y: 64, width: 80, height: 30)
+        content.addSubview(historyBtn)
 
         let resultTitle = NSTextField(labelWithString: "Resultado")
         resultTitle.frame = NSRect(x: 20, y: 42, width: 120, height: 22)
@@ -495,6 +546,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         if !limitedMode {
             renderSpecificResult(total: totalGiven, requested: requested, unlimited: true)
             setStatus("Cambio especifico aplicado en modo ilimitado.")
+            registerHistory("Cambio especifico aplicado (ilimitado, macOS).")
             return
         }
 
@@ -517,6 +569,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         table.reloadData()
         renderSpecificResult(total: totalGiven, requested: requested, unlimited: false)
         setStatus("Cambio especifico aplicado y stock persistido.")
+        registerHistory("Cambio especifico aplicado con stock (macOS).")
     }
 
     func applyChange(isAdd: Bool) {
@@ -564,7 +617,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         setStatus(isAdd ? "Stock actualizado (suma)." : "Stock actualizado (resta).")
     }
 
-    func calculateLimitedChange(amount: String) -> [String]? {
+    @objc func toggleRegister() {
+        let isReg = registerCheck.state == .on
+        priceField.isEnabled = isReg
+        paymentField.isEnabled = isReg
+        amountField.isEnabled = !isReg
+    }
+
+    @objc func showHistory() {
+        if let url = URL(string: "file://" + FileManager.default.currentDirectoryPath + "/historial.txt") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    func calculateLimitedChange(amount: String, limit: Int) -> [String]? {
         var remain = normalize(amount)
         var solution = Array(repeating: "0", count: denoms.count)
 
@@ -583,10 +649,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
             if remain == "0" { break }
         }
 
-        return remain == "0" ? solution : nil
+        if remain != "0" { return nil }
+        if limit > 0 {
+            var coins = 0
+            for s in solution {
+                if let v = Int(s) { coins += v }
+            }
+            if coins > limit { return nil }
+        }
+        return solution
     }
 
-    func calculateUnlimitedChange(amount: String) -> [String]? {
+    func calculateUnlimitedChange(amount: String, limit: Int) -> [String]? {
         var remain = normalize(amount)
         var solution = Array(repeating: "0", count: denoms.count)
 
@@ -597,7 +671,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
             if remain == "0" { break }
         }
 
-        return remain == "0" ? solution : nil
+        if remain != "0" { return nil }
+        if limit > 0 {
+            var coins = 0
+            for s in solution {
+                if let v = Int(s) { coins += v }
+            }
+            if coins > limit { return nil }
+        }
+        return solution
     }
 
     func renderResult(amount: String, solution: [String]) {
@@ -623,17 +705,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
             return
         }
 
-        let amount = normalize(amountField.stringValue)
-        if !isDigits(amount) {
-            setStatus("Monto invalido: usa entero no negativo en centimos.", error: true)
-            return
+        var amount = "0"
+        if registerCheck.state == .on {
+            let p = normalize(priceField.stringValue)
+            let pay = normalize(paymentField.stringValue)
+            if !isDigits(p) || !isDigits(pay) {
+                setStatus("Precio o pago invalido.", error: true)
+                return
+            }
+            guard let diff = subBig(pay, p) else {
+                setStatus("El pago es menor que el precio.", error: true)
+                return
+            }
+            amount = diff
+        } else {
+            amount = normalize(amountField.stringValue)
+            if !isDigits(amount) {
+                setStatus("Monto invalido: usa entero no negativo en centimos.", error: true)
+                return
+            }
+        }
+
+        var limitVal = 0
+        let l = normalize(limitField.stringValue)
+        if isDigits(l) && l != "0" {
+            limitVal = Int(l) ?? 0
         }
 
         let solution: [String]?
         if limitedMode {
-            solution = calculateLimitedChange(amount: amount)
+            solution = calculateLimitedChange(amount: amount, limit: limitVal)
         } else {
-            solution = calculateUnlimitedChange(amount: amount)
+            solution = calculateUnlimitedChange(amount: amount, limit: limitVal)
         }
 
         guard let solved = solution else {
@@ -651,6 +754,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         if !limitedMode {
             amountField.stringValue = ""
             setStatus("Devolucion calculada en modo ilimitado.")
+            registerHistory("Cambio aplicado (ilimitado, macOS).")
             return
         }
 
@@ -672,6 +776,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         table.reloadData()
         amountField.stringValue = ""
         setStatus("Devolucion aplicada y stock persistido.")
+        registerHistory("Cambio aplicado con stock (macOS).")
     }
 
     @objc func addStock() {

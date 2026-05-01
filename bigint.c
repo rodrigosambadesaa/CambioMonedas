@@ -3,7 +3,7 @@
 #include <string.h>
 #include "bigint.h"
 
-/* *duplicar: documenta el comportamiento principal y validaciones de entrada. */
+/* *duplicar: Funcion auxiliar. Ejecuta su logica, valida parametros de entrada y retorna un estado. */
 static char *duplicar(const char *s)
 {
     size_t len;
@@ -21,7 +21,7 @@ static char *duplicar(const char *s)
     return copia;
 }
 
-/* texto_valido_entero_no_negativo: documenta el comportamiento principal y validaciones de entrada. */
+/* texto_valido_entero_no_negativo: Funcion auxiliar. Ejecuta su logica, valida parametros de entrada y retorna un estado. */
 static int texto_valido_entero_no_negativo(const char *text)
 {
     size_t i;
@@ -38,7 +38,7 @@ static int texto_valido_entero_no_negativo(const char *text)
     return 1;
 }
 
-/* *normalizar: documenta el comportamiento principal y validaciones de entrada. */
+/* *normalizar: Funcion auxiliar. Ejecuta su logica, valida parametros de entrada y retorna un estado. */
 static char *normalizar(const char *text)
 {
     size_t i = 0;
@@ -52,7 +52,7 @@ static char *normalizar(const char *text)
     return duplicar(text + i);
 }
 
-/* bigint_init: documenta el comportamiento principal y validaciones de entrada. */
+/* bigint_init: Funcion de precision arbitraria para operar con numeros grandes. */
 int bigint_init(BigInt *n, const char *text)
 {
     char *normalizado;
@@ -68,7 +68,7 @@ int bigint_init(BigInt *n, const char *text)
     return 1;
 }
 
-/* bigint_set: documenta el comportamiento principal y validaciones de entrada. */
+/* bigint_set: Funcion de precision arbitraria para operar con numeros grandes. */
 int bigint_set(BigInt *dest, const BigInt *src)
 {
     char *copia;
@@ -85,7 +85,7 @@ int bigint_set(BigInt *dest, const BigInt *src)
     return 1;
 }
 
-/* bigint_free: documenta el comportamiento principal y validaciones de entrada. */
+/* bigint_free: Funcion de precision arbitraria para operar con numeros grandes. */
 void bigint_free(BigInt *n)
 {
     if (n == NULL)
@@ -95,7 +95,7 @@ void bigint_free(BigInt *n)
     n->digits = NULL;
 }
 
-/* bigint_compare: documenta el comportamiento principal y validaciones de entrada. */
+/* bigint_compare: Funcion de precision arbitraria para operar con numeros grandes. */
 int bigint_compare(const BigInt *a, const BigInt *b)
 {
     size_t la;
@@ -121,13 +121,13 @@ int bigint_compare(const BigInt *a, const BigInt *b)
     return 0;
 }
 
-/* bigint_is_zero: documenta el comportamiento principal y validaciones de entrada. */
+/* bigint_is_zero: Funcion de precision arbitraria para operar con numeros grandes. */
 int bigint_is_zero(const BigInt *n)
 {
     return n != NULL && n->digits != NULL && strcmp(n->digits, "0") == 0;
 }
 
-/* bigint_add: documenta el comportamiento principal y validaciones de entrada. */
+/* bigint_add: Funcion de precision arbitraria para operar con numeros grandes. */
 int bigint_add(const BigInt *a, const BigInt *b, BigInt *out)
 {
     size_t la;
@@ -174,7 +174,7 @@ int bigint_add(const BigInt *a, const BigInt *b, BigInt *out)
     return 1;
 }
 
-/* bigint_subtract: documenta el comportamiento principal y validaciones de entrada. */
+/* bigint_subtract: Funcion de precision arbitraria para operar con numeros grandes. */
 int bigint_subtract(const BigInt *a, const BigInt *b, BigInt *out)
 {
     size_t la;
@@ -203,7 +203,7 @@ int bigint_subtract(const BigInt *a, const BigInt *b, BigInt *out)
         int db = (lb > k) ? (b->digits[lb - 1 - k] - '0') : 0;
         int d = da - db - borrow;
 
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
+       
         if (d < 0)
         {
             d += 10;
@@ -231,7 +231,7 @@ int bigint_subtract(const BigInt *a, const BigInt *b, BigInt *out)
     return 1;
 }
 
-/* bigint_multiply: documenta el comportamiento principal y validaciones de entrada. */
+/* bigint_multiply: Funcion de precision arbitraria para operar con numeros grandes. */
 int bigint_multiply(const BigInt *a, const BigInt *b, BigInt *out)
 {
     size_t la;
@@ -271,7 +271,7 @@ int bigint_multiply(const BigInt *a, const BigInt *b, BigInt *out)
     }
 
     tmp = (char *)malloc(n + 1);
-    /* if: documenta el comportamiento principal y validaciones de entrada. */
+   
     if (tmp == NULL)
     {
         free(acc);
@@ -298,7 +298,7 @@ int bigint_multiply(const BigInt *a, const BigInt *b, BigInt *out)
     return 1;
 }
 
-/* bigint_divmod: documenta el comportamiento principal y validaciones de entrada. */
+/* bigint_divmod: Punto de entrada principal. Configura el entorno y lanza la ejecucion. */
 int bigint_divmod(const BigInt *a, const BigInt *b, BigInt *quotient, BigInt *remainder)
 {
     size_t la;
@@ -316,7 +316,7 @@ int bigint_divmod(const BigInt *a, const BigInt *b, BigInt *quotient, BigInt *re
 
     if (!bigint_init(&rem, "0"))
         return 0;
-    /* if: documenta el comportamiento principal y validaciones de entrada. */
+   
     if (!bigint_set(&d, b))
     {
         bigint_free(&rem);
@@ -341,13 +341,13 @@ int bigint_divmod(const BigInt *a, const BigInt *b, BigInt *quotient, BigInt *re
 
         if (!bigint_multiply(&rem, &(BigInt){"10"}, &rem10))
             goto cleanup;
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
+       
         if (!bigint_init(&digit, digTxt))
         {
             bigint_free(&rem10);
             goto cleanup;
         }
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
+       
         if (!bigint_add(&rem10, &digit, &nuevoRem))
         {
             bigint_free(&rem10);
@@ -359,7 +359,7 @@ int bigint_divmod(const BigInt *a, const BigInt *b, BigInt *quotient, BigInt *re
         bigint_free(&rem10);
         bigint_free(&digit);
 
-        /* while: documenta el comportamiento principal y validaciones de entrada. */
+       
         while (bigint_compare(&rem, &d) >= 0)
         {
             BigInt tmp = {0};
@@ -382,7 +382,7 @@ int bigint_divmod(const BigInt *a, const BigInt *b, BigInt *quotient, BigInt *re
         if (nq == NULL)
             goto cleanup;
         qtmp.digits = nq;
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
+       
         if (!bigint_set(&rtmp, &rem) && !bigint_init(&rtmp, rem.digits))
         {
             bigint_free(&qtmp);
@@ -402,7 +402,7 @@ cleanup:
     return ok;
 }
 
-/* bigint_array_create: documenta el comportamiento principal y validaciones de entrada. */
+/* bigint_array_create: Funcion de precision arbitraria para operar con numeros grandes. */
 int bigint_array_create(BigIntArray *arr, size_t len)
 {
     if (arr == NULL || len == 0)
@@ -415,7 +415,7 @@ int bigint_array_create(BigIntArray *arr, size_t len)
     arr->len = len;
     for (size_t i = 0; i < len; i++)
     {
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
+       
         if (!bigint_init(&arr->items[i], "0"))
         {
             bigint_array_free(arr);
@@ -426,7 +426,7 @@ int bigint_array_create(BigIntArray *arr, size_t len)
     return 1;
 }
 
-/* bigint_array_set: documenta el comportamiento principal y validaciones de entrada. */
+/* bigint_array_set: Funcion de precision arbitraria para operar con numeros grandes. */
 int bigint_array_set(BigIntArray *arr, size_t idx, const BigInt *value)
 {
     if (arr == NULL || value == NULL || idx >= arr->len)
@@ -435,13 +435,13 @@ int bigint_array_set(BigIntArray *arr, size_t idx, const BigInt *value)
     return bigint_set(&arr->items[idx], value);
 }
 
-/* bigint_array_free: documenta el comportamiento principal y validaciones de entrada. */
+/* bigint_array_free: Funcion de precision arbitraria para operar con numeros grandes. */
 void bigint_array_free(BigIntArray *arr)
 {
     if (arr == NULL)
         return;
 
-    /* if: documenta el comportamiento principal y validaciones de entrada. */
+   
     if (arr->items != NULL)
     {
         for (size_t i = 0; i < arr->len; i++)

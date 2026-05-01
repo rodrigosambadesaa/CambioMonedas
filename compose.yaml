@@ -7,6 +7,7 @@ services:
     volumes:
       - ./monedas.txt:/app/monedas.txt:ro
       - ./stock.txt:/app/stock.txt
+      - ./historial.txt:/app/historial.txt
     stdin_open: true
     tty: true
     command: [ "console" ]
@@ -19,6 +20,7 @@ services:
     volumes:
       - ./monedas.txt:/app/monedas.txt:ro
       - ./stock.txt:/app/stock.txt
+      - ./historial.txt:/app/historial.txt
     stdin_open: true
     tty: true
     command: [ "gui" ]
@@ -31,4 +33,5 @@ services:
     volumes:
       - ./monedas.txt:/app/monedas.txt:ro
       - ./stock.txt:/app/stock.txt
+      - ./historial.txt:/app/historial.txt
     command: [ "test" ]

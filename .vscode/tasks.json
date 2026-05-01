@@ -14,6 +14,7 @@
                 "main.c",
                 "moneda_gestion.c",
                 "bigint.c",
+                "algoritmo_cambio.c",
                 "-o",
                 "progvoraz.exe"
             ],
@@ -38,6 +39,7 @@
                 "main.c",
                 "moneda_gestion.c",
                 "bigint.c",
+                "algoritmo_cambio.c",
                 "-o",
                 "progvoraz"
             ],
@@ -64,6 +66,7 @@
                 "gui_window.c",
                 "moneda_gestion.c",
                 "bigint.c",
+                "algoritmo_cambio.c",
                 "-o",
                 "progvoraz_gui.exe",
                 "-mwindows"
@@ -85,6 +88,7 @@
                 "gui_portable.c",
                 "moneda_gestion.c",
                 "bigint.c",
+                "algoritmo_cambio.c",
                 "-o",
                 "progvoraz_gui"
             ],
