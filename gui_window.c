@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 #include <windows.h>
 #include <time.h>
 #include "bigint.h"
@@ -74,16 +75,32 @@ static BigIntArray g_stock = {0};
 static void registrar_historial(const char *mensaje)
 {
     FILE *fp = fopen("historial.txt", "a");
-    if (fp) {
+    if (fp)
+    {
         time_t t = time(NULL);
         struct tm *tm_info = localtime(&t);
-        if (tm_info) {
+        if (tm_info)
+        {
             fprintf(fp, "[%04d-%02d-%02d %02d:%02d:%02d] %s\n",
                     tm_info->tm_year + 1900, tm_info->tm_mon + 1, tm_info->tm_mday,
                     tm_info->tm_hour, tm_info->tm_min, tm_info->tm_sec, mensaje);
         }
         fclose(fp);
     }
+}
+
+static void registrar_historialf(const char *fmt, ...)
+{
+    char mensaje[512];
+    va_list args;
+
+    if (fmt == NULL)
+        return;
+
+    va_start(args, fmt);
+    vsnprintf(mensaje, sizeof(mensaje), fmt, args);
+    va_end(args);
+    registrar_historial(mensaje);
 }
 
 /* es_numero: Revisa si una cadena entrante es estrictamente numerica (ej: '500'). */
@@ -205,11 +222,14 @@ static void configurar_modo_stock(int limitado)
     EnableWindow(g_editDevolucionCambio, TRUE);
     EnableWindow(g_btnCambioEspecifico, TRUE);
     EnableWindow(g_checkCaja, TRUE);
-    if (SendMessageA(g_checkCaja, BM_GETCHECK, 0, 0) == BST_CHECKED) {
+    if (SendMessageA(g_checkCaja, BM_GETCHECK, 0, 0) == BST_CHECKED)
+    {
         EnableWindow(g_editPrecio, TRUE);
         EnableWindow(g_editPago, TRUE);
         EnableWindow(g_editMonto, FALSE);
-    } else {
+    }
+    else
+    {
         EnableWindow(g_editPrecio, FALSE);
         EnableWindow(g_editPago, FALSE);
         EnableWindow(g_editMonto, TRUE);
@@ -248,12 +268,12 @@ static void precargar_ceros_en_edit(HWND edit)
 
         /* Detecta BufferTruncation. */
         if ((size_t)escritos >= restante)
-        /* Detecta BufferTruncation. */
-        if ((size_t)escritos >= restante)
-        {
-            pos = sizeof(texto) - 1;
-            break;
-        }
+            /* Detecta BufferTruncation. */
+            if ((size_t)escritos >= restante)
+            {
+                pos = sizeof(texto) - 1;
+                break;
+            }
 
         pos += (size_t)escritos;
     }
@@ -423,7 +443,6 @@ static void refrescar_lista_stock(void)
     limpiar_resultado_cambio();
 }
 
-
 /* leer_monto_cambio: Trata de jalar la string cruda del TexBox monto principal a una variable BigInt (Modo Clasico). */
 static int leer_monto_cambio(BigInt *monto)
 {
@@ -461,33 +480,44 @@ static int calcular_y_mostrar_cambio(void)
     int tiene_limite = 0;
     char bufferLim[256];
 
-    if (GetWindowTextA(g_editLimite, bufferLim, sizeof(bufferLim)) > 0) {
+    if (GetWindowTextA(g_editLimite, bufferLim, sizeof(bufferLim)) > 0)
+    {
         long v = strtol(bufferLim, NULL, 10);
-        if (v > 0) {
+        if (v > 0)
+        {
             limite_monedas = (size_t)v;
             tiene_limite = 1;
         }
     }
 
-    if (es_caja) {
+    if (es_caja)
+    {
         char bufferPrecio[256], bufferPago[256];
         BigInt precio = {0}, pago = {0};
         GetWindowTextA(g_editPrecio, bufferPrecio, sizeof(bufferPrecio));
         GetWindowTextA(g_editPago, bufferPago, sizeof(bufferPago));
-        if (!bigint_init(&precio, bufferPrecio) || !bigint_init(&pago, bufferPago)) {
+        if (!bigint_init(&precio, bufferPrecio) || !bigint_init(&pago, bufferPago))
+        {
             mostrar_error("Cambio", "Precio o Pago invalido.");
-            bigint_free(&precio); bigint_free(&pago);
+            bigint_free(&precio);
+            bigint_free(&pago);
             return 0;
         }
-        if (bigint_compare(&pago, &precio) < 0) {
+        if (bigint_compare(&pago, &precio) < 0)
+        {
             mostrar_error("Cambio", "El pago es menor que el precio.");
-            bigint_free(&precio); bigint_free(&pago);
+            bigint_free(&precio);
+            bigint_free(&pago);
             return 0;
         }
         bigint_subtract(&pago, &precio, &monto);
-        bigint_free(&precio); bigint_free(&pago);
-    } else {
-        if (!leer_monto_cambio(&monto)) {
+        bigint_free(&precio);
+        bigint_free(&pago);
+    }
+    else
+    {
+        if (!leer_monto_cambio(&monto))
+        {
             mostrar_error("Cambio", "Monto invalido. Usa un entero no negativo en centimos.");
             return 0;
         }
@@ -499,15 +529,23 @@ static int calcular_y_mostrar_cambio(void)
     SendMessageA(g_listResultado, LB_ADDSTRING, 0, (LPARAM)linea);
 
     int ok = 0;
-    if (g_modo_stock_limitado) {
-        if (tiene_limite) ok = calcular_cambio_optimo_stock_con_limite(&monto, &g_denom, &g_stock, limite_monedas, &solucion);
-        else ok = calcular_cambio_optimo_stock(&monto, &g_denom, &g_stock, &solucion);
-    } else {
-        if (tiene_limite) ok = calcular_cambio_optimo_con_limite(&monto, &g_denom, limite_monedas, &solucion);
-        else ok = calcular_cambio_optimo(&monto, &g_denom, &solucion);
+    if (g_modo_stock_limitado)
+    {
+        if (tiene_limite)
+            ok = calcular_cambio_optimo_stock_con_limite(&monto, &g_denom, &g_stock, limite_monedas, &solucion);
+        else
+            ok = calcular_cambio_optimo_stock(&monto, &g_denom, &g_stock, &solucion);
+    }
+    else
+    {
+        if (tiene_limite)
+            ok = calcular_cambio_optimo_con_limite(&monto, &g_denom, limite_monedas, &solucion);
+        else
+            ok = calcular_cambio_optimo(&monto, &g_denom, &solucion);
     }
 
-    if (!ok) {
+    if (!ok)
+    {
         SendMessageA(g_listResultado, LB_ADDSTRING, 0, (LPARAM) "No existe devolucion exacta con los parametros actuales.");
         ajustar_scroll_horizontal_lista(g_listResultado, max_chars + 4);
         bigint_free(&monto);
@@ -563,7 +601,6 @@ static int calcular_y_mostrar_cambio(void)
         if (bigint_is_zero(&solucion.items[i]))
             continue;
 
-       
         if (!bigint_subtract(&stock_nuevo.items[i], &solucion.items[i], &nuevo_stock))
         {
             bigint_array_free(&stock_nuevo);
@@ -573,7 +610,6 @@ static int calcular_y_mostrar_cambio(void)
             return 0;
         }
 
-       
         if (!bigint_array_set(&stock_nuevo, i, &nuevo_stock))
         {
             bigint_free(&nuevo_stock);
@@ -587,7 +623,6 @@ static int calcular_y_mostrar_cambio(void)
         bigint_free(&nuevo_stock);
     }
 
-   
     if (!actualizar_stock_moneda(g_monedas[g_monedaActiva], &stock_nuevo))
     {
         bigint_array_free(&stock_nuevo);
@@ -619,17 +654,16 @@ static int cargar_moneda_seleccionada(void)
 
     if (!cargar_denominaciones_moneda(g_monedas[idx], &g_denom))
         return 0;
-   
+
     if (g_modo_stock_limitado)
     {
-       
+
         if (!cargar_stock_moneda(g_monedas[idx], &g_stock))
         {
             bigint_array_free(&g_denom);
             return 0;
         }
 
-       
         if (g_denom.len != g_stock.len)
         {
             liberar_datos_moneda();
@@ -657,7 +691,7 @@ static int leer_cantidad_delta(BigInt *delta)
 /* aplicar_cambio_stock: Funcion auxiliar. Ejecuta su logica, valida parametros de entrada y retorna un estado. */
 static int aplicar_cambio_stock(int esSuma)
 {
-   
+
     if (!g_modo_stock_limitado)
     {
         mostrar_error("Administrador", "El panel administrador solo aplica en modo stock limitado.");
@@ -668,7 +702,6 @@ static int aplicar_cambio_stock(int esSuma)
     BigInt delta = {0};
     BigInt nuevo = {0};
 
-   
     if (g_monedaActiva < 0)
     {
         mostrar_error("Administrador", "Primero carga una moneda.");
@@ -676,24 +709,22 @@ static int aplicar_cambio_stock(int esSuma)
     }
 
     idxDenom = (int)SendMessageA(g_comboDenom, CB_GETCURSEL, 0, 0);
-   
+
     if (idxDenom < 0 || (size_t)idxDenom >= g_stock.len)
     {
         mostrar_error("Administrador", "Selecciona una denominacion valida.");
         return 0;
     }
 
-   
     if (!leer_cantidad_delta(&delta))
     {
         mostrar_error("Administrador", "Cantidad invalida. Usa un entero no negativo.");
         return 0;
     }
 
-   
     if (esSuma)
     {
-       
+
         if (!bigint_add(&g_stock.items[idxDenom], &delta, &nuevo))
         {
             bigint_free(&delta);
@@ -703,7 +734,7 @@ static int aplicar_cambio_stock(int esSuma)
     }
     else
     {
-       
+
         if (bigint_compare(&g_stock.items[idxDenom], &delta) < 0)
         {
             bigint_free(&delta);
@@ -711,7 +742,6 @@ static int aplicar_cambio_stock(int esSuma)
             return 0;
         }
 
-       
         if (!bigint_subtract(&g_stock.items[idxDenom], &delta, &nuevo))
         {
             bigint_free(&delta);
@@ -720,7 +750,6 @@ static int aplicar_cambio_stock(int esSuma)
         }
     }
 
-   
     if (!bigint_array_set(&g_stock, (size_t)idxDenom, &nuevo))
     {
         bigint_free(&delta);
@@ -729,7 +758,6 @@ static int aplicar_cambio_stock(int esSuma)
         return 0;
     }
 
-   
     if (!actualizar_stock_moneda(g_monedas[g_monedaActiva], &g_stock))
     {
         bigint_free(&delta);
@@ -743,6 +771,11 @@ static int aplicar_cambio_stock(int esSuma)
 
     SetWindowTextA(g_editCantidad, "");
     refrescar_lista_stock();
+    registrar_historialf("Admin %s (windows) | Moneda=%s | Denom=%s c | Cantidad=%s",
+                         esSuma ? "ANADIR" : "QUITAR",
+                         g_monedas[g_monedaActiva],
+                         g_denom.items[idxDenom].digits,
+                         delta.digits);
     mostrar_info("Administrador", esSuma ? "Stock actualizado (suma)." : "Stock actualizado (resta).");
     return 1;
 }
@@ -753,28 +786,24 @@ static int aplicar_cambio_stock_lote(int esSuma)
     BigIntArray deltas = {0};
     BigIntArray stock_nuevo = {0};
 
-   
     if (!g_modo_stock_limitado)
     {
         mostrar_error("Administrador", "El panel administrador solo aplica en modo stock limitado.");
         return 0;
     }
 
-   
     if (g_monedaActiva < 0 || g_stock.items == NULL || g_denom.len != g_stock.len)
     {
         mostrar_error("Administrador", "Primero carga una moneda valida.");
         return 0;
     }
 
-   
     if (!leer_cantidades_lote(&deltas))
     {
         mostrar_error("Administrador", "Lote invalido. Introduce exactamente una cantidad por denominacion (linea por linea).");
         return 0;
     }
 
-   
     if (!copiar_arreglo_bigint(&g_stock, &stock_nuevo))
     {
         bigint_array_free(&deltas);
@@ -789,10 +818,9 @@ static int aplicar_cambio_stock_lote(int esSuma)
         if (bigint_is_zero(&deltas.items[i]))
             continue;
 
-       
         if (esSuma)
         {
-           
+
             if (!bigint_add(&stock_nuevo.items[i], &deltas.items[i], &nuevo))
             {
                 bigint_array_free(&deltas);
@@ -813,7 +841,6 @@ static int aplicar_cambio_stock_lote(int esSuma)
             }
         }
 
-       
         if (!bigint_array_set(&stock_nuevo, i, &nuevo))
         {
             bigint_free(&nuevo);
@@ -826,7 +853,6 @@ static int aplicar_cambio_stock_lote(int esSuma)
         bigint_free(&nuevo);
     }
 
-   
     if (!actualizar_stock_moneda(g_monedas[g_monedaActiva], &stock_nuevo))
     {
         bigint_array_free(&deltas);
@@ -840,6 +866,9 @@ static int aplicar_cambio_stock_lote(int esSuma)
     bigint_array_free(&deltas);
 
     refrescar_lista_stock();
+    registrar_historialf("Admin lote %s (windows) | Moneda=%s",
+                         esSuma ? "ANADIR" : "QUITAR",
+                         g_monedas[g_monedaActiva]);
     mostrar_info("Administrador", esSuma ? "Lote aplicado correctamente (suma)." : "Lote aplicado correctamente (resta).");
     return 1;
 }
@@ -894,7 +923,6 @@ static int aplicar_cambio_especifico(void)
     char linea[512];
     int max_chars = 0;
 
-   
     if (g_monedaActiva < 0 || g_denom.items == NULL || g_denom.len == 0)
     {
         mostrar_error("Cambio especifico", "Primero carga una moneda valida.");
@@ -921,7 +949,6 @@ static int aplicar_cambio_especifico(void)
         return 0;
     }
 
-   
     if (bigint_compare(&totalEntrada, &totalDevolucion) != 0)
     {
         mostrar_error("Cambio especifico", "El total entregado debe ser igual al total solicitado como devolucion.");
@@ -932,7 +959,6 @@ static int aplicar_cambio_especifico(void)
         return 0;
     }
 
-   
     if (!g_modo_stock_limitado)
     {
         limpiar_resultado_cambio();
@@ -960,7 +986,6 @@ static int aplicar_cambio_especifico(void)
         return 1;
     }
 
-   
     if (g_stock.items == NULL || g_denom.len != g_stock.len)
     {
         mostrar_error("Cambio especifico", "No hay stock cargado para modo limitado.");
@@ -971,7 +996,6 @@ static int aplicar_cambio_especifico(void)
         return 0;
     }
 
-   
     if (!copiar_arreglo_bigint(&g_stock, &stock_nuevo))
     {
         mostrar_error("Cambio especifico", "No se pudo preparar la actualizacion de stock.");
@@ -1007,7 +1031,6 @@ static int aplicar_cambio_especifico(void)
         bigint_free(&trasSalida);
     }
 
-   
     if (!actualizar_stock_moneda(g_monedas[g_monedaActiva], &stock_nuevo))
     {
         bigint_array_free(&entradas);
@@ -1168,12 +1191,12 @@ static void crear_controles(HWND hwnd)
 /* wnd_proc: Gestiona la inicializacion y el ciclo de mensajes de la interfaz de usuario. */
 static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-   
+
     switch (msg)
     {
     case WM_CREATE:
         crear_controles(hwnd);
-       
+
         if (!cargar_nombres_moneda())
         {
             mostrar_error("Inicio", "No se pudieron leer monedas desde monedas.txt");
@@ -1185,7 +1208,6 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
     {
         int id = LOWORD(wParam);
 
-       
         if (id == ID_BTN_CARGAR)
         {
             if (!cargar_moneda_seleccionada())
@@ -1193,11 +1215,10 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
             return 0;
         }
 
-       
         if (id == ID_BTN_RECARGAR)
         {
             int idx_prev = (int)SendMessageA(g_comboMoneda, CB_GETCURSEL, 0, 0);
-           
+
             if (!cargar_nombres_moneda())
             {
                 mostrar_error("Recarga", "No se pudieron recargar monedas.");
@@ -1210,7 +1231,6 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
             if (idx_prev >= 0 && idx_prev < g_monedasCount)
                 SendMessageA(g_comboMoneda, CB_SETCURSEL, (WPARAM)idx_prev, 0);
 
-           
             if (!cargar_moneda_seleccionada())
             {
                 mostrar_error("Recarga", "No se pudo recargar moneda/stock.");
@@ -1219,35 +1239,30 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
             return 0;
         }
 
-       
         if (id == ID_BTN_AGREGAR)
         {
             aplicar_cambio_stock(1);
             return 0;
         }
 
-       
         if (id == ID_BTN_QUITAR)
         {
             aplicar_cambio_stock(0);
             return 0;
         }
 
-       
         if (id == ID_BTN_AGREGAR_LOTE)
         {
             aplicar_cambio_stock_lote(1);
             return 0;
         }
 
-       
         if (id == ID_BTN_QUITAR_LOTE)
         {
             aplicar_cambio_stock_lote(0);
             return 0;
         }
 
-       
         if (id == ID_BTN_HISTORIAL)
         {
             system("notepad historial.txt");
@@ -1256,11 +1271,14 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
 
         if (id == ID_CHECK_CAJA)
         {
-            if (SendMessageA(g_checkCaja, BM_GETCHECK, 0, 0) == BST_CHECKED) {
+            if (SendMessageA(g_checkCaja, BM_GETCHECK, 0, 0) == BST_CHECKED)
+            {
                 EnableWindow(g_editPrecio, TRUE);
                 EnableWindow(g_editPago, TRUE);
                 EnableWindow(g_editMonto, FALSE);
-            } else {
+            }
+            else
+            {
                 EnableWindow(g_editPrecio, FALSE);
                 EnableWindow(g_editPago, FALSE);
                 EnableWindow(g_editMonto, TRUE);
@@ -1274,18 +1292,16 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
             return 0;
         }
 
-       
         if (id == ID_BTN_CAMBIO_ESPECIFICO)
         {
             aplicar_cambio_especifico();
             return 0;
         }
 
-       
         if (id == ID_RADIO_LIMITADO || id == ID_RADIO_ILIMITADO)
         {
             int nuevo_limitado = (id == ID_RADIO_LIMITADO) ? 1 : 0;
-           
+
             if (nuevo_limitado != g_modo_stock_limitado)
             {
                 int idx = (int)SendMessageA(g_comboMoneda, CB_GETCURSEL, 0, 0);
@@ -1340,7 +1356,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ShowWindow(hwnd, nCmdShow);
     UpdateWindow(hwnd);
 
-   
     while (GetMessageA(&msg, NULL, 0, 0) > 0)
     {
         TranslateMessage(&msg);
