@@ -1,5 +1,5 @@
 APP := progvoraz
-SRC := main.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c
+SRC := main.c app_console.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c
 GUI_APP := progvoraz_gui
 GUI_SRC_WIN := gui_window.c moneda_gestion.c bigint.c algoritmo_cambio.c
 GUI_SRC_MAC := gui_macos.swift
