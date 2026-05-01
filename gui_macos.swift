@@ -614,6 +614,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
 
         qtyField.stringValue = ""
         table.reloadData()
+        registerHistory("Admin \(isAdd ? "ANADIR" : "QUITAR") (macOS) | Moneda=\(coin) | Denom=\(denoms[idx]) c | Cantidad=\(qty)")
         setStatus(isAdd ? "Stock actualizado (suma)." : "Stock actualizado (resta).")
     }
 
@@ -625,9 +626,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
     }
 
     @objc func showHistory() {
-        if let url = URL(string: "file://" + FileManager.default.currentDirectoryPath + "/historial.txt") {
-            NSWorkspace.shared.open(url)
+        let path = FileManager.default.currentDirectoryPath + "/historial.txt"
+        if !FileManager.default.fileExists(atPath: path) {
+            FileManager.default.createFile(atPath: path, contents: Data(), attributes: nil)
         }
+        NSWorkspace.shared.openFile(path)
     }
 
     func calculateLimitedChange(amount: String, limit: Int) -> [String]? {
