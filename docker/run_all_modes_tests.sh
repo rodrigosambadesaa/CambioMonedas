@@ -42,27 +42,27 @@ run_case() {
 
 run_case "Consola modo a (tradicional)" \
   ./progvoraz \
-  "Subopcion cambio (tradicional/especifico, volver, modo o salir):" \
+  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3, volver, modo o salir):" \
   "a\n${currency}\ntradicional\n30\nsalir\n"
 
 run_case "Consola modo b (tradicional)" \
   ./progvoraz \
-  "Subopcion cambio (tradicional/especifico, volver, modo o salir):" \
+  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3, volver, modo o salir):" \
   "b\n${currency}\ntradicional\n30\nsalir\n"
 
 run_case "Consola modo c (admin)" \
   ./progvoraz \
-  "Accion admin (anadir/quitar, volver, modo, salir):" \
+  "Accion admin (anadir/quitar/historial, volver, modo, salir):" \
   "c\n${currency}\nanadir\n1\n0\nsalir\n"
 
 run_case "GUI portable modo limitado" \
   ./progvoraz_gui \
-  "Accion (calcular/especifico/anadir/quitar/modo/volver/salir):" \
+  "Accion (calcular/caja/limite/especifico/historial/anadir/quitar/modo/volver/salir):" \
   "limitado\n${currency}\ncalcular\n30\nsalir\n"
 
 run_case "GUI portable modo ilimitado" \
   ./progvoraz_gui \
-  "Accion (calcular/especifico/modo/volver/salir):" \
+  "Accion (calcular/caja/limite/especifico/historial/modo/volver/salir):" \
   "ilimitado\n${currency}\ncalcular\n30\nsalir\n"
 
 echo "Todas las pruebas en contenedor han finalizado correctamente."
