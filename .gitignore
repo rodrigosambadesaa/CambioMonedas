@@ -12,6 +12,7 @@ progvoraz_gui
 # Temporary and generated data
 stock.tmp
 *.tmp
+historial.txt
 
 # Legacy NetBeans build artifacts
 build/
