@@ -29,7 +29,7 @@ run_case() {
   cp "$stock_backup" stock.txt
   output="$(printf "%b" "$input" | "$exe" 2>&1 || true)"
 
-  if ! grep -Fq "$expected" <<<"$output"; then
+  if ! grep -Fq -- "$expected" <<<"$output"; then
     echo "[FALLO] $name"
     echo "Esperado: $expected"
     echo "Salida:"
@@ -102,5 +102,10 @@ run_case "GUI portable modo ilimitado" \
   ./progvoraz_gui \
   "Accion (calcular/caja/limite/especifico/historial/modo/volver/salir):" \
   "ilimitado\n${currency}\ncalcular\n30\nsalir\n"
+
+run_case "GUI portable historial desde modo" \
+  ./progvoraz_gui \
+  "--- HISTORIAL DE TRANSACCIONES ---" \
+  "historial\n\nsalir\n"
 
 echo "Todas las pruebas en contenedor han finalizado correctamente."
