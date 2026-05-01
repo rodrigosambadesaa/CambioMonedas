@@ -4,6 +4,8 @@ Este proyecto calcula el cambio de monedas en dos modos:
 
 - Modo `a`: monedas infinitas.
 - Modo `b`: monedas limitadas por stock (actualiza `stock.txt`).
+- Modo `c`: administrador de stock.
+- Opcion `h` / `historial`: consulta historial de transacciones.
 
 Tambien incluye:
 
@@ -49,7 +51,15 @@ Persistencia de archivos en Docker Compose:
 
 - `monedas.txt` se monta en solo lectura desde la raiz del proyecto.
 - `stock.txt` se monta en modo lectura/escritura desde la raiz del proyecto.
+- `historial.txt` se monta en modo lectura/escritura desde la raiz del proyecto.
 - Los cambios de stock realizados dentro del contenedor se reflejan en el `stock.txt` local.
+- Las transacciones registradas dentro del contenedor se reflejan en el `historial.txt` local.
+
+Si cambiaste codigo y quieres forzar recompilacion de la imagen:
+
+```bash
+docker compose run --rm --build progvoraz-console
+```
 
 Ejecuta pruebas automatizadas de modos `a`, `b`, `c`, GUI limitado y GUI ilimitado:
 
@@ -190,6 +200,8 @@ Si usaste Make en Linux/macOS:
 1. Elegir opcion:
    - `a` para monedas infinitas.
    - `b` para monedas limitadas.
+  - `c` para administrador.
+  - `h` o `historial` para ver historial.
 2. Escribir nombre de moneda (por ejemplo: `euro`, `dolar`, `yen`).
 3. Introducir cantidad en centimos.
 4. Introducir `0` para salir.
@@ -199,6 +211,8 @@ Comandos de navegacion disponibles:
 - `volver`: regresa al menu anterior donde aplique.
 - `modo`: vuelve al menu de seleccion de modo.
 - `salir`: cierra la aplicacion desde cualquier pantalla.
+
+En subopciones de cambio tambien se acepta `historial` para consultar transacciones sin salir del flujo.
 
 ## Panel administrador (GUI)
 
@@ -222,6 +236,12 @@ La GUI de Windows permite elegir modo directamente:
 - `Stock ilimitado`: calcula devolucion ignorando stock (no modifica `stock.txt`).
 
 Para valores de stock muy grandes, las listas de stock y resultado incluyen scroll horizontal para ver el numero completo.
+
+La GUI incluye acceso a historial:
+
+- Windows: boton `Historial` en la ventana principal.
+- macOS: boton `Historial` en la ventana principal.
+- Linux/portable: comando `historial` en seleccion de modo y en acciones.
 
 ## Ejemplo de prueba automatizada (PowerShell)
 
@@ -276,6 +296,7 @@ Mismo orden de bloques que `monedas.txt`:
 - Se corrigieron validaciones de limites en el vector dinamico.
 - Se agrego validacion de entrada para opcion y cantidad.
 - La actualizacion de stock reescribe `stock.txt` en el mismo archivo abierto (`r+`) sin temporales.
+- La consola fue modularizada: `main.c` ahora delega en `app_console.c`.
 - Se modernizo el flujo para GitHub con `Makefile`, `.gitignore` y CI en `.github/workflows/ci.yml`.
 
 ## Nota sobre Windows Phone
