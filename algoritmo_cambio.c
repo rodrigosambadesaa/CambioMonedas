@@ -669,3 +669,39 @@ int calcular_cambio_optimo_stock(const BigInt *monto,
         bigint_array_free(solucion);
     return res;
 }
+
+int calcular_cambio_optimo_stock_con_limite(const BigInt *monto, const BigIntArray *denominaciones, const BigIntArray *stock, size_t limite_monedas, BigIntArray *solucion)
+{
+    if (monto == NULL || denominaciones == NULL || stock == NULL || solucion == NULL) return 0;
+    if (denominaciones->len != stock->len) return 0;
+    if (limite_monedas == 0) return calcular_cambio_optimo_stock(monto, denominaciones, stock, solucion);
+    // Para simplificar, implementaremos una version greedy con verificacion de limite
+    // En una version real esto deberia integrar DP
+    if (!calcular_cambio_optimo_stock(monto, denominaciones, stock, solucion)) return 0;
+    size_t count = 0;
+    for (size_t i = 0; i < solucion->len; i++) {
+        long v = strtol(solucion->items[i].digits, NULL, 10);
+        count += v;
+    }
+    if (count > limite_monedas) {
+        bigint_array_free(solucion);
+        return 0;
+    }
+    return 1;
+}
+
+int calcular_cambio_optimo_con_limite(const BigInt *monto, const BigIntArray *denominaciones, size_t limite_monedas, BigIntArray *solucion)
+{
+    if (limite_monedas == 0) return calcular_cambio_optimo(monto, denominaciones, solucion);
+    if (!calcular_cambio_optimo(monto, denominaciones, solucion)) return 0;
+    size_t count = 0;
+    for (size_t i = 0; i < solucion->len; i++) {
+        long v = strtol(solucion->items[i].digits, NULL, 10);
+        count += v;
+    }
+    if (count > limite_monedas) {
+        bigint_array_free(solucion);
+        return 0;
+    }
+    return 1;
+}

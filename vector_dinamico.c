@@ -41,13 +41,13 @@ void crear(vectorP *v1, unsigned long tam1)
     if (*v1 == NULL)
         return;
 
-    /* Estado inicial consistente antes de reservar datos. */
+    /* Estado inicial consistente antes de reserva de datos. */
     (*v1)->datos = NULL;
     (*v1)->tam = tam1;
 
     /* Reserva almacenamiento de elementos. */
     (*v1)->datos = (TELEMENTO *)malloc(tam1 * sizeof(TELEMENTO));
-    /* if: documenta el comportamiento principal y validaciones de entrada. */
+   
     if ((*v1)->datos == NULL)
     {
         /* Si falla reserva interna, libera cabecera para evitar fuga. */

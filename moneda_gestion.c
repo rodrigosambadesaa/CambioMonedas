@@ -20,7 +20,7 @@
 #define MAX_LINEA_STOCK 256
 #define MAX_LINEAS_STOCK 512
 
-/* es_texto_bigint_valido: documenta el comportamiento principal y validaciones de entrada. */
+/* es_texto_bigint_valido: Funcion auxiliar que verifica si un string es un numero grande valido. */
 static int es_texto_bigint_valido(const char *texto)
 {
     size_t i;
@@ -37,7 +37,7 @@ static int es_texto_bigint_valido(const char *texto)
     return 1;
 }
 
-/* *duplicar_cadena: documenta el comportamiento principal y validaciones de entrada. */
+/* duplicar_cadena: Asigna memoria y copia el contenido de una cadena en ella. */
 static char *duplicar_cadena(const char *texto)
 {
     size_t len;
@@ -55,7 +55,7 @@ static char *duplicar_cadena(const char *texto)
     return copia;
 }
 
-/* recortar_fin_linea: documenta el comportamiento principal y validaciones de entrada. */
+/* recortar_fin_linea: Elimina saltos de linea CR o LF al final del string. */
 static void recortar_fin_linea(char *texto)
 {
     if (texto == NULL)
@@ -64,7 +64,7 @@ static void recortar_fin_linea(char *texto)
     texto[strcspn(texto, "\r\n")] = '\0';
 }
 
-/* cargar_datos_moneda: documenta el comportamiento principal y validaciones de entrada. */
+/* cargar_datos_moneda: Nucleo lector para monedas y stock. */
 static int cargar_datos_moneda(const char *archivo, const char *nombreMoneda, int convertirMenosUnoACero, BigIntArray *resultado)
 {
     FILE *fp;
@@ -80,10 +80,10 @@ static int cargar_datos_moneda(const char *archivo, const char *nombreMoneda, in
     if (fp == NULL)
         return 0;
 
-    /* while: documenta el comportamiento principal y validaciones de entrada. */
+    /* Bucle principal: va extrayendo palabras (tokens) limitadas a 255 caracteres separados por espacios o saltos de linea. */
     while (fscanf(fp, "%255s", token) == 1)
     {
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
+        /* Si aun no hemos encontrado la declaracion de la moneda que buscamos... */
         if (!enSeccion)
         {
             if (strcmp(token, nombreMoneda) == 0)
@@ -115,13 +115,13 @@ static int cargar_datos_moneda(const char *archivo, const char *nombreMoneda, in
     for (size_t i = 0; i < cantidad; i++)
     {
         BigInt tmp = {0};
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
+        /* Intenta inicializar tmp con los digitos guardados en valores[i]. Si falla la reserva dentro de init... */
         if (!bigint_init(&tmp, valores[i]))
         {
             bigint_array_free(resultado);
             return 0;
         }
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
+        /* Asigna la estructura tmp recien creada al indice 'i' del array destino 'resultado'. Si falla... */
         if (!bigint_array_set(resultado, i, &tmp))
         {
             bigint_free(&tmp);
@@ -134,19 +134,19 @@ static int cargar_datos_moneda(const char *archivo, const char *nombreMoneda, in
     return 1;
 }
 
-/* cargar_denominaciones_moneda: documenta el comportamiento principal y validaciones de entrada. */
+/* cargar_denominaciones_moneda: Wrapper que delega en cargar_datos_moneda apuntando a "monedas.txt". */
 int cargar_denominaciones_moneda(const char *nombreMoneda, BigIntArray *resultado)
 {
     return cargar_datos_moneda("monedas.txt", nombreMoneda, 0, resultado);
 }
 
-/* cargar_stock_moneda: documenta el comportamiento principal y validaciones de entrada. */
+/* cargar_stock_moneda: Wrapper que delega en cargar_datos_moneda apuntando a "stock.txt". */
 int cargar_stock_moneda(const char *nombreMoneda, BigIntArray *resultado)
 {
     return cargar_datos_moneda("stock.txt", nombreMoneda, 1, resultado);
 }
 
-/* actualizar_stock_moneda: documenta el comportamiento principal y validaciones de entrada. */
+/* actualizar_stock_moneda: Funcion que reescribe in-place el archivo stock.txt con los nuevos valores descontados. */
 int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
 {
     FILE *archivo;
@@ -169,19 +169,19 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
     for (i = 0; i < MAX_LINEAS_STOCK; i++)
         lineas[i] = NULL;
 
-    /* while: documenta el comportamiento principal y validaciones de entrada. */
+    /* Bucle principal de lectura: carga todo el archivo stock.txt en la matriz dinamica 'lineas'. */
     while (fgets(buffer, sizeof(buffer), archivo) != NULL)
     {
         size_t len = strlen(buffer);
 
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
+        /* Limita la lectura a MAX_LINEAS_STOCK para evitar buffer overflow en el arreglo 'lineas'. */
         if (totalLineas >= MAX_LINEAS_STOCK)
         {
             ok = 0;
             break;
         }
 
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
+        /* Si la linea es demasiado larga, fgets no habra incluido un salto de linea al final (salvo EOF). */
         if (len > 0 && buffer[len - 1] != '\n' && !feof(archivo))
         {
             ok = 0;
@@ -189,7 +189,7 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
         }
 
         lineas[totalLineas] = duplicar_cadena(buffer);
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
+        /* Verifica que malloc no haya fallado durante 'duplicar_cadena'. */
         if (lineas[totalLineas] == NULL)
         {
             ok = 0;
@@ -198,7 +198,7 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
         totalLineas++;
     }
 
-    /* if: documenta el comportamiento principal y validaciones de entrada. */
+    /* Fase de modificación: busca y altera las lineas del stock de la moneda si no hubo errores previos. */
     if (ok)
     {
         for (size_t linea = 0; linea < totalLineas && !actualizado; linea++)
@@ -216,7 +216,7 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
             if (strcmp(comparable, nombreMoneda) != 0)
                 continue;
 
-            /* if: documenta el comportamiento principal y validaciones de entrada. */
+            /* Verificamos que queden suficientes lineas debajo de la etiqueta para reemplazar todo el stock sin pasarnos. */
             if (stock->len > totalLineas - (linea + 1))
             {
                 ok = 0;
@@ -235,7 +235,7 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
 
                 free(lineas[objetivo]);
                 lineas[objetivo] = duplicar_cadena(nuevaLinea);
-                /* if: documenta el comportamiento principal y validaciones de entrada. */
+                /* Si no habia memoria para crear esta nueva linea... */
                 if (lineas[objetivo] == NULL)
                 {
                     ok = 0;
@@ -248,7 +248,7 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
         }
     }
 
-    /* if: documenta el comportamiento principal y validaciones de entrada. */
+    /* Fase de aborto o limpieza temprana. */
     if (!ok || !actualizado)
     {
         for (i = 0; i < totalLineas; i++)
@@ -260,7 +260,7 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
     rewind(archivo);
     for (i = 0; i < totalLineas; i++)
     {
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
+        /* Escribe secuencialmente la linea sobreescribiendo el archivo. */
         if (fputs(lineas[i], archivo) == EOF)
         {
             ok = 0;
@@ -271,11 +271,11 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
     if (ok && fflush(archivo) != 0)
         ok = 0;
 
-    /* if: documenta el comportamiento principal y validaciones de entrada. */
+    /* Fase final: truncado. (Para evitar basura vieja residual si el nuevo archivo termina siendo mas pequeno). */
     if (ok)
     {
         long fin = ftell(archivo);
-        /* if: documenta el comportamiento principal y validaciones de entrada. */
+        /* Valida que ftell haya funcionado correctamente. */
         if (fin < 0)
         {
             ok = 0;
