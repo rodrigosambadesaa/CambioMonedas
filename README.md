@@ -7,6 +7,7 @@ Proyecto de cambio de monedas escrito en C, originalmente creado en 2014 con Net
 - Calcula cambio en modo de monedas infinitas.
 - Calcula cambio en modo con stock limitado.
 - Persiste actualizaciones de stock en stock.txt.
+- Registra y consulta historial de transacciones en historial.txt.
 - Incluye GUI nativa en Windows y macOS (Swift/AppKit), y GUI portable en terminal para Linux.
 
 ## Modernizacion aplicada
@@ -24,7 +25,8 @@ La logica de acceso y persistencia de monedas/stock se separo de main.c para mej
 
 - moneda_gestion.h: interfaz publica de carga y persistencia.
 - moneda_gestion.c: implementacion de lectura de bloques por moneda y actualizacion de stock.
-- main.c: ahora orquesta UI y algoritmo voraz, delegando IO de moneda al nuevo modulo.
+- app_console.c / app_console.h: logica completa de la aplicacion de consola.
+- main.c: punto de entrada minimo que delega en app_console_run().
 
 Funciones expuestas por el modulo:
 
@@ -60,6 +62,12 @@ Ejecutar modo consola:
 docker compose run --rm progvoraz-console
 ```
 
+Si cambiaste codigo y quieres forzar recompilacion de la imagen:
+
+```bash
+docker compose run --rm --build progvoraz-console
+```
+
 Ejecutar GUI portable (terminal):
 
 ```bash
@@ -69,7 +77,9 @@ docker compose run --rm progvoraz-gui-portable
 Persistencia de datos con Docker Compose:
 
 - `monedas.txt` y `stock.txt` de la raiz del proyecto se montan dentro del contenedor.
+- `historial.txt` tambien se monta dentro del contenedor.
 - Cualquier actualizacion de stock hecha desde consola o GUI portable se guarda en tu `stock.txt` local.
+- Cualquier transaccion registrada desde consola o GUI se refleja en tu `historial.txt` local.
 
 Ejecutar pruebas automáticas de todos los modos soportados en Docker:
 
@@ -156,7 +166,8 @@ Ejecucion:
 
 ## Estructura relevante
 
-- main.c: logica principal y TUI en consola.
+- main.c: punto de entrada minimo de consola.
+- app_console.c / app_console.h: logica principal y TUI en consola.
 - gui_window.c: interfaz grafica de ventana (Windows).
 - gui_macos.swift: interfaz grafica nativa para macOS (Swift/AppKit).
 - gui_portable.c: interfaz GUI portable para Linux y otros Unix-like (panel administrador en terminal).
@@ -164,6 +175,7 @@ Ejecucion:
 - moneda_gestion.c / moneda_gestion.h: carga y persistencia de monedas/stock.
 - monedas.txt: denominaciones por moneda.
 - stock.txt: stock por denominacion.
+- historial.txt: log de transacciones y operaciones.
 - tests/test_bigint_algoritmo.c: pruebas unitarias de aritmetica y cambio.
 - .github/workflows/ci.yml: pipeline de compilacion y prueba rapida.
 
