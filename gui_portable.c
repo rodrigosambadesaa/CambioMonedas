@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 #include "bigint.h"
 #include "moneda_gestion.h"
 #include "algoritmo_cambio.h"
@@ -14,16 +15,32 @@
 static void registrar_historial(const char *mensaje)
 {
     FILE *fp = fopen("historial.txt", "a");
-    if (fp) {
+    if (fp)
+    {
         time_t t = time(NULL);
         struct tm *tm_info = localtime(&t);
-        if (tm_info) {
+        if (tm_info)
+        {
             fprintf(fp, "[%04d-%02d-%02d %02d:%02d:%02d] %s\n",
                     tm_info->tm_year + 1900, tm_info->tm_mon + 1, tm_info->tm_mday,
                     tm_info->tm_hour, tm_info->tm_min, tm_info->tm_sec, mensaje);
         }
         fclose(fp);
     }
+}
+
+static void registrar_historialf(const char *fmt, ...)
+{
+    char mensaje[512];
+    va_list args;
+
+    if (fmt == NULL)
+        return;
+
+    va_start(args, fmt);
+    vsnprintf(mensaje, sizeof(mensaje), fmt, args);
+    va_end(args);
+    registrar_historial(mensaje);
 }
 
 static void mostrar_historial_transacciones(void)
@@ -43,6 +60,15 @@ static void mostrar_historial_transacciones(void)
         fclose(fp);
     }
     printf("----------------------------------\n\n");
+}
+
+static void pausar_pantalla(void)
+{
+    char buffer[8];
+
+    printf("Presione Enter para continuar...");
+    if (fgets(buffer, (int)sizeof(buffer), stdin) == NULL)
+        clearerr(stdin);
 }
 
 #define MAX_MONEDAS 64
@@ -107,7 +133,6 @@ static int cargar_nombres_moneda(char monedas[MAX_MONEDAS][MAX_NOMBRE], int *can
 
     *cantidad = 0;
 
-   
     while (fscanf(fp, "%255s", token) == 1)
     {
         int existe = 0;
@@ -116,7 +141,7 @@ static int cargar_nombres_moneda(char monedas[MAX_MONEDAS][MAX_NOMBRE], int *can
 
         for (int i = 0; i < *cantidad; i++)
         {
-           
+
             if (strcmp(monedas[i], token) == 0)
             {
                 existe = 1;
@@ -124,7 +149,6 @@ static int cargar_nombres_moneda(char monedas[MAX_MONEDAS][MAX_NOMBRE], int *can
             }
         }
 
-       
         if (!existe && *cantidad < MAX_MONEDAS)
         {
             size_t n = strlen(token);
@@ -226,7 +250,7 @@ static int copiar_arreglo_bigint(const BigIntArray *origen, BigIntArray *destino
 
     for (size_t i = 0; i < origen->len; i++)
     {
-       
+
         if (!bigint_array_set(destino, i, &origen->items[i]))
         {
             bigint_array_free(destino);
@@ -236,7 +260,6 @@ static int copiar_arreglo_bigint(const BigIntArray *origen, BigIntArray *destino
 
     return 1;
 }
-
 
 /* pedir_cantidades_por_denominacion: Funcion auxiliar. Ejecuta su logica, valida parametros de entrada y retorna un estado. */
 static int pedir_cantidades_por_denominacion(const BigIntArray *denom, const char *titulo, BigIntArray *cantidades)
@@ -250,28 +273,26 @@ static int pedir_cantidades_por_denominacion(const BigIntArray *denom, const cha
     printf("%s\n", titulo);
     for (size_t i = 0; i < denom->len; i++)
     {
-       
+
         while (1)
         {
             char buffer[2048];
             BigInt tmp = {0};
 
             printf("Cantidad para %s c: ", denom->items[i].digits);
-           
+
             if (!leer_linea(buffer, sizeof(buffer)))
             {
                 bigint_array_free(cantidades);
                 return 0;
             }
 
-           
             if (!bigint_init(&tmp, buffer))
             {
                 printf("Cantidad invalida. Usa entero no negativo.\n");
                 continue;
             }
 
-           
             if (!bigint_array_set(cantidades, i, &tmp))
             {
                 bigint_free(&tmp);
@@ -349,7 +370,6 @@ static int aplicar_cambio_especifico(const char *moneda,
         return 0;
     }
 
-   
     if (bigint_compare(&totalEntregado, &totalDevolucion) != 0)
     {
         printf("Total entregado (%s c) y total solicitado (%s c) deben ser iguales.\n",
@@ -359,7 +379,6 @@ static int aplicar_cambio_especifico(const char *moneda,
         return 0;
     }
 
-   
     if (!copiar_arreglo_bigint(stock, &stockNuevo))
     {
         bigint_free(&totalEntregado);
@@ -390,7 +409,6 @@ static int aplicar_cambio_especifico(const char *moneda,
         bigint_free(&trasSalida);
     }
 
-   
     if (!actualizar_stock_moneda(moneda, &stockNuevo))
     {
         bigint_array_free(&stockNuevo);
@@ -469,44 +487,87 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
     BigIntArray stockNuevo = {0};
 
     size_t limite_monedas = 0;
-    if (es_caja) {
+    if (es_caja)
+    {
         char buf1[256], buf2[256];
         BigInt precio = {0}, pago = {0};
         printf("Precio a cobrar: ");
-        if (!leer_linea(buf1, sizeof(buf1)) || !bigint_init(&precio, buf1)) { printf("Precio invalido.\n"); bigint_free(&precio); bigint_free(&monto); return 0; }
+        if (!leer_linea(buf1, sizeof(buf1)) || !bigint_init(&precio, buf1))
+        {
+            printf("Precio invalido.\n");
+            bigint_free(&precio);
+            bigint_free(&monto);
+            return 0;
+        }
         printf("Cantidad pagada: ");
-        if (!leer_linea(buf2, sizeof(buf2)) || !bigint_init(&pago, buf2)) { printf("Pago invalido.\n"); bigint_free(&precio); bigint_free(&pago); bigint_free(&monto); return 0; }
-        if (bigint_compare(&pago, &precio) < 0) { printf("El pago es menor que el precio.\n"); bigint_free(&precio); bigint_free(&pago); bigint_free(&monto); return 0; }
+        if (!leer_linea(buf2, sizeof(buf2)) || !bigint_init(&pago, buf2))
+        {
+            printf("Pago invalido.\n");
+            bigint_free(&precio);
+            bigint_free(&pago);
+            bigint_free(&monto);
+            return 0;
+        }
+        if (bigint_compare(&pago, &precio) < 0)
+        {
+            printf("El pago es menor que el precio.\n");
+            bigint_free(&precio);
+            bigint_free(&pago);
+            bigint_free(&monto);
+            return 0;
+        }
         bigint_subtract(&pago, &precio, &monto);
-        bigint_free(&precio); bigint_free(&pago);
+        bigint_free(&precio);
+        bigint_free(&pago);
         printf("Cambio a devolver: %s c\n", monto.digits);
-    } else {
+    }
+    else
+    {
         int okMonto = pedir_monto(&monto);
-        if (okMonto <= 0) {
+        if (okMonto <= 0)
+        {
             printf("Monto invalido.\n");
             bigint_free(&monto);
             return 0;
         }
-        if (con_limite) {
+        if (con_limite)
+        {
             char bufL[256];
             printf("Limite maximo de monedas: ");
-            if (!leer_linea(bufL, sizeof(bufL))) { bigint_free(&monto); return 0; }
+            if (!leer_linea(bufL, sizeof(bufL)))
+            {
+                bigint_free(&monto);
+                return 0;
+            }
             long v = strtol(bufL, NULL, 10);
-            if (v < 1) { printf("Limite invalido.\n"); bigint_free(&monto); return 0; }
+            if (v < 1)
+            {
+                printf("Limite invalido.\n");
+                bigint_free(&monto);
+                return 0;
+            }
             limite_monedas = (size_t)v;
         }
     }
 
     int ok = 0;
-    if (modo == MODO_LIMITADO) {
-        if (con_limite) ok = calcular_cambio_optimo_stock_con_limite(&monto, denom, stock, limite_monedas, &solucion);
-        else ok = calcular_cambio_optimo_stock(&monto, denom, stock, &solucion);
-    } else {
-        if (con_limite) ok = calcular_cambio_optimo_con_limite(&monto, denom, limite_monedas, &solucion);
-        else ok = calcular_cambio_optimo(&monto, denom, &solucion);
+    if (modo == MODO_LIMITADO)
+    {
+        if (con_limite)
+            ok = calcular_cambio_optimo_stock_con_limite(&monto, denom, stock, limite_monedas, &solucion);
+        else
+            ok = calcular_cambio_optimo_stock(&monto, denom, stock, &solucion);
     }
-    
-    if (!ok) {
+    else
+    {
+        if (con_limite)
+            ok = calcular_cambio_optimo_con_limite(&monto, denom, limite_monedas, &solucion);
+        else
+            ok = calcular_cambio_optimo(&monto, denom, &solucion);
+    }
+
+    if (!ok)
+    {
         printf("No existe devolucion exacta con los parametros actuales.\n");
         bigint_free(&monto);
         bigint_array_free(&solucion);
@@ -515,7 +576,6 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
 
     imprimir_resultado_cambio(&monto, denom, &solucion);
 
-   
     if (modo == MODO_ILIMITADO)
     {
         bigint_free(&monto);
@@ -524,7 +584,6 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
         return 1;
     }
 
-   
     if (!copiar_arreglo_bigint(stock, &stockNuevo))
     {
         printf("No se pudo preparar actualizacion de stock.\n");
@@ -540,7 +599,6 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
         if (bigint_is_zero(&solucion.items[i]))
             continue;
 
-       
         if (!bigint_subtract(&stockNuevo.items[i], &solucion.items[i], &nuevoStock))
         {
             bigint_array_free(&stockNuevo);
@@ -550,7 +608,6 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
             return 0;
         }
 
-       
         if (!bigint_array_set(&stockNuevo, i, &nuevoStock))
         {
             bigint_free(&nuevoStock);
@@ -564,7 +621,6 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
         bigint_free(&nuevoStock);
     }
 
-   
     if (!actualizar_stock_moneda(moneda, &stockNuevo))
     {
         bigint_array_free(&stockNuevo);
@@ -598,13 +654,13 @@ static int pedir_modo(ModoGUI *modo)
         return 0;
     if (strcmp(entrada, "historial") == 0 || strcmp(entrada, "h") == 0)
         return 2;
-   
+
     if (strcmp(entrada, "limitado") == 0 || strcmp(entrada, "b") == 0)
     {
         *modo = MODO_LIMITADO;
         return 1;
     }
-   
+
     if (strcmp(entrada, "ilimitado") == 0 || strcmp(entrada, "a") == 0)
     {
         *modo = MODO_ILIMITADO;
@@ -640,14 +696,12 @@ int main(void)
     printf("ProgVoraz GUI portable iniciado en %s\n", so);
     printf("Nota: en este SO se usa panel administrador y calculo de devolucion en terminal (sin WinAPI).\n");
 
-   
     if (!cargar_nombres_moneda(monedas, &nMonedas))
     {
         printf("No se pudieron cargar monedas desde monedas.txt\n");
         return 1;
     }
 
-   
     while (1)
     {
         char entrada[128];
@@ -664,6 +718,7 @@ int main(void)
         if (estadoModo == 2)
         {
             mostrar_historial_transacciones();
+            pausar_pantalla();
             continue;
         }
         if (estadoModo < 0)
@@ -690,12 +745,11 @@ int main(void)
                 idxMoneda = (int)(v - 1);
         }
 
-       
         if (idxMoneda < 0)
         {
             for (int i = 0; i < nMonedas; i++)
             {
-               
+
                 if (strcmp(monedas[i], entrada) == 0)
                 {
                     idxMoneda = i;
@@ -704,14 +758,12 @@ int main(void)
             }
         }
 
-       
         if (idxMoneda < 0)
         {
             printf("Moneda invalida.\n");
             continue;
         }
 
-       
         if (!cargar_denominaciones_moneda(monedas[idxMoneda], &denom) || !cargar_stock_moneda(monedas[idxMoneda], &stock) || denom.len != stock.len)
         {
             printf("No se pudo cargar denominaciones/stock para esa moneda.\n");
@@ -720,7 +772,6 @@ int main(void)
             continue;
         }
 
-       
         while (1)
         {
             char accion[32];
@@ -735,7 +786,7 @@ int main(void)
                 printf("Accion (calcular/caja/limite/especifico/historial/anadir/quitar/modo/volver/salir): ");
             else
                 printf("Accion (calcular/caja/limite/especifico/historial/modo/volver/salir): ");
-           
+
             if (!leer_linea(accion, sizeof(accion)))
             {
                 bigint_free(&delta);
@@ -745,7 +796,7 @@ int main(void)
             }
 
             a_minusculas(accion);
-           
+
             if (strcmp(accion, "salir") == 0)
             {
                 bigint_free(&delta);
@@ -753,24 +804,23 @@ int main(void)
                 bigint_array_free(&stock);
                 return 0;
             }
-           
+
             if (strcmp(accion, "volver") == 0)
             {
                 bigint_free(&delta);
                 break;
             }
-           
+
             if (strcmp(accion, "modo") == 0)
             {
                 bigint_free(&delta);
                 break;
             }
 
-           
-            
             if (strcmp(accion, "historial") == 0)
             {
                 mostrar_historial_transacciones();
+                pausar_pantalla();
                 bigint_free(&delta);
                 continue;
             }
@@ -781,8 +831,6 @@ int main(void)
                 continue;
             }
 
-           
-            
             if (strcmp(accion, "caja") == 0)
             {
                 calcular_y_aplicar_cambio(modoActual, monedas[idxMoneda], &denom, &stock, 1, 0);
@@ -834,7 +882,6 @@ int main(void)
                 continue;
             }
 
-           
             if (!requiereAdmin)
             {
                 printf("Accion invalida para modo stock ilimitado.\n");
@@ -853,7 +900,6 @@ int main(void)
                 continue;
             }
 
-           
             if (pedir_indice(denom.len, &idxDen) <= 0)
             {
                 printf("Indice invalido.\n");
@@ -861,7 +907,6 @@ int main(void)
                 continue;
             }
 
-           
             if (pedir_cantidad(&delta) <= 0)
             {
                 printf("Cantidad invalida.\n");
@@ -869,10 +914,9 @@ int main(void)
                 continue;
             }
 
-           
             if (esSuma)
             {
-               
+
                 if (!bigint_add(&stock.items[idxDen], &delta, &nuevo))
                 {
                     printf("No se pudo sumar stock.\n");
@@ -883,7 +927,7 @@ int main(void)
             }
             else
             {
-               
+
                 if (bigint_compare(&stock.items[idxDen], &delta) < 0 || !bigint_subtract(&stock.items[idxDen], &delta, &nuevo))
                 {
                     printf("No se pudo quitar stock (insuficiente o error).\n");
@@ -893,7 +937,6 @@ int main(void)
                 }
             }
 
-           
             if (!bigint_array_set(&stock, idxDen, &nuevo))
             {
                 printf("No se pudo aplicar cambio en memoria.\n");
@@ -905,7 +948,14 @@ int main(void)
             if (!actualizar_stock_moneda(monedas[idxMoneda], &stock))
                 printf("No se pudo persistir stock en archivo.\n");
             else
+            {
+                registrar_historialf("Admin %s (portable) | Moneda=%s | Denom=%s c | Cantidad=%s",
+                                     esSuma ? "ANADIR" : "QUITAR",
+                                     monedas[idxMoneda],
+                                     denom.items[idxDen].digits,
+                                     delta.digits);
                 printf("Stock actualizado correctamente.\n");
+            }
 
             bigint_free(&delta);
             bigint_free(&nuevo);
