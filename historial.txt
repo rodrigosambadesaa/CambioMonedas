@@ -1,0 +1,43 @@
+[2026-05-01 10:19:51] Cambio optimo con stock realizado.
+[2026-05-01 10:31:31] Cambio tradicional ilimitado | Moneda=euro | Monto=30 c
+[2026-05-01 10:31:31] Cambio tradicional con stock | Moneda=euro | Monto=30 c
+[2026-05-01 10:31:32] Admin ANADIR | Moneda=euro | Denom=50000 c | Cantidad=0
+[2026-05-01 10:31:32] Cambio portable aplicado con stock.
+[2026-05-01 10:31:52] Cambio tradicional ilimitado | Moneda=euro | Monto=30 c
+[2026-05-01 10:31:52] Cambio tradicional con stock | Moneda=euro | Monto=30 c
+[2026-05-01 10:31:53] Admin ANADIR | Moneda=euro | Denom=50000 c | Cantidad=0
+[2026-05-01 10:31:53] Cambio portable aplicado con stock.
+[2026-05-01 10:31:53] Cambio portable aplicado (ilimitado).
+[2026-05-01 13:12:25] Cambio tradicional ilimitado | Moneda=euro | Monto=1231 c
+[2026-05-01 13:12:40] Cambio tradicional con stock | Moneda=euro | Monto=1 c
+[2026-05-01 13:59:59] Cambio tradicional ilimitado | Moneda=euro | Monto=231231231 c
+[2026-05-01 20:23:50] Cambio tradicional ilimitado | Moneda=euro | Monto=30 c
+[2026-05-01 20:23:50] Cambio tradicional con stock | Moneda=euro | Monto=30 c
+[2026-05-01 20:23:50] Admin ANADIR | Moneda=euro | Denom=50000 c | Cantidad=0
+[2026-05-01 20:23:50] Cambio portable aplicado con stock.
+[2026-05-01 20:23:51] Cambio portable aplicado (ilimitado).
+[2026-05-01 20:24:58] Cambio tradicional ilimitado | Moneda=euro | Monto=30 c
+[2026-05-01 20:24:58] Cambio tradicional con stock | Moneda=euro | Monto=30 c
+[2026-05-01 20:24:58] Admin ANADIR | Moneda=euro | Denom=50000 c | Cantidad=0
+[2026-05-01 20:24:58] Cambio portable aplicado con stock.
+[2026-05-01 20:24:58] Cambio portable aplicado (ilimitado).
+[2026-05-01 20:28:10] Cambio tradicional ilimitado | Moneda=euro | Monto=30 c
+[2026-05-01 20:28:10] Cambio tradicional con stock | Moneda=euro | Monto=30 c
+[2026-05-01 20:28:10] Admin ANADIR | Moneda=euro | Denom=50000 c | Cantidad=0
+[2026-05-01 20:28:11] Cambio portable aplicado con stock.
+[2026-05-01 20:28:11] Cambio portable aplicado (ilimitado).
+[2026-05-01 20:30:49] Cambio tradicional ilimitado | Moneda=euro | Monto=30 c
+[2026-05-01 20:30:49] Cambio tradicional con stock | Moneda=euro | Monto=30 c
+[2026-05-01 20:30:49] Admin ANADIR | Moneda=euro | Denom=50000 c | Cantidad=0
+[2026-05-01 20:30:49] Cambio portable aplicado con stock.
+[2026-05-01 20:30:49] Cambio portable aplicado (ilimitado).
+[2026-05-01 20:31:11] Cambio tradicional ilimitado | Moneda=euro | Monto=30 c
+[2026-05-01 20:31:11] Cambio tradicional con stock | Moneda=euro | Monto=30 c
+[2026-05-01 20:31:11] Admin ANADIR | Moneda=euro | Denom=50000 c | Cantidad=0
+[2026-05-01 20:31:11] Cambio portable aplicado con stock.
+[2026-05-01 20:31:11] Cambio portable aplicado (ilimitado).
+[2026-05-01 20:33:21] Cambio tradicional ilimitado | Moneda=euro | Monto=30 c
+[2026-05-01 20:33:21] Cambio tradicional con stock | Moneda=euro | Monto=30 c
+[2026-05-01 20:33:21] Admin ANADIR | Moneda=euro | Denom=50000 c | Cantidad=0
+[2026-05-01 20:33:21] Cambio portable aplicado con stock.
+[2026-05-01 20:33:21] Cambio portable aplicado (ilimitado).
