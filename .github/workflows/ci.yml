@@ -21,7 +21,7 @@ jobs:
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
-        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz
+        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c app_console.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz
 
       - name: Build GUI (Linux portable)
         if: runner.os == 'Linux'
@@ -33,7 +33,7 @@ jobs:
 
       - name: Build (macOS)
         if: runner.os == 'macOS'
-        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz
+        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c app_console.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz
 
       - name: Swift toolchain info (macOS)
         if: runner.os == 'macOS'
@@ -89,7 +89,7 @@ jobs:
       - name: Build (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz.exe
+        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c app_console.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz.exe
 
       - name: Build GUI (Windows)
         if: runner.os == 'Windows'
