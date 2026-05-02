@@ -18,7 +18,7 @@ int cargar_stock_moneda(const char *nombreMoneda, BigIntArray *resultado);
 
 /*
  * Persiste en stock.txt el vector de stock de la moneda indicada,
- * reescribiendo el mismo archivo (sin temporales).
+ * escribiendo primero en un archivo temporal y luego reemplazando stock.txt.
  * Devuelve 1 si pudo actualizar; 0 en caso contrario.
  */
 int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock);

@@ -146,13 +146,16 @@ int cargar_stock_moneda(const char *nombreMoneda, BigIntArray *resultado)
     return cargar_datos_moneda("stock.txt", nombreMoneda, 1, resultado);
 }
 
-/* actualizar_stock_moneda: Funcion que reescribe in-place el archivo stock.txt con los nuevos valores descontados. */
+/* actualizar_stock_moneda: Funcion que reescribe stock.txt mediante temporal para evitar corrupcion parcial. */
 int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
 {
-    FILE *archivo;
+    FILE *archivoLectura;
+    FILE *archivoTemporal = NULL;
     char *lineas[MAX_LINEAS_STOCK];
     char buffer[MAX_LINEA_STOCK];
     char comparable[MAX_LINEA_STOCK];
+    const char *rutaStock = "stock.txt";
+    const char *rutaTemporal = "stock.txt.tmp";
     size_t i;
     size_t totalLineas = 0;
     int ok = 1;
@@ -162,15 +165,15 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
         stock == NULL || stock->items == NULL || stock->len == 0)
         return 0;
 
-    archivo = fopen("stock.txt", "r+");
-    if (archivo == NULL)
+    archivoLectura = fopen(rutaStock, "r");
+    if (archivoLectura == NULL)
         return 0;
 
     for (i = 0; i < MAX_LINEAS_STOCK; i++)
         lineas[i] = NULL;
 
     /* Bucle principal de lectura: carga todo el archivo stock.txt en la matriz dinamica 'lineas'. */
-    while (fgets(buffer, sizeof(buffer), archivo) != NULL)
+    while (fgets(buffer, sizeof(buffer), archivoLectura) != NULL)
     {
         size_t len = strlen(buffer);
 
@@ -182,7 +185,7 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
         }
 
         /* Si la linea es demasiado larga, fgets no habra incluido un salto de linea al final (salvo EOF). */
-        if (len > 0 && buffer[len - 1] != '\n' && !feof(archivo))
+        if (len > 0 && buffer[len - 1] != '\n' && !feof(archivoLectura))
         {
             ok = 0;
             break;
@@ -253,48 +256,74 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
     {
         for (i = 0; i < totalLineas; i++)
             free(lineas[i]);
-        fclose(archivo);
+        fclose(archivoLectura);
         return 0;
     }
 
-    rewind(archivo);
-    for (i = 0; i < totalLineas; i++)
-    {
-        /* Escribe secuencialmente la linea sobreescribiendo el archivo. */
-        if (fputs(lineas[i], archivo) == EOF)
-        {
-            ok = 0;
-            break;
-        }
-    }
+    fclose(archivoLectura);
+    archivoLectura = NULL;
 
-    if (ok && fflush(archivo) != 0)
+    archivoTemporal = fopen(rutaTemporal, "w");
+    if (archivoTemporal == NULL)
         ok = 0;
 
-    /* Fase final: truncado. (Para evitar basura vieja residual si el nuevo archivo termina siendo mas pequeno). */
-    if (ok)
+    for (i = 0; ok && i < totalLineas; i++)
     {
-        long fin = ftell(archivo);
-        /* Valida que ftell haya funcionado correctamente. */
-        if (fin < 0)
+        /* Escribe secuencialmente la linea en el archivo temporal. */
+        if (fputs(lineas[i], archivoTemporal) == EOF)
         {
             ok = 0;
         }
-        else
-        {
+    }
+
+    if (ok && fflush(archivoTemporal) != 0)
+        ok = 0;
+
+    if (archivoTemporal != NULL && fclose(archivoTemporal) != 0)
+        ok = 0;
+    archivoTemporal = NULL;
+
+    if (ok)
+    {
 #ifdef _WIN32
-            if (_chsize_s(_fileno(archivo), (__int64)fin) != 0)
-                ok = 0;
-#else
-            if (ftruncate(fileno(archivo), (off_t)fin) != 0)
-                ok = 0;
+        if (remove(rutaStock) != 0)
+            ok = 0;
 #endif
+        if (ok && rename(rutaTemporal, rutaStock) != 0)
+        {
+            FILE *archivoDestino = fopen(rutaStock, "w");
+            if (archivoDestino == NULL)
+            {
+                ok = 0;
+            }
+            else
+            {
+                for (i = 0; i < totalLineas; i++)
+                {
+                    if (fputs(lineas[i], archivoDestino) == EOF)
+                    {
+                        ok = 0;
+                        break;
+                    }
+                }
+                if (ok && fflush(archivoDestino) != 0)
+                    ok = 0;
+                if (fclose(archivoDestino) != 0)
+                    ok = 0;
+            }
         }
     }
+
+    if (!ok)
+        remove(rutaTemporal);
 
     for (i = 0; i < totalLineas; i++)
         free(lineas[i]);
-    fclose(archivo);
 
-    return ok ? 1 : 0;
+    if (archivoLectura != NULL)
+        fclose(archivoLectura);
+    if (archivoTemporal != NULL)
+        fclose(archivoTemporal);
+
+    return (ok && actualizado) ? 1 : 0;
 }

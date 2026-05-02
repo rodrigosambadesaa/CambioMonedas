@@ -40,12 +40,50 @@ run_case() {
   echo "[OK] $name"
 }
 
+run_case_updates_stock() {
+  local name="$1"
+  local exe="$2"
+  local expected="$3"
+  local input="$4"
+  local output
+  local before
+  local after
+
+  cp "$stock_backup" stock.txt
+  before="$(cat stock.txt)"
+  output="$(printf "%b" "$input" | "$exe" 2>&1 || true)"
+  after="$(cat stock.txt)"
+
+  if ! grep -Fq -- "$expected" <<<"$output"; then
+    echo "[FALLO] $name"
+    echo "Esperado: $expected"
+    echo "Salida:"
+    echo "$output"
+    exit 1
+  fi
+
+  if [[ "$before" == "$after" ]]; then
+    echo "[FALLO] $name"
+    echo "Salida:"
+    echo "$output"
+    echo "stock.txt no cambio tras la operacion."
+    exit 1
+  fi
+
+  echo "[OK] $name"
+}
+
 run_case "Consola modo a (tradicional)" \
   ./progvoraz \
   "Subopcion cambio (tradicional|1 / especifico|2 / historial|3, volver, modo o salir):" \
   "a\n${currency}\ntradicional\n30\nsalir\n"
 
 run_case "Consola modo b (tradicional)" \
+  ./progvoraz \
+  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3, volver, modo o salir):" \
+  "b\n${currency}\ntradicional\n30\nsalir\n"
+
+run_case_updates_stock "Consola modo b actualiza stock.txt" \
   ./progvoraz \
   "Subopcion cambio (tradicional|1 / especifico|2 / historial|3, volver, modo o salir):" \
   "b\n${currency}\ntradicional\n30\nsalir\n"
