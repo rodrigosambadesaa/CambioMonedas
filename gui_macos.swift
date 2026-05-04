@@ -679,7 +679,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         registerHistory("Resumen consultado (macOS) | Moneda=\(coin) | Piezas=\(normalize(totalUnits)) | Valor=\(normalize(totalValueStock)) c")
     }
 
-    func calculateLimitedChange(amount: String, limit: Int) -> [String]? {
+    func calculateLimitedChange(amount: String, minCoins: Int, maxCoins: Int) -> [String]? {
         var remain = normalize(amount)
         var solution = Array(repeating: "0", count: denoms.count)
 
@@ -699,17 +699,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         }
 
         if remain != "0" { return nil }
-        if limit > 0 {
-            var coins = 0
-            for s in solution {
-                if let v = Int(s) { coins += v }
-            }
-            if coins > limit { return nil }
+
+        var coins = 0
+        for s in solution {
+            if let v = Int(s) { coins += v }
         }
+        if maxCoins > 0 && coins > maxCoins { return nil }
+        if coins < minCoins { return nil }
+
         return solution
     }
 
-    func calculateUnlimitedChange(amount: String, limit: Int) -> [String]? {
+    func calculateUnlimitedChange(amount: String, minCoins: Int, maxCoins: Int) -> [String]? {
         var remain = normalize(amount)
         var solution = Array(repeating: "0", count: denoms.count)
 
@@ -721,14 +722,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         }
 
         if remain != "0" { return nil }
-        if limit > 0 {
-            var coins = 0
-            for s in solution {
-                if let v = Int(s) { coins += v }
-            }
-            if coins > limit { return nil }
+
+        var coins = 0
+        for s in solution {
+            if let v = Int(s) { coins += v }
         }
+        if maxCoins > 0 && coins > maxCoins { return nil }
+        if coins < minCoins { return nil }
+
         return solution
+    }
+
+    func parseRestriction(_ text: String) -> (Int, Int)? {
+        let raw = text.replacingOccurrences(of: " ", with: "")
+        if raw.isEmpty {
+            return nil
+        }
+
+        if raw.first == "=" {
+            let v = String(raw.dropFirst())
+            guard isDigits(v), let n = Int(v), n > 0 else { return nil }
+            return (n, n)
+        }
+
+        if let dash = raw.firstIndex(of: "-") {
+            let left = String(raw[..<dash])
+            let right = String(raw[raw.index(after: dash)...])
+            guard isDigits(left), isDigits(right),
+                  let minV = Int(left), let maxV = Int(right),
+                  minV > 0, maxV > 0, minV <= maxV else { return nil }
+            return (minV, maxV)
+        }
+
+        guard isDigits(raw), let maxV = Int(raw), maxV > 0 else { return nil }
+        return (0, maxV)
     }
 
     func renderResult(amount: String, solution: [String]) {
@@ -775,17 +802,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
             }
         }
 
-        var limitVal = 0
+        var minCoins = 0
+        var maxCoins = 0
         let l = normalize(limitField.stringValue)
-        if isDigits(l) && l != "0" {
-            limitVal = Int(l) ?? 0
+        if !l.isEmpty && l != "0" {
+            guard let restriction = parseRestriction(l) else {
+                setStatus("Restriccion invalida. Usa N, =N o N-M.", error: true)
+                return
+            }
+            minCoins = restriction.0
+            maxCoins = restriction.1
         }
 
         let solution: [String]?
         if limitedMode {
-            solution = calculateLimitedChange(amount: amount, limit: limitVal)
+            solution = calculateLimitedChange(amount: amount, minCoins: minCoins, maxCoins: maxCoins)
         } else {
-            solution = calculateUnlimitedChange(amount: amount, limit: limitVal)
+            solution = calculateUnlimitedChange(amount: amount, minCoins: minCoins, maxCoins: maxCoins)
         }
 
         guard let solved = solution else {

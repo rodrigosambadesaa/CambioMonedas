@@ -6,6 +6,7 @@ Proyecto de cambio de monedas escrito en C, originalmente creado en 2014 con Net
 
 - Calcula cambio en modo de monedas infinitas.
 - Calcula cambio en modo con stock limitado.
+- Permite restricciones de cantidad de monedas en todos los modos principales: `N` (maximo), `=N` (exacto), `N-M` (rango).
 - Persiste actualizaciones de stock en stock.txt.
 - Registra y consulta historial de transacciones en historial.txt.
 - Incluye GUI nativa en Windows y macOS (Swift/AppKit), y GUI portable en terminal para Linux.
