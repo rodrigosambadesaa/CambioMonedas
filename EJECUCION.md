@@ -309,3 +309,11 @@ Como cobertura equivalente en CI se ejecutan pruebas en `windows-latest` para:
 - Consola: flujo de administrador en modo `c`.
 - Ventana (Win32): compilacion y prueba de arranque de la GUI.
 
+## Licencia
+
+Este proyecto se distribuye bajo licencia MIT.
+
+El uso es libre (incluyendo uso comercial, modificacion y redistribucion), siempre que se mantenga la atribucion al codigo original mediante el aviso de copyright y licencia.
+
+Consulta el archivo `LICENSE` para el texto completo.
+
