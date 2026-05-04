@@ -193,6 +193,12 @@ En la GUI (ventana nativa en Windows/macOS, portable en Linux):
 
 La configuracion legacy de NetBeans ya no es necesaria para compilar ni ejecutar el proyecto y se excluye del versionado con .gitignore.
 
+## Licencia
+
+Este proyecto se distribuye bajo licencia MIT.
+
+Se permite el uso libre (incluyendo uso comercial, modificacion y redistribucion), manteniendo siempre la atribucion al codigo original mediante el aviso de copyright y licencia incluidos en `LICENSE`.
+
 ## Proyecto en Visual Studio Code
 
 El repositorio ya incluye configuracion nativa de VS Code en `.vscode/`:
