@@ -340,6 +340,440 @@ cleanup:
     return resultado;
 }
 
+static int calcular_dp_ilimitado_rango(const BigInt *monto,
+                                       const BigIntArray *denom,
+                                       size_t min_monedas,
+                                       size_t max_monedas,
+                                       BigIntArray *solucion)
+{
+    size_t amount;
+    size_t stride;
+    size_t estados;
+    size_t *valores = NULL;
+    size_t *cantidades = NULL;
+    unsigned char *alcanzable = NULL;
+    size_t *prev_monto = NULL;
+    size_t *moneda = NULL;
+    size_t min_valor = (size_t)-1;
+    size_t i;
+    size_t k;
+    size_t objetivo_k = (size_t)-1;
+    int resultado = DP_NO_APLICA;
+
+    if (!bigint_a_size_limitado(monto, DP_MONTO_MAX, &amount))
+        return DP_NO_APLICA;
+
+    valores = (size_t *)calloc(denom->len, sizeof(size_t));
+    cantidades = (size_t *)calloc(denom->len, sizeof(size_t));
+    if (valores == NULL || cantidades == NULL)
+        goto cleanup;
+
+    for (i = 0; i < denom->len; i++)
+    {
+        if (!bigint_a_size_con_tope(&denom->items[i], amount + 1, &valores[i]))
+            goto cleanup;
+
+        if (valores[i] > 0 && valores[i] < min_valor)
+            min_valor = valores[i];
+    }
+
+    if (amount == 0)
+    {
+        if (min_monedas == 0)
+        {
+            resultado = cargar_solucion_size(cantidades, denom->len, solucion) ? DP_OK : DP_NO_APLICA;
+        }
+        else
+        {
+            resultado = DP_SIN_SOLUCION;
+        }
+        goto cleanup;
+    }
+
+    if (min_valor == (size_t)-1)
+    {
+        resultado = DP_SIN_SOLUCION;
+        goto cleanup;
+    }
+
+    {
+        size_t tope_natural = amount / min_valor;
+        if (max_monedas > tope_natural)
+            max_monedas = tope_natural;
+    }
+
+    if (min_monedas > max_monedas)
+    {
+        resultado = DP_SIN_SOLUCION;
+        goto cleanup;
+    }
+
+    if (max_monedas > ((size_t)-1) / (amount + 1) - 1)
+        goto cleanup;
+
+    stride = amount + 1;
+    estados = (max_monedas + 1) * stride;
+
+    alcanzable = (unsigned char *)calloc(estados, sizeof(unsigned char));
+    prev_monto = (size_t *)malloc(estados * sizeof(size_t));
+    moneda = (size_t *)malloc(estados * sizeof(size_t));
+    if (alcanzable == NULL || prev_monto == NULL || moneda == NULL)
+        goto cleanup;
+
+    for (i = 0; i < estados; i++)
+    {
+        prev_monto[i] = 0;
+        moneda[i] = denom->len;
+    }
+
+    alcanzable[0] = 1;
+    for (k = 1; k <= max_monedas; k++)
+    {
+        size_t monto_k;
+
+        for (monto_k = 0; monto_k <= amount; monto_k++)
+        {
+            size_t j;
+            size_t idx = k * stride + monto_k;
+
+            for (j = 0; j < denom->len; j++)
+            {
+                size_t valor = valores[j];
+                size_t idx_prev;
+
+                if (valor == 0 || valor > monto_k)
+                    continue;
+
+                idx_prev = (k - 1) * stride + (monto_k - valor);
+                if (!alcanzable[idx_prev])
+                    continue;
+
+                alcanzable[idx] = 1;
+                prev_monto[idx] = monto_k - valor;
+                moneda[idx] = j;
+                break;
+            }
+        }
+    }
+
+    for (k = min_monedas; k <= max_monedas; k++)
+    {
+        if (alcanzable[k * stride + amount])
+        {
+            objetivo_k = k;
+            break;
+        }
+    }
+
+    if (objetivo_k == (size_t)-1)
+    {
+        resultado = DP_SIN_SOLUCION;
+        goto cleanup;
+    }
+
+    {
+        size_t monto_actual = amount;
+        size_t k_actual = objetivo_k;
+
+        while (k_actual > 0)
+        {
+            size_t idx = k_actual * stride + monto_actual;
+            size_t j = moneda[idx];
+
+            if (j >= denom->len || prev_monto[idx] > monto_actual)
+                goto cleanup;
+
+            cantidades[j]++;
+            monto_actual = prev_monto[idx];
+            k_actual--;
+        }
+
+        if (monto_actual != 0)
+            goto cleanup;
+    }
+
+    resultado = cargar_solucion_size(cantidades, denom->len, solucion) ? DP_OK : DP_NO_APLICA;
+
+cleanup:
+    free(valores);
+    free(cantidades);
+    free(alcanzable);
+    free(prev_monto);
+    free(moneda);
+    return resultado;
+}
+
+typedef struct
+{
+    size_t idx_denom;
+    size_t monedas;
+    size_t valor;
+} DPItemStock;
+
+static int push_item_stock(DPItemStock **items, size_t *len, size_t *cap, size_t idx_denom, size_t monedas, size_t valor)
+{
+    DPItemStock *nuevo;
+
+    if (items == NULL || len == NULL || cap == NULL)
+        return 0;
+
+    if (*len >= *cap)
+    {
+        size_t nueva_cap = (*cap == 0) ? 16 : (*cap * 2);
+        if (nueva_cap < *cap)
+            return 0;
+        nuevo = (DPItemStock *)realloc(*items, nueva_cap * sizeof(DPItemStock));
+        if (nuevo == NULL)
+            return 0;
+        *items = nuevo;
+        *cap = nueva_cap;
+    }
+
+    (*items)[*len].idx_denom = idx_denom;
+    (*items)[*len].monedas = monedas;
+    (*items)[*len].valor = valor;
+    (*len)++;
+    return 1;
+}
+
+static int calcular_dp_stock_rango(const BigInt *monto,
+                                   const BigIntArray *denom,
+                                   const BigIntArray *stock,
+                                   size_t min_monedas,
+                                   size_t max_monedas,
+                                   BigIntArray *solucion)
+{
+    size_t amount;
+    size_t stride;
+    size_t estados;
+    size_t *valores = NULL;
+    size_t *topes = NULL;
+    size_t *cantidades = NULL;
+    unsigned char *alcanzable = NULL;
+    size_t *prev_k = NULL;
+    size_t *prev_monto = NULL;
+    size_t *item_usado = NULL;
+    DPItemStock *items = NULL;
+    size_t items_len = 0;
+    size_t items_cap = 0;
+    size_t i;
+    size_t objetivo_k = (size_t)-1;
+    size_t tope_monedas = 0;
+    const size_t invalid = (size_t)-1;
+    int resultado = DP_NO_APLICA;
+
+    if (!bigint_a_size_limitado(monto, DP_MONTO_MAX, &amount))
+        return DP_NO_APLICA;
+
+    valores = (size_t *)calloc(denom->len, sizeof(size_t));
+    topes = (size_t *)calloc(denom->len, sizeof(size_t));
+    cantidades = (size_t *)calloc(denom->len, sizeof(size_t));
+    if (valores == NULL || topes == NULL || cantidades == NULL)
+        goto cleanup;
+
+    for (i = 0; i < denom->len; i++)
+    {
+        size_t cap_uso;
+
+        if (!bigint_a_size_con_tope(&denom->items[i], amount + 1, &valores[i]) ||
+            !bigint_a_size_con_tope(&stock->items[i], amount, &topes[i]))
+        {
+            goto cleanup;
+        }
+
+        if (valores[i] == 0)
+            continue;
+
+        cap_uso = topes[i];
+        if (valores[i] > 0)
+        {
+            size_t cap_por_monto = amount / valores[i];
+            if (cap_por_monto < cap_uso)
+                cap_uso = cap_por_monto;
+        }
+
+        tope_monedas += cap_uso;
+    }
+
+    if (amount == 0)
+    {
+        if (min_monedas == 0)
+        {
+            resultado = cargar_solucion_size(cantidades, denom->len, solucion) ? DP_OK : DP_NO_APLICA;
+        }
+        else
+        {
+            resultado = DP_SIN_SOLUCION;
+        }
+        goto cleanup;
+    }
+
+    if (max_monedas > tope_monedas)
+        max_monedas = tope_monedas;
+
+    if (min_monedas > max_monedas)
+    {
+        resultado = DP_SIN_SOLUCION;
+        goto cleanup;
+    }
+
+    for (i = 0; i < denom->len; i++)
+    {
+        size_t cap_uso;
+        size_t chunk = 1;
+
+        if (valores[i] == 0)
+            continue;
+
+        cap_uso = topes[i];
+        {
+            size_t cap_por_monto = amount / valores[i];
+            if (cap_por_monto < cap_uso)
+                cap_uso = cap_por_monto;
+        }
+        if (cap_uso > max_monedas)
+            cap_uso = max_monedas;
+
+        while (cap_uso > 0)
+        {
+            size_t take = (chunk < cap_uso) ? chunk : cap_uso;
+            size_t valor_item = take * valores[i];
+
+            if (!push_item_stock(&items, &items_len, &items_cap, i, take, valor_item))
+                goto cleanup;
+
+            cap_uso -= take;
+            if (chunk <= ((size_t)-1) / 2)
+                chunk *= 2;
+            else
+                chunk = cap_uso;
+        }
+    }
+
+    if (max_monedas > ((size_t)-1) / (amount + 1) - 1)
+        goto cleanup;
+
+    stride = amount + 1;
+    estados = (max_monedas + 1) * stride;
+
+    alcanzable = (unsigned char *)calloc(estados, sizeof(unsigned char));
+    prev_k = (size_t *)malloc(estados * sizeof(size_t));
+    prev_monto = (size_t *)malloc(estados * sizeof(size_t));
+    item_usado = (size_t *)malloc(estados * sizeof(size_t));
+    if (alcanzable == NULL || prev_k == NULL || prev_monto == NULL || item_usado == NULL)
+        goto cleanup;
+
+    for (i = 0; i < estados; i++)
+    {
+        prev_k[i] = invalid;
+        prev_monto[i] = 0;
+        item_usado[i] = invalid;
+    }
+
+    alcanzable[0] = 1;
+    for (i = 0; i < items_len; i++)
+    {
+        size_t k;
+        size_t valor_item = items[i].valor;
+        size_t monedas_item = items[i].monedas;
+
+        for (k = max_monedas + 1; k > monedas_item;)
+        {
+            size_t kk = k - 1;
+            size_t m;
+
+            for (m = amount + 1; m > valor_item;)
+            {
+                size_t mm = m - 1;
+                size_t idx = kk * stride + mm;
+                size_t idx_prev = (kk - monedas_item) * stride + (mm - valor_item);
+
+                if (!alcanzable[idx] && alcanzable[idx_prev])
+                {
+                    alcanzable[idx] = 1;
+                    prev_k[idx] = kk - monedas_item;
+                    prev_monto[idx] = mm - valor_item;
+                    item_usado[idx] = i;
+                }
+
+                m--;
+            }
+
+            k--;
+        }
+    }
+
+    for (i = min_monedas; i <= max_monedas; i++)
+    {
+        if (alcanzable[i * stride + amount])
+        {
+            objetivo_k = i;
+            break;
+        }
+    }
+
+    if (objetivo_k == (size_t)-1)
+    {
+        resultado = DP_SIN_SOLUCION;
+        goto cleanup;
+    }
+
+    {
+        size_t k_actual = objetivo_k;
+        size_t monto_actual = amount;
+
+        while (k_actual > 0)
+        {
+            size_t idx = k_actual * stride + monto_actual;
+            size_t idx_item = item_usado[idx];
+
+            if (idx_item == invalid || idx_item >= items_len)
+                goto cleanup;
+
+            cantidades[items[idx_item].idx_denom] += items[idx_item].monedas;
+            monto_actual = prev_monto[idx];
+            k_actual = prev_k[idx];
+        }
+
+        if (monto_actual != 0)
+            goto cleanup;
+    }
+
+    resultado = cargar_solucion_size(cantidades, denom->len, solucion) ? DP_OK : DP_NO_APLICA;
+
+cleanup:
+    free(valores);
+    free(topes);
+    free(cantidades);
+    free(alcanzable);
+    free(prev_k);
+    free(prev_monto);
+    free(item_usado);
+    free(items);
+    return resultado;
+}
+
+static int solucion_cumple_max_monedas(const BigIntArray *solucion, size_t max_monedas)
+{
+    size_t total = 0;
+    size_t i;
+
+    if (solucion == NULL || solucion->items == NULL)
+        return 0;
+
+    for (i = 0; i < solucion->len; i++)
+    {
+        size_t valor;
+
+        if (!bigint_a_size_limitado(&solucion->items[i], max_monedas - total, &valor))
+            return 0;
+
+        total += valor;
+    }
+
+    return total <= max_monedas;
+}
+
 static int copiar_bigint(BigInt *dest, const BigInt *src)
 {
     if (dest == NULL || src == NULL || src->digits == NULL)
@@ -672,36 +1106,91 @@ int calcular_cambio_optimo_stock(const BigInt *monto,
 
 int calcular_cambio_optimo_stock_con_limite(const BigInt *monto, const BigIntArray *denominaciones, const BigIntArray *stock, size_t limite_monedas, BigIntArray *solucion)
 {
-    if (monto == NULL || denominaciones == NULL || stock == NULL || solucion == NULL) return 0;
-    if (denominaciones->len != stock->len) return 0;
-    if (limite_monedas == 0) return calcular_cambio_optimo_stock(monto, denominaciones, stock, solucion);
-    // Para simplificar, implementaremos una version greedy con verificacion de limite
-    // En una version real esto deberia integrar DP
-    if (!calcular_cambio_optimo_stock(monto, denominaciones, stock, solucion)) return 0;
-    size_t count = 0;
-    for (size_t i = 0; i < solucion->len; i++) {
-        long v = strtol(solucion->items[i].digits, NULL, 10);
-        count += v;
-    }
-    if (count > limite_monedas) {
-        bigint_array_free(solucion);
-        return 0;
-    }
-    return 1;
+    if (limite_monedas == 0)
+        return calcular_cambio_optimo_stock(monto, denominaciones, stock, solucion);
+
+    return calcular_cambio_optimo_stock_con_rango(monto, denominaciones, stock, 0, limite_monedas, solucion);
 }
 
 int calcular_cambio_optimo_con_limite(const BigInt *monto, const BigIntArray *denominaciones, size_t limite_monedas, BigIntArray *solucion)
 {
-    if (limite_monedas == 0) return calcular_cambio_optimo(monto, denominaciones, solucion);
-    if (!calcular_cambio_optimo(monto, denominaciones, solucion)) return 0;
-    size_t count = 0;
-    for (size_t i = 0; i < solucion->len; i++) {
-        long v = strtol(solucion->items[i].digits, NULL, 10);
-        count += v;
-    }
-    if (count > limite_monedas) {
-        bigint_array_free(solucion);
+    if (limite_monedas == 0)
+        return calcular_cambio_optimo(monto, denominaciones, solucion);
+
+    return calcular_cambio_optimo_con_rango(monto, denominaciones, 0, limite_monedas, solucion);
+}
+
+int calcular_cambio_optimo_con_rango(const BigInt *monto,
+                                     const BigIntArray *denominaciones,
+                                     size_t min_monedas,
+                                     size_t max_monedas,
+                                     BigIntArray *solucion)
+{
+    int dp;
+
+    if (monto == NULL || denominaciones == NULL || solucion == NULL)
         return 0;
+    if (min_monedas > max_monedas)
+        return 0;
+
+    dp = calcular_dp_ilimitado_rango(monto, denominaciones, min_monedas, max_monedas, solucion);
+    if (dp != DP_NO_APLICA)
+        return dp == DP_OK;
+
+    /*
+     * Para montos BigInt fuera del tope DP mantenemos una ruta compatible con el
+     * comportamiento previo: solo se soporta restriccion de maximo (min=0).
+     */
+    if (min_monedas == 0)
+    {
+        if (!calcular_cambio_optimo(monto, denominaciones, solucion))
+            return 0;
+
+        if (!solucion_cumple_max_monedas(solucion, max_monedas))
+        {
+            bigint_array_free(solucion);
+            return 0;
+        }
+
+        return 1;
     }
-    return 1;
+
+    return 0;
+}
+
+int calcular_cambio_optimo_stock_con_rango(const BigInt *monto,
+                                           const BigIntArray *denominaciones,
+                                           const BigIntArray *stock,
+                                           size_t min_monedas,
+                                           size_t max_monedas,
+                                           BigIntArray *solucion)
+{
+    int dp;
+
+    if (monto == NULL || denominaciones == NULL || stock == NULL || solucion == NULL)
+        return 0;
+    if (denominaciones->len != stock->len)
+        return 0;
+    if (min_monedas > max_monedas)
+        return 0;
+
+    dp = calcular_dp_stock_rango(monto, denominaciones, stock, min_monedas, max_monedas, solucion);
+    if (dp != DP_NO_APLICA)
+        return dp == DP_OK;
+
+    if (min_monedas == 0)
+    {
+        if (!calcular_cambio_optimo_stock(monto, denominaciones, stock, solucion))
+            return 0;
+
+        if (!solucion_cumple_max_monedas(solucion, max_monedas))
+        {
+            bigint_array_free(solucion);
+            return 0;
+        }
+
+        return 1;
+    }
+
+    return 0;
 }

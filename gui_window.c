@@ -460,6 +460,91 @@ static int leer_monto_cambio(BigInt *monto)
     return bigint_init(monto, buffer);
 }
 
+static int parse_size_t_positivo_gui(const char *texto, size_t *valor_out)
+{
+    char *fin;
+    unsigned long long valor;
+
+    if (texto == NULL || texto[0] == '\0' || valor_out == NULL)
+        return 0;
+
+    valor = strtoull(texto, &fin, 10);
+    if (*fin != '\0' || valor == 0 || valor > (unsigned long long)((size_t)-1))
+        return 0;
+
+    *valor_out = (size_t)valor;
+    return 1;
+}
+
+static int parse_restriccion_gui(const char *entrada, size_t *min_monedas, size_t *max_monedas)
+{
+    char limpio[128];
+    size_t i = 0;
+    size_t j = 0;
+
+    if (entrada == NULL || min_monedas == NULL || max_monedas == NULL)
+        return 0;
+
+    while (entrada[i] != '\0' && j + 1 < sizeof(limpio))
+    {
+        if (!isspace((unsigned char)entrada[i]))
+            limpio[j++] = entrada[i];
+        i++;
+    }
+    limpio[j] = '\0';
+
+    if (limpio[0] == '\0')
+        return 0;
+
+    if (limpio[0] == '=')
+    {
+        size_t exacto;
+        if (!parse_size_t_positivo_gui(limpio + 1, &exacto))
+            return 0;
+        *min_monedas = exacto;
+        *max_monedas = exacto;
+        return 1;
+    }
+
+    {
+        char *guion = strchr(limpio, '-');
+        if (guion != NULL)
+        {
+            char izq[64];
+            char der[64];
+            size_t min_v;
+            size_t max_v;
+            size_t len_izq = (size_t)(guion - limpio);
+
+            if (len_izq == 0 || len_izq >= sizeof(izq))
+                return 0;
+
+            memcpy(izq, limpio, len_izq);
+            izq[len_izq] = '\0';
+            strncpy(der, guion + 1, sizeof(der) - 1);
+            der[sizeof(der) - 1] = '\0';
+
+            if (!parse_size_t_positivo_gui(izq, &min_v) || !parse_size_t_positivo_gui(der, &max_v))
+                return 0;
+            if (min_v > max_v)
+                return 0;
+
+            *min_monedas = min_v;
+            *max_monedas = max_v;
+            return 1;
+        }
+    }
+
+    {
+        size_t max_v;
+        if (!parse_size_t_positivo_gui(limpio, &max_v))
+            return 0;
+        *min_monedas = 0;
+        *max_monedas = max_v;
+        return 1;
+    }
+}
+
 /* calcular_y_mostrar_cambio: El CORE del GUI. Une la GUI visual con los motores logicos abstractos del BackEnd 'algoritmo_cambio.c'. */
 static int calcular_y_mostrar_cambio(void)
 {
@@ -478,17 +563,21 @@ static int calcular_y_mostrar_cambio(void)
     }
 
     int es_caja = (SendMessageA(g_checkCaja, BM_GETCHECK, 0, 0) == BST_CHECKED);
-    size_t limite_monedas = 0;
+    size_t min_monedas = 0;
+    size_t max_monedas = 0;
     int tiene_limite = 0;
     char bufferLim[256];
 
     if (GetWindowTextA(g_editLimite, bufferLim, sizeof(bufferLim)) > 0)
     {
-        long v = strtol(bufferLim, NULL, 10);
-        if (v > 0)
+        if (parse_restriccion_gui(bufferLim, &min_monedas, &max_monedas))
         {
-            limite_monedas = (size_t)v;
             tiene_limite = 1;
+        }
+        else
+        {
+            mostrar_error("Cambio", "Restriccion invalida. Usa N, =N o N-M.");
+            return 0;
         }
     }
 
@@ -534,14 +623,14 @@ static int calcular_y_mostrar_cambio(void)
     if (g_modo_stock_limitado)
     {
         if (tiene_limite)
-            ok = calcular_cambio_optimo_stock_con_limite(&monto, &g_denom, &g_stock, limite_monedas, &solucion);
+            ok = calcular_cambio_optimo_stock_con_rango(&monto, &g_denom, &g_stock, min_monedas, max_monedas, &solucion);
         else
             ok = calcular_cambio_optimo_stock(&monto, &g_denom, &g_stock, &solucion);
     }
     else
     {
         if (tiene_limite)
-            ok = calcular_cambio_optimo_con_limite(&monto, &g_denom, limite_monedas, &solucion);
+            ok = calcular_cambio_optimo_con_rango(&monto, &g_denom, min_monedas, max_monedas, &solucion);
         else
             ok = calcular_cambio_optimo(&monto, &g_denom, &solucion);
     }

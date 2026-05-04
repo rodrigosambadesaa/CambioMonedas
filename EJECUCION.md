@@ -12,6 +12,12 @@ Tambien incluye:
 - Interfaz de consola (TUI) para modo clasico.
 - Interfaz grafica de ventana en Windows y macOS con panel de administrador.
 
+Restricciones de cantidad de monedas (modo cambio):
+
+- `N`: maximo de monedas.
+- `=N`: exige exactamente `N` monedas.
+- `N-M`: exige un rango minimo/maximo de monedas.
+
 ## Requisitos
 
 - GCC/Clang disponible en `PATH` (Windows, Linux o macOS).
