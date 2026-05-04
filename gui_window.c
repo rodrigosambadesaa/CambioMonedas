@@ -37,6 +37,7 @@
 #define ID_EDIT_PAGO 1022
 #define ID_EDIT_LIMITE 1023
 #define ID_BTN_HISTORIAL 1024
+#define ID_BTN_RESUMEN 1025
 
 static HWND g_comboMoneda;
 static HWND g_listStock;
@@ -62,6 +63,7 @@ static HWND g_editPrecio;
 static HWND g_editPago;
 static HWND g_editLimite;
 static HWND g_btnHistorial;
+static HWND g_btnResumen;
 
 static char g_monedas[MAX_MONEDAS][MAX_NOMBRE];
 static int g_monedasCount = 0;
@@ -912,6 +914,111 @@ static int calcular_total_valor(const BigIntArray *denom, const BigIntArray *can
     return 1;
 }
 
+static int mostrar_resumen_moneda_gui(void)
+{
+    char mensaje[2048];
+    size_t usado = 0;
+    const BigInt *minDenom;
+    const BigInt *maxDenom;
+    size_t i;
+
+    if (g_monedaActiva < 0 || g_denom.items == NULL || g_denom.len == 0)
+    {
+        mostrar_error("Resumen", "Primero carga una moneda valida.");
+        return 0;
+    }
+
+    minDenom = &g_denom.items[0];
+    maxDenom = &g_denom.items[0];
+    for (i = 1; i < g_denom.len; i++)
+    {
+        if (bigint_compare(&g_denom.items[i], minDenom) < 0)
+            minDenom = &g_denom.items[i];
+        if (bigint_compare(&g_denom.items[i], maxDenom) > 0)
+            maxDenom = &g_denom.items[i];
+    }
+
+    usado += (size_t)snprintf(mensaje + usado, sizeof(mensaje) - usado,
+                              "Moneda: %s\r\nDenominaciones: %zu\r\nMin: %s c\r\nMax: %s c\r\n",
+                              g_monedas[g_monedaActiva],
+                              g_denom.len,
+                              minDenom->digits,
+                              maxDenom->digits);
+
+    if (!g_modo_stock_limitado)
+    {
+        (void)snprintf(mensaje + usado, sizeof(mensaje) - usado,
+                       "Modo stock ilimitado: no se calcula inventario fisico.");
+        mostrar_info("Resumen", mensaje);
+        registrar_historialf("Resumen consultado (windows) | Moneda=%s | Modo=Ilimitado",
+                             g_monedas[g_monedaActiva]);
+        return 1;
+    }
+
+    if (g_stock.items == NULL || g_stock.len != g_denom.len)
+    {
+        mostrar_error("Resumen", "No hay stock valido para calcular resumen.");
+        return 0;
+    }
+
+    {
+        BigInt totalPiezas = {0};
+        BigInt totalValor = {0};
+        int ok = 1;
+
+        if (!bigint_init(&totalPiezas, "0") || !bigint_init(&totalValor, "0"))
+            ok = 0;
+
+        for (i = 0; ok && i < g_denom.len; i++)
+        {
+            BigInt nuevoTotalPiezas = {0};
+            BigInt parcialValor = {0};
+            BigInt nuevoTotalValor = {0};
+
+            if (!bigint_add(&totalPiezas, &g_stock.items[i], &nuevoTotalPiezas) ||
+                !bigint_multiply(&g_denom.items[i], &g_stock.items[i], &parcialValor) ||
+                !bigint_add(&totalValor, &parcialValor, &nuevoTotalValor))
+            {
+                bigint_free(&nuevoTotalPiezas);
+                bigint_free(&parcialValor);
+                bigint_free(&nuevoTotalValor);
+                ok = 0;
+                break;
+            }
+
+            bigint_free(&totalPiezas);
+            bigint_free(&totalValor);
+            totalPiezas = nuevoTotalPiezas;
+            totalValor = nuevoTotalValor;
+            bigint_free(&parcialValor);
+        }
+
+        if (!ok)
+        {
+            bigint_free(&totalPiezas);
+            bigint_free(&totalValor);
+            mostrar_error("Resumen", "No se pudo calcular el resumen de inventario.");
+            return 0;
+        }
+
+        (void)snprintf(mensaje + strlen(mensaje), sizeof(mensaje) - strlen(mensaje),
+                       "Piezas en stock: %s\r\nValor total stock: %s c",
+                       totalPiezas.digits,
+                       totalValor.digits);
+
+        registrar_historialf("Resumen consultado (windows) | Moneda=%s | Piezas=%s | Valor=%s c",
+                             g_monedas[g_monedaActiva],
+                             totalPiezas.digits,
+                             totalValor.digits);
+
+        bigint_free(&totalPiezas);
+        bigint_free(&totalValor);
+    }
+
+    mostrar_info("Resumen", mensaje);
+    return 1;
+}
+
 /* aplicar_cambio_especifico: Funcion auxiliar. Ejecuta su logica, valida parametros de entrada y retorna un estado. */
 static int aplicar_cambio_especifico(void)
 {
@@ -1184,6 +1291,9 @@ static void crear_controles(HWND hwnd)
     g_btnHistorial = CreateWindowA("BUTTON", "Historial", WS_CHILD | WS_VISIBLE,
                                    375, 628, 80, 28, hwnd, (HMENU)ID_BTN_HISTORIAL, NULL, NULL);
 
+    g_btnResumen = CreateWindowA("BUTTON", "Resumen", WS_CHILD | WS_VISIBLE,
+                                 465, 628, 80, 28, hwnd, (HMENU)ID_BTN_RESUMEN, NULL, NULL);
+
     g_listResultado = CreateWindowA("LISTBOX", "", WS_CHILD | WS_VISIBLE | WS_BORDER | WS_HSCROLL | WS_VSCROLL | LBS_NOTIFY,
                                     20, 665, 570, 100, hwnd, (HMENU)ID_LIST_RESULTADO, NULL, NULL);
 }
@@ -1266,6 +1376,12 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
         if (id == ID_BTN_HISTORIAL)
         {
             system("notepad historial.txt");
+            return 0;
+        }
+
+        if (id == ID_BTN_RESUMEN)
+        {
+            mostrar_resumen_moneda_gui();
             return 0;
         }
 
