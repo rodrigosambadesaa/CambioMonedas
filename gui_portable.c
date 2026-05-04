@@ -175,6 +175,101 @@ static void imprimir_panel(const char *moneda, const BigIntArray *denom, const B
     printf("==============================================\n");
 }
 
+static void mostrar_resumen_moneda(const char *moneda, const BigIntArray *denom, const BigIntArray *stock, int usarStock)
+{
+    const BigInt *minDenom;
+    const BigInt *maxDenom;
+    size_t i;
+
+    if (denom == NULL || denom->items == NULL || denom->len == 0)
+    {
+        printf("No hay denominaciones cargadas para mostrar resumen.\n");
+        return;
+    }
+
+    minDenom = &denom->items[0];
+    maxDenom = &denom->items[0];
+    for (i = 1; i < denom->len; i++)
+    {
+        if (bigint_compare(&denom->items[i], minDenom) < 0)
+            minDenom = &denom->items[i];
+        if (bigint_compare(&denom->items[i], maxDenom) > 0)
+            maxDenom = &denom->items[i];
+    }
+
+    printf("\n--- RESUMEN DE MONEDA ---\n");
+    printf("Moneda: %s\n", moneda != NULL ? moneda : "(sin nombre)");
+    printf("Denominaciones cargadas: %zu\n", denom->len);
+    printf("Denominacion minima: %s c\n", minDenom->digits);
+    printf("Denominacion maxima: %s c\n", maxDenom->digits);
+
+    if (!usarStock)
+    {
+        printf("Modo stock ilimitado: no se calcula inventario fisico.\n");
+        printf("-------------------------\n\n");
+        return;
+    }
+
+    if (stock == NULL || stock->items == NULL || stock->len != denom->len)
+    {
+        printf("No hay stock valido para calcular resumen de inventario.\n");
+        printf("-------------------------\n\n");
+        return;
+    }
+
+    {
+        BigInt totalPiezas = {0};
+        BigInt totalValor = {0};
+        int ok = 1;
+
+        if (!bigint_init(&totalPiezas, "0") || !bigint_init(&totalValor, "0"))
+            ok = 0;
+
+        for (i = 0; ok && i < denom->len; i++)
+        {
+            BigInt nuevoTotalPiezas = {0};
+            BigInt parcialValor = {0};
+            BigInt nuevoTotalValor = {0};
+
+            if (!bigint_add(&totalPiezas, &stock->items[i], &nuevoTotalPiezas) ||
+                !bigint_multiply(&denom->items[i], &stock->items[i], &parcialValor) ||
+                !bigint_add(&totalValor, &parcialValor, &nuevoTotalValor))
+            {
+                bigint_free(&nuevoTotalPiezas);
+                bigint_free(&parcialValor);
+                bigint_free(&nuevoTotalValor);
+                ok = 0;
+                break;
+            }
+
+            bigint_free(&totalPiezas);
+            bigint_free(&totalValor);
+            totalPiezas = nuevoTotalPiezas;
+            totalValor = nuevoTotalValor;
+            bigint_free(&parcialValor);
+        }
+
+        if (ok)
+        {
+            printf("Total de piezas en stock: %s\n", totalPiezas.digits);
+            printf("Valor total del stock: %s c\n", totalValor.digits);
+            registrar_historialf("Resumen consultado (portable) | Moneda=%s | Piezas=%s | Valor=%s c",
+                                 moneda != NULL ? moneda : "(sin nombre)",
+                                 totalPiezas.digits,
+                                 totalValor.digits);
+        }
+        else
+        {
+            printf("No se pudo calcular el resumen de inventario.\n");
+        }
+
+        bigint_free(&totalPiezas);
+        bigint_free(&totalValor);
+    }
+
+    printf("-------------------------\n\n");
+}
+
 /* pedir_indice: Funcion auxiliar. Ejecuta su logica, valida parametros de entrada y retorna un estado. */
 static int pedir_indice(size_t max, size_t *indice)
 {
@@ -785,9 +880,9 @@ int main(void)
 
             imprimir_panel(monedas[idxMoneda], &denom, &stock);
             if (requiereAdmin)
-                printf("Accion (calcular/caja/limite/especifico/historial/anadir/quitar/modo/volver/salir): ");
+                printf("Accion (calcular/caja/limite/especifico/historial/resumen/anadir/quitar/modo/volver/salir): ");
             else
-                printf("Accion (calcular/caja/limite/especifico/historial/modo/volver/salir): ");
+                printf("Accion (calcular/caja/limite/especifico/historial/resumen/modo/volver/salir): ");
 
             if (!leer_linea(accion, sizeof(accion)))
             {
@@ -822,6 +917,14 @@ int main(void)
             if (strcmp(accion, "historial") == 0)
             {
                 mostrar_historial_transacciones();
+                pausar_pantalla();
+                bigint_free(&delta);
+                continue;
+            }
+
+            if (strcmp(accion, "resumen") == 0)
+            {
+                mostrar_resumen_moneda(monedas[idxMoneda], &denom, requiereAdmin ? &stock : NULL, requiereAdmin);
                 pausar_pantalla();
                 bigint_free(&delta);
                 continue;
