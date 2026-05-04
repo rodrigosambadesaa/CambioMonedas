@@ -219,6 +219,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
     var paymentField: NSTextField!
     var limitField: NSTextField!
     var historyBtn: NSButton!
+    var summaryBtn: NSButton!
     var table: NSTableView!
     var resultView: NSTextView!
     var statusLabel: NSTextField!
@@ -386,6 +387,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         historyBtn = NSButton(title: "Historial", target: self, action: #selector(showHistory))
         historyBtn.frame = NSRect(x: 640, y: 64, width: 80, height: 30)
         content.addSubview(historyBtn)
+
+        summaryBtn = NSButton(title: "Resumen", target: self, action: #selector(showSummary))
+        summaryBtn.frame = NSRect(x: 550, y: 34, width: 170, height: 26)
+        content.addSubview(summaryBtn)
 
         let resultTitle = NSTextField(labelWithString: "Resultado")
         resultTitle.frame = NSRect(x: 20, y: 42, width: 120, height: 22)
@@ -631,6 +636,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
             FileManager.default.createFile(atPath: path, contents: Data(), attributes: nil)
         }
         NSWorkspace.shared.openFile(path)
+    }
+
+    @objc func showSummary() {
+        guard let coin = activeCoin, !denoms.isEmpty else {
+            setStatus("Primero carga una moneda.", error: true)
+            return
+        }
+
+        var minDenom = denoms[0]
+        var maxDenom = denoms[0]
+        for d in denoms {
+            if compareBig(d, minDenom) < 0 { minDenom = d }
+            if compareBig(d, maxDenom) > 0 { maxDenom = d }
+        }
+
+        var lines: [String] = []
+        lines.append("Moneda: \(coin)")
+        lines.append("Denominaciones: \(denoms.count)")
+        lines.append("Min: \(minDenom) c")
+        lines.append("Max: \(maxDenom) c")
+
+        if !limitedMode {
+            lines.append("Modo stock ilimitado: no se calcula inventario fisico.")
+            resultView.string = lines.joined(separator: "\n")
+            setStatus("Resumen mostrado (modo ilimitado).")
+            registerHistory("Resumen consultado (macOS) | Moneda=\(coin) | Modo=Ilimitado")
+            return
+        }
+
+        var totalUnits = "0"
+        var totalValueStock = "0"
+        for i in 0..<min(denoms.count, stock.count) {
+            totalUnits = addBig(totalUnits, stock[i])
+            totalValueStock = addBig(totalValueStock, mulBig(denoms[i], stock[i]))
+        }
+
+        lines.append("Piezas en stock: \(normalize(totalUnits))")
+        lines.append("Valor total stock: \(normalize(totalValueStock)) c")
+        resultView.string = lines.joined(separator: "\n")
+        setStatus("Resumen mostrado (modo limitado).")
+        registerHistory("Resumen consultado (macOS) | Moneda=\(coin) | Piezas=\(normalize(totalUnits)) | Valor=\(normalize(totalValueStock)) c")
     }
 
     func calculateLimitedChange(amount: String, limit: Int) -> [String]? {
