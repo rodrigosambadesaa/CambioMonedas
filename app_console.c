@@ -85,6 +85,9 @@ static void pausar_pantalla(void)
 #define MAX_MONEDA_NOMBRE 20
 #define MAX_MONEDAS_DISPONIBLES 512
 
+static void limpiar_arreglo(BigIntArray *arr);
+static void mostrar_resumen_moneda(const char *monedaClave, const BigIntArray *monedas, const BigIntArray *stock, int usarStock);
+
 /* limpiar_pantalla: Envia secuencias ANSI de escape para borrar la terminal. */
 static void limpiar_pantalla(void)
 {
@@ -371,11 +374,66 @@ static void mostrar_monedas_disponibles(int opcion)
     imprimir_lista_monedas((const char (*)[MAX_MONEDA_NOMBRE + 1]) visibles, nVisibles);
 }
 
+static void mostrar_resumen_desde_menu_principal(void)
+{
+    char moneda[MAX_MONEDA_NOMBRE + 1];
+    char monedaClave[MAX_MONEDA_NOMBRE + 1];
+    char comando[MAX_MONEDA_NOMBRE + 1];
+    BigIntArray monedas = {0};
+    BigIntArray stock = {0};
+    int tieneStock;
+
+    mostrar_monedas_disponibles('a');
+    printf("Nombre de la moneda para resumen (volver o salir): ");
+
+    if (!leer_linea(moneda, sizeof(moneda)))
+    {
+        printf("Entrada finalizada.\n");
+        return;
+    }
+
+    if (moneda[0] == '\0')
+    {
+        printf("Nombre de moneda no valido.\n");
+        return;
+    }
+
+    normalizar_clave(moneda, comando, sizeof(comando));
+    if (strcmp(comando, "volver") == 0)
+        return;
+    if (strcmp(comando, "salir") == 0)
+    {
+        printf("Use 'salir' en el menu principal para cerrar la aplicacion.\n");
+        return;
+    }
+
+    normalizar_clave(moneda, monedaClave, sizeof(monedaClave));
+
+    if (!cargar_denominaciones_moneda(monedaClave, &monedas))
+    {
+        printf("No se encontro la moneda en monedas.txt.\n");
+        return;
+    }
+
+    tieneStock = cargar_stock_moneda(monedaClave, &stock) && stock.len == monedas.len;
+    mostrar_resumen_moneda(monedaClave, &monedas, tieneStock ? &stock : NULL, tieneStock);
+
+    if (!tieneStock)
+    {
+        printf("Resumen mostrado sin stock (no disponible o inconsistente).\n");
+        registrar_historialf("Resumen consultado | Moneda=%s | Modo=Ilimitado", monedaClave);
+    }
+
+    limpiar_arreglo(&stock);
+    limpiar_arreglo(&monedas);
+}
+
 /*
  * Muestra menu inicial y devuelve opcion normalizada en minuscula.
  * Retorna:
  * - 'a', 'b' o 'c' si la entrada es valida
  * - -3 si usuario pide ver historial
+ * - -4 si usuario pide ver resumen de moneda
  * - 0 si la entrada es invalida/vacia
  * - -1 si hubo EOF/error de lectura
  * - -2 si usuario pide salir
@@ -391,8 +449,9 @@ static int pedir_opcion(void)
     printf("|   b) Monedas limitadas (usa stock)                |\n");
     printf("|   c) Administrador de stock                       |\n");
     printf("|   h) Historial de transacciones                   |\n");
+    printf("|   r) Resumen de moneda                            |\n");
     dibujar_linea();
-    printf("Opcion (a/b/c/h, historial o salir): ");
+    printf("Opcion (a/b/c/h/r, historial, resumen o salir): ");
 
     if (!leer_linea(buffer, sizeof(buffer)))
         return -1;
@@ -407,6 +466,8 @@ static int pedir_opcion(void)
         return -2;
     if (strcmp(comando, "historial") == 0 || strcmp(comando, "h") == 0)
         return -3;
+    if (strcmp(comando, "resumen") == 0 || strcmp(comando, "r") == 0)
+        return -4;
 
     return (int)tolower((unsigned char)buffer[0]);
 }
@@ -586,6 +647,102 @@ static void imprimir_stock_administrador(const BigIntArray *monedas, const BigIn
     dibujar_linea();
 }
 
+static void mostrar_resumen_moneda(const char *monedaClave, const BigIntArray *monedas, const BigIntArray *stock, int usarStock)
+{
+    const BigInt *minDenom;
+    const BigInt *maxDenom;
+    size_t i;
+
+    if (monedas == NULL || monedas->items == NULL || monedas->len == 0)
+    {
+        printf("No hay denominaciones cargadas para mostrar resumen.\n");
+        return;
+    }
+
+    minDenom = &monedas->items[0];
+    maxDenom = &monedas->items[0];
+
+    for (i = 1; i < monedas->len; i++)
+    {
+        if (bigint_compare(&monedas->items[i], minDenom) < 0)
+            minDenom = &monedas->items[i];
+        if (bigint_compare(&monedas->items[i], maxDenom) > 0)
+            maxDenom = &monedas->items[i];
+    }
+
+    dibujar_linea();
+    printf("Resumen de moneda: %s\n", monedaClave != NULL ? monedaClave : "(sin nombre)");
+    printf("Denominaciones cargadas: %zu\n", monedas->len);
+    printf("Denominacion minima: %s c\n", minDenom->digits);
+    printf("Denominacion maxima: %s c\n", maxDenom->digits);
+
+    if (!usarStock)
+    {
+        printf("Modo stock ilimitado: no se calcula inventario fisico.\n");
+        dibujar_linea();
+        return;
+    }
+
+    if (stock == NULL || stock->items == NULL || stock->len != monedas->len)
+    {
+        printf("No hay stock valido para calcular resumen de inventario.\n");
+        dibujar_linea();
+        return;
+    }
+
+    {
+        BigInt totalPiezas = {0};
+        BigInt totalValor = {0};
+        int ok = 1;
+
+        if (!bigint_init(&totalPiezas, "0") || !bigint_init(&totalValor, "0"))
+            ok = 0;
+
+        for (i = 0; ok && i < monedas->len; i++)
+        {
+            BigInt nuevoTotalPiezas = {0};
+            BigInt parcialValor = {0};
+            BigInt nuevoTotalValor = {0};
+
+            if (!bigint_add(&totalPiezas, &stock->items[i], &nuevoTotalPiezas) ||
+                !bigint_multiply(&monedas->items[i], &stock->items[i], &parcialValor) ||
+                !bigint_add(&totalValor, &parcialValor, &nuevoTotalValor))
+            {
+                bigint_free(&nuevoTotalPiezas);
+                bigint_free(&parcialValor);
+                bigint_free(&nuevoTotalValor);
+                ok = 0;
+                break;
+            }
+
+            bigint_free(&totalPiezas);
+            bigint_free(&totalValor);
+            totalPiezas = nuevoTotalPiezas;
+            totalValor = nuevoTotalValor;
+            bigint_free(&parcialValor);
+        }
+
+        if (ok)
+        {
+            printf("Total de piezas en stock: %s\n", totalPiezas.digits);
+            printf("Valor total del stock: %s c\n", totalValor.digits);
+            registrar_historialf("Resumen consultado | Moneda=%s | Piezas=%s | Valor=%s c",
+                                 monedaClave != NULL ? monedaClave : "(sin nombre)",
+                                 totalPiezas.digits,
+                                 totalValor.digits);
+        }
+        else
+        {
+            printf("No se pudo calcular el resumen de inventario por error interno.\n");
+        }
+
+        bigint_free(&totalPiezas);
+        bigint_free(&totalValor);
+    }
+
+    dibujar_linea();
+}
+
 /* aplicar_cambio_administrador: Suma o Resta stock manual a una divisa indicada en 'idx'. */
 static int aplicar_cambio_administrador(BigIntArray *stock, size_t idx, const BigInt *delta, int esSuma)
 {
@@ -622,7 +779,7 @@ static int pedir_subopcion_cambio(void)
     char buffer[32];
     char comando[32];
 
-    printf("Subopcion cambio (tradicional|1 / especifico|2 / historial|3, volver, modo o salir): ");
+    printf("Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4, volver, modo o salir): ");
     if (!leer_linea(buffer, sizeof(buffer)))
         return -1;
 
@@ -645,6 +802,8 @@ static int pedir_subopcion_cambio(void)
         return 5;
     if (strcmp(comando, "historial") == 0 || strcmp(comando, "h") == 0 || strcmp(comando, "3") == 0)
         return 6;
+    if (strcmp(comando, "resumen") == 0 || strcmp(comando, "r") == 0 || strcmp(comando, "4") == 0)
+        return 7;
 
     return 0;
 }
@@ -892,6 +1051,13 @@ int app_console_run(void)
                     continue;
                 }
 
+                if (opcion == -4)
+                {
+                    mostrar_resumen_desde_menu_principal();
+                    pausar_pantalla();
+                    continue;
+                }
+
                 /* Si devolvió el magik number -2 de salida manual. */
                 if (opcion == -2)
                 {
@@ -991,7 +1157,7 @@ int app_console_run(void)
                     int estadoDelta;
 
                     imprimir_stock_administrador(&monedas, &stock);
-                    printf("Accion admin (anadir/quitar/historial, volver, modo, salir): ");
+                    printf("Accion admin (anadir/quitar/historial/resumen, volver, modo, salir): ");
 
                     /* Bloqueo en consola. */
                     if (!leer_linea(accion, sizeof(accion)))
@@ -1020,6 +1186,12 @@ int app_console_run(void)
                     if (strcmp(accion, "historial") == 0)
                     {
                         mostrar_historial_transacciones();
+                        continue;
+                    }
+
+                    if (strcmp(accion, "resumen") == 0)
+                    {
+                        mostrar_resumen_moneda(monedaClave, &monedas, &stock, 1);
                         continue;
                     }
 
@@ -1167,6 +1339,12 @@ int app_console_run(void)
                     if (subopcionStock == 6)
                     {
                         mostrar_historial_transacciones();
+                        continue;
+                    }
+
+                    if (subopcionStock == 7)
+                    {
+                        mostrar_resumen_moneda(monedaClave, &monedas, opcion == 'b' ? &stock : NULL, opcion == 'b');
                         continue;
                     }
                 }
