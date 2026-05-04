@@ -327,3 +327,35 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
 
     return (ok && actualizado) ? 1 : 0;
 }
+
+int validar_consistencia_moneda(const char *nombreMoneda)
+{
+    BigIntArray denom = {0};
+    BigIntArray stock = {0};
+    int ok = 0;
+
+    if (nombreMoneda == NULL || *nombreMoneda == '\0')
+        return 0;
+
+    if (!cargar_denominaciones_moneda(nombreMoneda, &denom))
+        goto fin;
+
+    if (!cargar_stock_moneda(nombreMoneda, &stock))
+        goto fin;
+
+    if (denom.len != stock.len || denom.len == 0)
+        goto fin;
+
+    for (size_t i = 1; i < denom.len; i++)
+    {
+        if (bigint_compare(&denom.items[i - 1], &denom.items[i]) <= 0)
+            goto fin;
+    }
+
+    ok = 1;
+
+fin:
+    bigint_array_free(&denom);
+    bigint_array_free(&stock);
+    return ok;
+}

@@ -23,4 +23,11 @@ int cargar_stock_moneda(const char *nombreMoneda, BigIntArray *resultado);
  */
 int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock);
 
+/*
+ * Valida que una moneda tenga igual cantidad de denominaciones y stock,
+ * y que las denominaciones esten en orden descendente estricto.
+ * Devuelve 1 si es consistente; 0 en caso contrario.
+ */
+int validar_consistencia_moneda(const char *nombreMoneda);
+
 #endif

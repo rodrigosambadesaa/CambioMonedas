@@ -955,30 +955,24 @@ int app_console_run(void)
 
             normalizar_clave(moneda, monedaClave, sizeof(monedaClave));
 
-            /* Intenta ir a disco para parsear la BD de dicha moneda. */
+            if (!validar_consistencia_moneda(monedaClave))
+            {
+                printf("Moneda no valida o inconsistente (denominaciones/stock). Intente de nuevo.\n");
+                continue;
+            }
+
             if (!cargar_denominaciones_moneda(monedaClave, &monedas))
             {
                 printf("No se encontro la moneda en monedas.txt. Intente de nuevo.\n");
                 continue;
             }
 
-            /* Si estamos en los modos que requiren base de datos de Stock... */
             if (opcion == 'b' || opcion == 'c')
             {
-                /* Intentamos cargar la segunda base de datos en paralelo. */
                 if (!cargar_stock_moneda(monedaClave, &stock))
                 {
                     limpiar_arreglo(&monedas);
                     printf("No se encontro stock para la moneda seleccionada. Intente de nuevo.\n");
-                    continue;
-                }
-
-                /* Validador de salud de Bases de Datos cruzada. */
-                if (stock.len != monedas.len)
-                {
-                    limpiar_arreglo(&stock);
-                    limpiar_arreglo(&monedas);
-                    printf("Inconsistencia entre denominaciones y stock. Intente otra moneda.\n");
                     continue;
                 }
             }

@@ -764,9 +764,11 @@ int main(void)
             continue;
         }
 
-        if (!cargar_denominaciones_moneda(monedas[idxMoneda], &denom) || !cargar_stock_moneda(monedas[idxMoneda], &stock) || denom.len != stock.len)
+        if (!validar_consistencia_moneda(monedas[idxMoneda]) ||
+            !cargar_denominaciones_moneda(monedas[idxMoneda], &denom) ||
+            !cargar_stock_moneda(monedas[idxMoneda], &stock))
         {
-            printf("No se pudo cargar denominaciones/stock para esa moneda.\n");
+            printf("No se pudo cargar denominaciones/stock para esa moneda (archivo inconsistente).\n");
             bigint_array_free(&denom);
             bigint_array_free(&stock);
             continue;
