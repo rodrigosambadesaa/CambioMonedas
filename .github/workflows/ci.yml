@@ -175,7 +175,6 @@ jobs:
           Write-Host "La cobertura equivalente se valida en windows-latest para consola (usuario/admin) y arranque GUI Win32."
 
   docker-branch:
-    if: ${{ (github.event_name == 'push' && github.ref_name == 'feat/dockerizacion-modos') || (github.event_name == 'pull_request' && github.head_ref == 'feat/dockerizacion-modos') }}
     runs-on: ubuntu-latest
 
     steps:
