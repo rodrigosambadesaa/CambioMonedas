@@ -779,7 +779,7 @@ static int pedir_subopcion_cambio(void)
     char buffer[32];
     char comando[32];
 
-    printf("Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4, volver, modo o salir): ");
+    printf("Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4 / limite|l, volver, modo o salir): ");
     if (!leer_linea(buffer, sizeof(buffer)))
         return -1;
 
@@ -804,8 +804,124 @@ static int pedir_subopcion_cambio(void)
         return 6;
     if (strcmp(comando, "resumen") == 0 || strcmp(comando, "r") == 0 || strcmp(comando, "4") == 0)
         return 7;
+    if (strcmp(comando, "limite") == 0 || strcmp(comando, "l") == 0)
+        return 8;
 
     return 0;
+}
+
+static int parse_size_t_positivo(const char *texto, size_t *valor_out)
+{
+    char *fin;
+    unsigned long long valor;
+
+    if (texto == NULL || texto[0] == '\0' || valor_out == NULL)
+        return 0;
+
+    valor = strtoull(texto, &fin, 10);
+    if (*fin != '\0' || valor == 0 || valor > (unsigned long long)((size_t)-1))
+        return 0;
+
+    *valor_out = (size_t)valor;
+    return 1;
+}
+
+static int parse_restriccion_monedas_texto(const char *entrada, size_t *min_monedas, size_t *max_monedas)
+{
+    char limpio[128];
+    size_t i = 0;
+    size_t j = 0;
+
+    if (entrada == NULL || min_monedas == NULL || max_monedas == NULL)
+        return 0;
+
+    while (entrada[i] != '\0' && j + 1 < sizeof(limpio))
+    {
+        if (!isspace((unsigned char)entrada[i]))
+            limpio[j++] = entrada[i];
+        i++;
+    }
+    limpio[j] = '\0';
+
+    if (limpio[0] == '\0')
+        return 0;
+
+    if (limpio[0] == '=')
+    {
+        size_t exacto;
+        if (!parse_size_t_positivo(limpio + 1, &exacto))
+            return 0;
+        *min_monedas = exacto;
+        *max_monedas = exacto;
+        return 1;
+    }
+
+    {
+        char *guion = strchr(limpio, '-');
+        if (guion != NULL)
+        {
+            size_t min_v;
+            size_t max_v;
+            char izq[64];
+            char der[64];
+            size_t len_izq = (size_t)(guion - limpio);
+
+            if (len_izq == 0 || len_izq >= sizeof(izq))
+                return 0;
+
+            memcpy(izq, limpio, len_izq);
+            izq[len_izq] = '\0';
+            strncpy(der, guion + 1, sizeof(der) - 1);
+            der[sizeof(der) - 1] = '\0';
+
+            if (!parse_size_t_positivo(izq, &min_v) || !parse_size_t_positivo(der, &max_v))
+                return 0;
+            if (min_v > max_v)
+                return 0;
+
+            *min_monedas = min_v;
+            *max_monedas = max_v;
+            return 1;
+        }
+    }
+
+    {
+        size_t max_v;
+        if (!parse_size_t_positivo(limpio, &max_v))
+            return 0;
+        *min_monedas = 0;
+        *max_monedas = max_v;
+        return 1;
+    }
+}
+
+static int pedir_restriccion_monedas(size_t *min_monedas, size_t *max_monedas)
+{
+    char buffer[128];
+    char comando[128];
+
+    printf("Restriccion de monedas (N, =N, N-M, volver, modo o salir): ");
+    if (!leer_linea(buffer, sizeof(buffer)))
+        return -1;
+
+    if (buffer[0] == '\0')
+        return 0;
+
+    strncpy(comando, buffer, sizeof(comando) - 1);
+    comando[sizeof(comando) - 1] = '\0';
+    a_minusculas(comando);
+
+    if (strcmp(comando, "salir") == 0)
+        return 4;
+    if (strcmp(comando, "modo") == 0)
+        return 3;
+    if (strcmp(comando, "volver") == 0)
+        return 2;
+
+    if (!parse_restriccion_monedas_texto(buffer, min_monedas, max_monedas))
+        return 0;
+
+    return 1;
 }
 
 static int calcular_total_valor(const BigIntArray *monedas, const BigIntArray *cantidades, BigInt *total);
@@ -1299,9 +1415,13 @@ int app_console_run(void)
 
                 BigInt cantidad = {0};
                 int estadoCantidad;
+                int estadoRestriccion;
                 int resultado;
                 BigIntArray solucion = {0};
                 int subopcionStock = 1;
+                int usar_restriccion = 0;
+                size_t min_monedas = 0;
+                size_t max_monedas = 0;
 
                 /* Caso MODO USUARIO NORMAL (Opciones A y B). */
                 if (opcion == 'a' || opcion == 'b')
@@ -1601,23 +1721,80 @@ int app_console_run(void)
                     continue;
                 }
 
+                usar_restriccion = (subopcionStock == 8);
+                if (usar_restriccion)
+                {
+                    estadoRestriccion = pedir_restriccion_monedas(&min_monedas, &max_monedas);
+
+                    if (estadoRestriccion == -1)
+                    {
+                        printf("Entrada finalizada.\n");
+                        bigint_free(&cantidad);
+                        ejecutando = 0;
+                        break;
+                    }
+                    if (estadoRestriccion == 4)
+                    {
+                        bigint_free(&cantidad);
+                        ejecutando = 0;
+                        break;
+                    }
+                    if (estadoRestriccion == 3)
+                    {
+                        bigint_free(&cantidad);
+                        opcion = 0;
+                        break;
+                    }
+                    if (estadoRestriccion == 2)
+                    {
+                        bigint_free(&cantidad);
+                        continue;
+                    }
+                    if (estadoRestriccion == 0)
+                    {
+                        printf("Restriccion invalida. Use N, =N o N-M.\n");
+                        bigint_free(&cantidad);
+                        continue;
+                    }
+                }
+
                 /* Si estamos en modo de monedas ilimitado (El Algoritmo Clásico Original). */
                 if (opcion == 'a')
                 {
-                    resultado = calcular_cambio_optimo(&cantidad, &monedas, &solucion);
+                    if (usar_restriccion)
+                        resultado = calcular_cambio_optimo_con_rango(&cantidad, &monedas, min_monedas, max_monedas, &solucion);
+                    else
+                        resultado = calcular_cambio_optimo(&cantidad, &monedas, &solucion);
+
                     if (resultado)
                     {
                         imprimir_resultado(&monedas, &solucion, NULL, 0);
-                        registrar_historialf("Cambio tradicional ilimitado | Moneda=%s | Monto=%s c",
-                                             monedaClave,
-                                             cantidad.digits);
+                        if (usar_restriccion)
+                            registrar_historialf("Cambio con restriccion ilimitado | Moneda=%s | Monto=%s c | Restriccion=%zu-%zu",
+                                                 monedaClave,
+                                                 cantidad.digits,
+                                                 min_monedas,
+                                                 max_monedas);
+                        else
+                            registrar_historialf("Cambio tradicional ilimitado | Moneda=%s | Monto=%s c",
+                                                 monedaClave,
+                                                 cantidad.digits);
                     }
                     else
-                        printf("No existe cambio exacto para esa cantidad.\n");
+                    {
+                        if (usar_restriccion)
+                            printf("No existe cambio exacto para esa cantidad con la restriccion indicada.\n");
+                        else
+                            printf("No existe cambio exacto para esa cantidad.\n");
+                    }
                 }
                 else
                 {
-                    resultado = calcular_cambio_optimo_stock(&cantidad, &monedas, &stock, &solucion);
+                    if (usar_restriccion)
+                        resultado = calcular_cambio_optimo_stock_con_rango(&cantidad, &monedas, &stock, min_monedas, max_monedas, &solucion);
+                    else
+                        resultado = calcular_cambio_optimo_stock(&cantidad, &monedas, &stock, &solucion);
+
                     /* Si encontro una respuesta viable. */
                     if (resultado)
                     {
@@ -1671,13 +1848,23 @@ int app_console_run(void)
                         limpiar_arreglo(&stock);
                         stock = stockNuevo;
                         imprimir_resultado(&monedas, &solucion, &stock, 1);
-                        registrar_historialf("Cambio tradicional con stock | Moneda=%s | Monto=%s c",
-                                             monedaClave,
-                                             cantidad.digits);
+                        if (usar_restriccion)
+                            registrar_historialf("Cambio con restriccion con stock | Moneda=%s | Monto=%s c | Restriccion=%zu-%zu",
+                                                 monedaClave,
+                                                 cantidad.digits,
+                                                 min_monedas,
+                                                 max_monedas);
+                        else
+                            registrar_historialf("Cambio tradicional con stock | Moneda=%s | Monto=%s c",
+                                                 monedaClave,
+                                                 cantidad.digits);
                     }
                     else
                     {
-                        printf("No existe cambio exacto para esa cantidad con el stock actual.\n");
+                        if (usar_restriccion)
+                            printf("No existe cambio exacto para esa cantidad con el stock actual y la restriccion indicada.\n");
+                        else
+                            printf("No existe cambio exacto para esa cantidad con el stock actual.\n");
                     }
                 }
 

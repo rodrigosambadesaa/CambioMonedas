@@ -93,6 +93,91 @@ static int leer_linea(char *buffer, size_t tam)
     return 1;
 }
 
+static int parse_size_t_positivo_gui(const char *texto, size_t *valor_out)
+{
+    char *fin;
+    unsigned long long valor;
+
+    if (texto == NULL || texto[0] == '\0' || valor_out == NULL)
+        return 0;
+
+    valor = strtoull(texto, &fin, 10);
+    if (*fin != '\0' || valor == 0 || valor > (unsigned long long)((size_t)-1))
+        return 0;
+
+    *valor_out = (size_t)valor;
+    return 1;
+}
+
+static int parse_restriccion_gui(const char *entrada, size_t *min_monedas, size_t *max_monedas)
+{
+    char limpio[128];
+    size_t i = 0;
+    size_t j = 0;
+
+    if (entrada == NULL || min_monedas == NULL || max_monedas == NULL)
+        return 0;
+
+    while (entrada[i] != '\0' && j + 1 < sizeof(limpio))
+    {
+        if (!isspace((unsigned char)entrada[i]))
+            limpio[j++] = entrada[i];
+        i++;
+    }
+    limpio[j] = '\0';
+
+    if (limpio[0] == '\0')
+        return 0;
+
+    if (limpio[0] == '=')
+    {
+        size_t exacto;
+        if (!parse_size_t_positivo_gui(limpio + 1, &exacto))
+            return 0;
+        *min_monedas = exacto;
+        *max_monedas = exacto;
+        return 1;
+    }
+
+    {
+        char *guion = strchr(limpio, '-');
+        if (guion != NULL)
+        {
+            char izq[64];
+            char der[64];
+            size_t min_v;
+            size_t max_v;
+            size_t len_izq = (size_t)(guion - limpio);
+
+            if (len_izq == 0 || len_izq >= sizeof(izq))
+                return 0;
+
+            memcpy(izq, limpio, len_izq);
+            izq[len_izq] = '\0';
+            strncpy(der, guion + 1, sizeof(der) - 1);
+            der[sizeof(der) - 1] = '\0';
+
+            if (!parse_size_t_positivo_gui(izq, &min_v) || !parse_size_t_positivo_gui(der, &max_v))
+                return 0;
+            if (min_v > max_v)
+                return 0;
+
+            *min_monedas = min_v;
+            *max_monedas = max_v;
+            return 1;
+        }
+    }
+
+    {
+        size_t max_v;
+        if (!parse_size_t_positivo_gui(limpio, &max_v))
+            return 0;
+        *min_monedas = 0;
+        *max_monedas = max_v;
+        return 1;
+    }
+}
+
 /* a_minusculas: Funcion auxiliar. Ejecuta su logica, valida parametros de entrada y retorna un estado. */
 static void a_minusculas(char *texto)
 {
@@ -581,7 +666,8 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
     BigIntArray solucion = {0};
     BigIntArray stockNuevo = {0};
 
-    size_t limite_monedas = 0;
+    size_t min_monedas = 0;
+    size_t max_monedas = 0;
     if (es_caja)
     {
         char buf1[256], buf2[256];
@@ -628,20 +714,18 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
         if (con_limite)
         {
             char bufL[256];
-            printf("Limite maximo de monedas: ");
+            printf("Restriccion de monedas (N, =N, N-M): ");
             if (!leer_linea(bufL, sizeof(bufL)))
             {
                 bigint_free(&monto);
                 return 0;
             }
-            long v = strtol(bufL, NULL, 10);
-            if (v < 1)
+            if (!parse_restriccion_gui(bufL, &min_monedas, &max_monedas))
             {
-                printf("Limite invalido.\n");
+                printf("Restriccion invalida.\n");
                 bigint_free(&monto);
                 return 0;
             }
-            limite_monedas = (size_t)v;
         }
     }
 
@@ -649,14 +733,14 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
     if (modo == MODO_LIMITADO)
     {
         if (con_limite)
-            ok = calcular_cambio_optimo_stock_con_limite(&monto, denom, stock, limite_monedas, &solucion);
+            ok = calcular_cambio_optimo_stock_con_rango(&monto, denom, stock, min_monedas, max_monedas, &solucion);
         else
             ok = calcular_cambio_optimo_stock(&monto, denom, stock, &solucion);
     }
     else
     {
         if (con_limite)
-            ok = calcular_cambio_optimo_con_limite(&monto, denom, limite_monedas, &solucion);
+            ok = calcular_cambio_optimo_con_rango(&monto, denom, min_monedas, max_monedas, &solucion);
         else
             ok = calcular_cambio_optimo(&monto, denom, &solucion);
     }
