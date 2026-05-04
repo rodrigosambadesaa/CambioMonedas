@@ -75,32 +75,32 @@ run_case_updates_stock() {
 
 run_case "Consola modo a (tradicional)" \
   ./progvoraz \
-  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3, volver, modo o salir):" \
+  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4, volver, modo o salir):" \
   "a\n${currency}\ntradicional\n30\nsalir\n"
 
 run_case "Consola modo b (tradicional)" \
   ./progvoraz \
-  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3, volver, modo o salir):" \
+  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4, volver, modo o salir):" \
   "b\n${currency}\ntradicional\n30\nsalir\n"
 
 run_case_updates_stock "Consola modo b actualiza stock.txt" \
   ./progvoraz \
-  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3, volver, modo o salir):" \
+  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4, volver, modo o salir):" \
   "b\n${currency}\ntradicional\n30\nsalir\n"
 
 run_case "Consola modo c (admin)" \
   ./progvoraz \
-  "Accion admin (anadir/quitar/historial, volver, modo, salir):" \
+  "Accion admin (anadir/quitar/historial/resumen, volver, modo, salir):" \
   "c\n${currency}\nanadir\n1\n0\nsalir\n"
 
 run_case "GUI portable modo limitado" \
   ./progvoraz_gui \
-  "Accion (calcular/caja/limite/especifico/historial/anadir/quitar/modo/volver/salir):" \
+  "Accion (calcular/caja/limite/especifico/historial/resumen/anadir/quitar/modo/volver/salir):" \
   "limitado\n${currency}\ncalcular\n30\nsalir\n"
 
 run_case "GUI portable modo ilimitado" \
   ./progvoraz_gui \
-  "Accion (calcular/caja/limite/especifico/historial/modo/volver/salir):" \
+  "Accion (calcular/caja/limite/especifico/historial/resumen/modo/volver/salir):" \
   "ilimitado\n${currency}\ncalcular\n30\nsalir\n"
 
 run_case "GUI portable historial desde modo" \
