@@ -18,6 +18,7 @@ Proyecto de cambio de monedas escrito en C, originalmente creado en 2014 con Net
 - Limpieza de artefactos con .gitignore para evitar ruido en commits.
 - Documentacion de uso y compilacion actualizada.
 - Modularizacion de la gestion de moneda en un modulo dedicado.
+- Validacion de consistencia por moneda (denominaciones estrictamente descendentes y cantidad de lineas de stock alineada).
 
 ## Nueva implementacion de gestion de moneda
 
