@@ -637,7 +637,112 @@ static int calcular_y_mostrar_cambio(void)
 
     if (!ok)
     {
+        BigInt monto_cubierto = {0};
+        BigInt faltante = {0};
+        BigIntArray sugerencia = {0};
+        BigIntArray stock_sugerido = {0};
+        int respuesta;
+        int ok_cercano;
+
+        if (tiene_limite)
+            ok_cercano = g_modo_stock_limitado
+                             ? calcular_cambio_cercano_stock_con_rango(&monto, &g_denom, &g_stock, min_monedas, max_monedas, &monto_cubierto, &sugerencia)
+                             : calcular_cambio_cercano_con_rango(&monto, &g_denom, min_monedas, max_monedas, &monto_cubierto, &sugerencia);
+        else
+            ok_cercano = g_modo_stock_limitado
+                             ? calcular_cambio_cercano_stock_con_rango(&monto, &g_denom, &g_stock, 0, (size_t)-1, &monto_cubierto, &sugerencia)
+                             : calcular_cambio_cercano_con_rango(&monto, &g_denom, 0, (size_t)-1, &monto_cubierto, &sugerencia);
+
         SendMessageA(g_listResultado, LB_ADDSTRING, 0, (LPARAM) "No existe devolucion exacta con los parametros actuales.");
+
+        if (ok_cercano && bigint_subtract(&monto, &monto_cubierto, &faltante))
+        {
+            snprintf(linea, sizeof(linea), "Sugerencia cercana: %s c (faltan %s c)", monto_cubierto.digits, faltante.digits);
+            if ((int)strlen(linea) > max_chars)
+                max_chars = (int)strlen(linea);
+            SendMessageA(g_listResultado, LB_ADDSTRING, 0, (LPARAM)linea);
+
+            respuesta = MessageBoxA(NULL,
+                                    "No existe devolucion exacta.\nDeseas aceptar la sugerencia cercana?",
+                                    "Sugerencia cercana",
+                                    MB_ICONQUESTION | MB_YESNO);
+
+            if (respuesta == IDYES)
+            {
+                if (g_modo_stock_limitado)
+                {
+                    if (!copiar_arreglo_bigint(&g_stock, &stock_sugerido))
+                    {
+                        mostrar_error("Cambio", "No se pudo preparar stock para la sugerencia.");
+                    }
+                    else
+                    {
+                        int ok_stock = 1;
+                        for (size_t i = 0; i < stock_sugerido.len; i++)
+                        {
+                            BigInt nuevo_stock = {0};
+
+                            if (bigint_is_zero(&sugerencia.items[i]))
+                                continue;
+
+                            if (!bigint_subtract(&stock_sugerido.items[i], &sugerencia.items[i], &nuevo_stock) ||
+                                !bigint_array_set(&stock_sugerido, i, &nuevo_stock))
+                            {
+                                bigint_free(&nuevo_stock);
+                                ok_stock = 0;
+                                break;
+                            }
+
+                            bigint_free(&nuevo_stock);
+                        }
+
+                        if (!ok_stock)
+                        {
+                            bigint_array_free(&stock_sugerido);
+                            mostrar_error("Cambio", "No se pudo aplicar la sugerencia al stock.");
+                        }
+                        else if (!actualizar_stock_moneda(g_monedas[g_monedaActiva], &stock_sugerido))
+                        {
+                            bigint_array_free(&stock_sugerido);
+                            mostrar_error("Cambio", "No se pudo persistir sugerencia en stock.txt.");
+                        }
+                        else
+                        {
+                            bigint_array_free(&g_stock);
+                            g_stock = stock_sugerido;
+                            refrescar_lista_stock();
+                            registrar_historial("Cambio cercano aceptado con stock.");
+                        }
+                    }
+                }
+                else
+                {
+                    registrar_historial("Cambio cercano aceptado (ilimitado).");
+                }
+            }
+            else
+            {
+                SendMessageA(g_listResultado, LB_ADDSTRING, 0, (LPARAM) "Operacion cancelada: no se aplico cambio.");
+            }
+
+            for (size_t i = 0; i < g_denom.len; i++)
+            {
+                if (bigint_is_zero(&sugerencia.items[i]))
+                    continue;
+
+                snprintf(linea, sizeof(linea), "%s c -> %s", g_denom.items[i].digits, sugerencia.items[i].digits);
+                if ((int)strlen(linea) > max_chars)
+                    max_chars = (int)strlen(linea);
+                SendMessageA(g_listResultado, LB_ADDSTRING, 0, (LPARAM)linea);
+            }
+
+            if (g_modo_stock_limitado && respuesta != IDYES)
+                SendMessageA(g_listResultado, LB_ADDSTRING, 0, (LPARAM) "Nota: la sugerencia cercana no se aplico al stock.");
+        }
+
+        bigint_free(&faltante);
+        bigint_free(&monto_cubierto);
+        bigint_array_free(&sugerencia);
         ajustar_scroll_horizontal_lista(g_listResultado, max_chars + 4);
         bigint_free(&monto);
         bigint_array_free(&solucion);

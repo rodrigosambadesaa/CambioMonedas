@@ -177,12 +177,62 @@ static void test_sin_solucion_con_stock(void)
     bigint_array_free(&solucion);
 }
 
+static void test_cambio_cercano_con_rango_ilimitado(void)
+{
+    const char *denom_txt[] = {"10", "4"};
+    const char *esperado[] = {"0", "1"};
+    BigInt monto = {0};
+    BigInt cubierto = {0};
+    BigIntArray denom = {0};
+    BigIntArray solucion = {0};
+
+    check_int(bigint_init(&monto, "7"), "inicializa monto cercano ilimitado");
+    check_int(crear_arreglo(&denom, denom_txt, 2), "crea denominaciones cercano ilimitado");
+    check_int(calcular_cambio_cercano_con_rango(&monto, &denom, 1, 1, &cubierto, &solucion),
+              "calcula cambio cercano con rango en modo ilimitado");
+    check_bigint_texto(&cubierto, "4", "monto cubierto cercano ilimitado");
+    check_arreglo_texto(&solucion, esperado, 2, "combinacion cercana ilimitada esperada");
+
+    bigint_free(&monto);
+    bigint_free(&cubierto);
+    bigint_array_free(&denom);
+    bigint_array_free(&solucion);
+}
+
+static void test_cambio_cercano_con_rango_stock(void)
+{
+    const char *denom_txt[] = {"10", "4", "1"};
+    const char *stock_txt[] = {"1", "1", "0"};
+    const char *esperado[] = {"1", "1", "0"};
+    BigInt monto = {0};
+    BigInt cubierto = {0};
+    BigIntArray denom = {0};
+    BigIntArray stock = {0};
+    BigIntArray solucion = {0};
+
+    check_int(bigint_init(&monto, "15"), "inicializa monto cercano con stock");
+    check_int(crear_arreglo(&denom, denom_txt, 3), "crea denominaciones cercano con stock");
+    check_int(crear_arreglo(&stock, stock_txt, 3), "crea stock cercano");
+    check_int(calcular_cambio_cercano_stock_con_rango(&monto, &denom, &stock, 2, 2, &cubierto, &solucion),
+              "calcula cambio cercano con rango en modo stock");
+    check_bigint_texto(&cubierto, "14", "monto cubierto cercano con stock");
+    check_arreglo_texto(&solucion, esperado, 3, "combinacion cercana con stock esperada");
+
+    bigint_free(&monto);
+    bigint_free(&cubierto);
+    bigint_array_free(&denom);
+    bigint_array_free(&stock);
+    bigint_array_free(&solucion);
+}
+
 int main(void)
 {
     test_bigint_basico();
     test_cambio_no_canonico_ilimitado();
     test_cambio_no_canonico_con_stock();
     test_sin_solucion_con_stock();
+    test_cambio_cercano_con_rango_ilimitado();
+    test_cambio_cercano_con_rango_stock();
 
     if (fallos != 0)
     {

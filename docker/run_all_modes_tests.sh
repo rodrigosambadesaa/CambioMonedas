@@ -75,18 +75,23 @@ run_case_updates_stock() {
 
 run_case "Consola modo a (tradicional)" \
   ./progvoraz \
-  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4, volver, modo o salir):" \
+  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4 / limite|5|l, volver, modo o salir):" \
   "a\n${currency}\ntradicional\n30\nsalir\n"
 
 run_case "Consola modo b (tradicional)" \
   ./progvoraz \
-  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4, volver, modo o salir):" \
+  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4 / limite|5|l, volver, modo o salir):" \
   "b\n${currency}\ntradicional\n30\nsalir\n"
 
 run_case_updates_stock "Consola modo b actualiza stock.txt" \
   ./progvoraz \
-  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4, volver, modo o salir):" \
+  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4 / limite|5|l, volver, modo o salir):" \
   "b\n${currency}\ntradicional\n30\nsalir\n"
+
+run_case "Consola modo b (restriccion por limite)" \
+  ./progvoraz \
+  "Restriccion de monedas (N, =N, N-M, volver, modo o salir):" \
+  "b\n${currency}\n5\n30\n=2\nvolver\nmodo\nsalir\n"
 
 run_case "Consola modo c (admin)" \
   ./progvoraz \

@@ -753,6 +753,435 @@ cleanup:
     return resultado;
 }
 
+static int calcular_dp_ilimitado_cercano_rango(const BigInt *monto,
+                                               const BigIntArray *denom,
+                                               size_t min_monedas,
+                                               size_t max_monedas,
+                                               size_t *monto_cubierto,
+                                               BigIntArray *solucion)
+{
+    size_t amount;
+    size_t stride;
+    size_t estados;
+    size_t *valores = NULL;
+    size_t *cantidades = NULL;
+    unsigned char *alcanzable = NULL;
+    size_t *prev_monto = NULL;
+    size_t *moneda = NULL;
+    size_t min_valor = (size_t)-1;
+    size_t i;
+    size_t k;
+    size_t objetivo_k = (size_t)-1;
+    size_t objetivo_monto = (size_t)-1;
+    int resultado = DP_NO_APLICA;
+
+    if (!bigint_a_size_limitado(monto, DP_MONTO_MAX, &amount))
+        return DP_NO_APLICA;
+
+    if (monto_cubierto == NULL)
+        return DP_NO_APLICA;
+
+    valores = (size_t *)calloc(denom->len, sizeof(size_t));
+    cantidades = (size_t *)calloc(denom->len, sizeof(size_t));
+    if (valores == NULL || cantidades == NULL)
+        goto cleanup;
+
+    for (i = 0; i < denom->len; i++)
+    {
+        if (!bigint_a_size_con_tope(&denom->items[i], amount + 1, &valores[i]))
+            goto cleanup;
+
+        if (valores[i] > 0 && valores[i] < min_valor)
+            min_valor = valores[i];
+    }
+
+    if (amount == 0)
+    {
+        if (min_monedas == 0)
+        {
+            *monto_cubierto = 0;
+            resultado = cargar_solucion_size(cantidades, denom->len, solucion) ? DP_OK : DP_NO_APLICA;
+        }
+        else
+        {
+            resultado = DP_SIN_SOLUCION;
+        }
+        goto cleanup;
+    }
+
+    if (min_valor == (size_t)-1)
+    {
+        resultado = DP_SIN_SOLUCION;
+        goto cleanup;
+    }
+
+    {
+        size_t tope_natural = amount / min_valor;
+        if (max_monedas > tope_natural)
+            max_monedas = tope_natural;
+    }
+
+    if (min_monedas > max_monedas)
+    {
+        resultado = DP_SIN_SOLUCION;
+        goto cleanup;
+    }
+
+    if (max_monedas > ((size_t)-1) / (amount + 1) - 1)
+        goto cleanup;
+
+    stride = amount + 1;
+    estados = (max_monedas + 1) * stride;
+
+    alcanzable = (unsigned char *)calloc(estados, sizeof(unsigned char));
+    prev_monto = (size_t *)malloc(estados * sizeof(size_t));
+    moneda = (size_t *)malloc(estados * sizeof(size_t));
+    if (alcanzable == NULL || prev_monto == NULL || moneda == NULL)
+        goto cleanup;
+
+    for (i = 0; i < estados; i++)
+    {
+        prev_monto[i] = 0;
+        moneda[i] = denom->len;
+    }
+
+    alcanzable[0] = 1;
+    for (k = 1; k <= max_monedas; k++)
+    {
+        size_t monto_k;
+
+        for (monto_k = 0; monto_k <= amount; monto_k++)
+        {
+            size_t j;
+            size_t idx = k * stride + monto_k;
+
+            for (j = 0; j < denom->len; j++)
+            {
+                size_t valor = valores[j];
+                size_t idx_prev;
+
+                if (valor == 0 || valor > monto_k)
+                    continue;
+
+                idx_prev = (k - 1) * stride + (monto_k - valor);
+                if (!alcanzable[idx_prev])
+                    continue;
+
+                alcanzable[idx] = 1;
+                prev_monto[idx] = monto_k - valor;
+                moneda[idx] = j;
+                break;
+            }
+        }
+    }
+
+    {
+        size_t monto_busqueda = amount;
+        int encontrado = 0;
+
+        while (1)
+        {
+            for (k = min_monedas; k <= max_monedas; k++)
+            {
+                if (alcanzable[k * stride + monto_busqueda])
+                {
+                    objetivo_k = k;
+                    objetivo_monto = monto_busqueda;
+                    encontrado = 1;
+                    break;
+                }
+            }
+
+            if (encontrado)
+                break;
+
+            if (monto_busqueda == 0)
+                break;
+
+            monto_busqueda--;
+        }
+    }
+
+    if (objetivo_k == (size_t)-1 || objetivo_monto == (size_t)-1 || objetivo_monto == 0)
+    {
+        resultado = DP_SIN_SOLUCION;
+        goto cleanup;
+    }
+
+    {
+        size_t monto_actual = objetivo_monto;
+        size_t k_actual = objetivo_k;
+
+        while (k_actual > 0)
+        {
+            size_t idx = k_actual * stride + monto_actual;
+            size_t j = moneda[idx];
+
+            if (j >= denom->len || prev_monto[idx] > monto_actual)
+                goto cleanup;
+
+            cantidades[j]++;
+            monto_actual = prev_monto[idx];
+            k_actual--;
+        }
+
+        if (monto_actual != 0)
+            goto cleanup;
+    }
+
+    *monto_cubierto = objetivo_monto;
+    resultado = cargar_solucion_size(cantidades, denom->len, solucion) ? DP_OK : DP_NO_APLICA;
+
+cleanup:
+    free(valores);
+    free(cantidades);
+    free(alcanzable);
+    free(prev_monto);
+    free(moneda);
+    return resultado;
+}
+
+static int calcular_dp_stock_cercano_rango(const BigInt *monto,
+                                           const BigIntArray *denom,
+                                           const BigIntArray *stock,
+                                           size_t min_monedas,
+                                           size_t max_monedas,
+                                           size_t *monto_cubierto,
+                                           BigIntArray *solucion)
+{
+    size_t amount;
+    size_t stride;
+    size_t estados;
+    size_t *valores = NULL;
+    size_t *topes = NULL;
+    size_t *cantidades = NULL;
+    unsigned char *alcanzable = NULL;
+    size_t *prev_k = NULL;
+    size_t *prev_monto = NULL;
+    size_t *item_usado = NULL;
+    DPItemStock *items = NULL;
+    size_t items_len = 0;
+    size_t items_cap = 0;
+    size_t i;
+    size_t objetivo_k = (size_t)-1;
+    size_t objetivo_monto = (size_t)-1;
+    size_t tope_monedas = 0;
+    const size_t invalid = (size_t)-1;
+    int resultado = DP_NO_APLICA;
+
+    if (!bigint_a_size_limitado(monto, DP_MONTO_MAX, &amount))
+        return DP_NO_APLICA;
+
+    if (monto_cubierto == NULL)
+        return DP_NO_APLICA;
+
+    valores = (size_t *)calloc(denom->len, sizeof(size_t));
+    topes = (size_t *)calloc(denom->len, sizeof(size_t));
+    cantidades = (size_t *)calloc(denom->len, sizeof(size_t));
+    if (valores == NULL || topes == NULL || cantidades == NULL)
+        goto cleanup;
+
+    for (i = 0; i < denom->len; i++)
+    {
+        size_t cap_uso;
+
+        if (!bigint_a_size_con_tope(&denom->items[i], amount + 1, &valores[i]) ||
+            !bigint_a_size_con_tope(&stock->items[i], amount, &topes[i]))
+        {
+            goto cleanup;
+        }
+
+        if (valores[i] == 0)
+            continue;
+
+        cap_uso = topes[i];
+        {
+            size_t cap_por_monto = amount / valores[i];
+            if (cap_por_monto < cap_uso)
+                cap_uso = cap_por_monto;
+        }
+
+        tope_monedas += cap_uso;
+    }
+
+    if (amount == 0)
+    {
+        if (min_monedas == 0)
+        {
+            *monto_cubierto = 0;
+            resultado = cargar_solucion_size(cantidades, denom->len, solucion) ? DP_OK : DP_NO_APLICA;
+        }
+        else
+        {
+            resultado = DP_SIN_SOLUCION;
+        }
+        goto cleanup;
+    }
+
+    if (max_monedas > tope_monedas)
+        max_monedas = tope_monedas;
+
+    if (min_monedas > max_monedas)
+    {
+        resultado = DP_SIN_SOLUCION;
+        goto cleanup;
+    }
+
+    for (i = 0; i < denom->len; i++)
+    {
+        size_t cap_uso;
+        size_t chunk = 1;
+
+        if (valores[i] == 0)
+            continue;
+
+        cap_uso = topes[i];
+        {
+            size_t cap_por_monto = amount / valores[i];
+            if (cap_por_monto < cap_uso)
+                cap_uso = cap_por_monto;
+        }
+        if (cap_uso > max_monedas)
+            cap_uso = max_monedas;
+
+        while (cap_uso > 0)
+        {
+            size_t take = (chunk < cap_uso) ? chunk : cap_uso;
+            size_t valor_item = take * valores[i];
+
+            if (!push_item_stock(&items, &items_len, &items_cap, i, take, valor_item))
+                goto cleanup;
+
+            cap_uso -= take;
+            if (chunk <= ((size_t)-1) / 2)
+                chunk *= 2;
+            else
+                chunk = cap_uso;
+        }
+    }
+
+    if (max_monedas > ((size_t)-1) / (amount + 1) - 1)
+        goto cleanup;
+
+    stride = amount + 1;
+    estados = (max_monedas + 1) * stride;
+
+    alcanzable = (unsigned char *)calloc(estados, sizeof(unsigned char));
+    prev_k = (size_t *)malloc(estados * sizeof(size_t));
+    prev_monto = (size_t *)malloc(estados * sizeof(size_t));
+    item_usado = (size_t *)malloc(estados * sizeof(size_t));
+    if (alcanzable == NULL || prev_k == NULL || prev_monto == NULL || item_usado == NULL)
+        goto cleanup;
+
+    for (i = 0; i < estados; i++)
+    {
+        prev_k[i] = invalid;
+        prev_monto[i] = 0;
+        item_usado[i] = invalid;
+    }
+
+    alcanzable[0] = 1;
+    for (i = 0; i < items_len; i++)
+    {
+        size_t k;
+        size_t valor_item = items[i].valor;
+        size_t monedas_item = items[i].monedas;
+
+        for (k = max_monedas + 1; k > monedas_item;)
+        {
+            size_t kk = k - 1;
+            size_t m;
+
+            for (m = amount + 1; m > valor_item;)
+            {
+                size_t mm = m - 1;
+                size_t idx = kk * stride + mm;
+                size_t idx_prev = (kk - monedas_item) * stride + (mm - valor_item);
+
+                if (!alcanzable[idx] && alcanzable[idx_prev])
+                {
+                    alcanzable[idx] = 1;
+                    prev_k[idx] = kk - monedas_item;
+                    prev_monto[idx] = mm - valor_item;
+                    item_usado[idx] = i;
+                }
+
+                m--;
+            }
+
+            k--;
+        }
+    }
+
+    {
+        size_t monto_busqueda = amount;
+        int encontrado = 0;
+
+        while (1)
+        {
+            for (i = min_monedas; i <= max_monedas; i++)
+            {
+                if (alcanzable[i * stride + monto_busqueda])
+                {
+                    objetivo_k = i;
+                    objetivo_monto = monto_busqueda;
+                    encontrado = 1;
+                    break;
+                }
+            }
+
+            if (encontrado)
+                break;
+
+            if (monto_busqueda == 0)
+                break;
+
+            monto_busqueda--;
+        }
+    }
+
+    if (objetivo_k == (size_t)-1 || objetivo_monto == (size_t)-1 || objetivo_monto == 0)
+    {
+        resultado = DP_SIN_SOLUCION;
+        goto cleanup;
+    }
+
+    {
+        size_t k_actual = objetivo_k;
+        size_t monto_actual = objetivo_monto;
+
+        while (k_actual > 0)
+        {
+            size_t idx = k_actual * stride + monto_actual;
+            size_t idx_item = item_usado[idx];
+
+            if (idx_item == invalid || idx_item >= items_len)
+                goto cleanup;
+
+            cantidades[items[idx_item].idx_denom] += items[idx_item].monedas;
+            monto_actual = prev_monto[idx];
+            k_actual = prev_k[idx];
+        }
+
+        if (monto_actual != 0)
+            goto cleanup;
+    }
+
+    *monto_cubierto = objetivo_monto;
+    resultado = cargar_solucion_size(cantidades, denom->len, solucion) ? DP_OK : DP_NO_APLICA;
+
+cleanup:
+    free(valores);
+    free(topes);
+    free(cantidades);
+    free(alcanzable);
+    free(prev_k);
+    free(prev_monto);
+    free(item_usado);
+    free(items);
+    return resultado;
+}
+
 static int solucion_cumple_max_monedas(const BigIntArray *solucion, size_t max_monedas)
 {
     size_t total = 0;
@@ -1190,6 +1619,79 @@ int calcular_cambio_optimo_stock_con_rango(const BigInt *monto,
         }
 
         return 1;
+    }
+
+    return 0;
+}
+
+int calcular_cambio_cercano_con_rango(const BigInt *monto,
+                                      const BigIntArray *denominaciones,
+                                      size_t min_monedas,
+                                      size_t max_monedas,
+                                      BigInt *monto_cubierto,
+                                      BigIntArray *solucion)
+{
+    int dp;
+    size_t cubierto_size = 0;
+
+    if (monto == NULL || denominaciones == NULL || monto_cubierto == NULL || solucion == NULL)
+        return 0;
+    if (min_monedas > max_monedas)
+        return 0;
+
+    dp = calcular_dp_ilimitado_cercano_rango(monto, denominaciones, min_monedas, max_monedas, &cubierto_size, solucion);
+    if (dp != DP_NO_APLICA)
+    {
+        if (dp != DP_OK)
+            return 0;
+
+        return size_a_bigint(cubierto_size, monto_cubierto);
+    }
+
+    if (min_monedas == 0)
+    {
+        if (!calcular_cambio_optimo(monto, denominaciones, solucion))
+            return 0;
+
+        return copiar_bigint(monto_cubierto, monto);
+    }
+
+    return 0;
+}
+
+int calcular_cambio_cercano_stock_con_rango(const BigInt *monto,
+                                            const BigIntArray *denominaciones,
+                                            const BigIntArray *stock,
+                                            size_t min_monedas,
+                                            size_t max_monedas,
+                                            BigInt *monto_cubierto,
+                                            BigIntArray *solucion)
+{
+    int dp;
+    size_t cubierto_size = 0;
+
+    if (monto == NULL || denominaciones == NULL || stock == NULL || monto_cubierto == NULL || solucion == NULL)
+        return 0;
+    if (denominaciones->len != stock->len)
+        return 0;
+    if (min_monedas > max_monedas)
+        return 0;
+
+    dp = calcular_dp_stock_cercano_rango(monto, denominaciones, stock, min_monedas, max_monedas, &cubierto_size, solucion);
+    if (dp != DP_NO_APLICA)
+    {
+        if (dp != DP_OK)
+            return 0;
+
+        return size_a_bigint(cubierto_size, monto_cubierto);
+    }
+
+    if (min_monedas == 0)
+    {
+        if (!calcular_cambio_optimo_stock(monto, denominaciones, stock, solucion))
+            return 0;
+
+        return copiar_bigint(monto_cubierto, monto);
     }
 
     return 0;
