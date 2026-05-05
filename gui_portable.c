@@ -747,7 +747,149 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
 
     if (!ok)
     {
-        printf("No existe devolucion exacta con los parametros actuales.\n");
+        BigInt monto_cubierto = {0};
+        BigInt faltante = {0};
+        BigIntArray sugerencia = {0};
+        BigIntArray stockSugerido = {0};
+        char respuesta[32];
+        char cmd[32];
+        int aceptar = 0;
+        int ok_cercano;
+
+        if (con_limite)
+            ok_cercano = (modo == MODO_LIMITADO)
+                             ? calcular_cambio_cercano_stock_con_rango(&monto, denom, stock, min_monedas, max_monedas, &monto_cubierto, &sugerencia)
+                             : calcular_cambio_cercano_con_rango(&monto, denom, min_monedas, max_monedas, &monto_cubierto, &sugerencia);
+        else
+            ok_cercano = (modo == MODO_LIMITADO)
+                             ? calcular_cambio_cercano_stock_con_rango(&monto, denom, stock, 0, (size_t)-1, &monto_cubierto, &sugerencia)
+                             : calcular_cambio_cercano_con_rango(&monto, denom, 0, (size_t)-1, &monto_cubierto, &sugerencia);
+
+        if (ok_cercano && bigint_subtract(&monto, &monto_cubierto, &faltante))
+        {
+            printf("No existe devolucion exacta con los parametros actuales.\n");
+            printf("Sugerencia cercana: devolver %s c (faltan %s c).\n", monto_cubierto.digits, faltante.digits);
+
+            while (1)
+            {
+                printf("Aceptar sugerencia? (si/no): ");
+                if (!leer_linea(respuesta, sizeof(respuesta)))
+                {
+                    bigint_free(&faltante);
+                    bigint_free(&monto_cubierto);
+                    bigint_array_free(&sugerencia);
+                    bigint_free(&monto);
+                    bigint_array_free(&solucion);
+                    return 0;
+                }
+
+                strncpy(cmd, respuesta, sizeof(cmd) - 1);
+                cmd[sizeof(cmd) - 1] = '\0';
+                a_minusculas(cmd);
+
+                if (strcmp(cmd, "si") == 0 || strcmp(cmd, "s") == 0 || strcmp(cmd, "yes") == 0 || strcmp(cmd, "y") == 0)
+                {
+                    aceptar = 1;
+                    break;
+                }
+
+                if (strcmp(cmd, "no") == 0 || strcmp(cmd, "n") == 0)
+                    break;
+
+                printf("Respuesta invalida. Escribe si o no.\n");
+            }
+
+            if (!aceptar)
+            {
+                printf("Operacion cancelada: no se aplico cambio.\n");
+                bigint_free(&faltante);
+                bigint_free(&monto_cubierto);
+                bigint_array_free(&sugerencia);
+                bigint_free(&monto);
+                bigint_array_free(&solucion);
+                return 0;
+            }
+
+            if (modo == MODO_LIMITADO)
+            {
+                if (!copiar_arreglo_bigint(stock, &stockSugerido))
+                {
+                    printf("No se pudo preparar actualizacion de stock para sugerencia.\n");
+                    bigint_free(&faltante);
+                    bigint_free(&monto_cubierto);
+                    bigint_array_free(&sugerencia);
+                    bigint_free(&monto);
+                    bigint_array_free(&solucion);
+                    return 0;
+                }
+
+                for (size_t i = 0; i < stockSugerido.len; i++)
+                {
+                    BigInt nuevoStock = {0};
+
+                    if (bigint_is_zero(&sugerencia.items[i]))
+                        continue;
+
+                    if (!bigint_subtract(&stockSugerido.items[i], &sugerencia.items[i], &nuevoStock) ||
+                        !bigint_array_set(&stockSugerido, i, &nuevoStock))
+                    {
+                        bigint_free(&nuevoStock);
+                        bigint_array_free(&stockSugerido);
+                        printf("No se pudo aplicar sugerencia al stock.\n");
+                        bigint_free(&faltante);
+                        bigint_free(&monto_cubierto);
+                        bigint_array_free(&sugerencia);
+                        bigint_free(&monto);
+                        bigint_array_free(&solucion);
+                        return 0;
+                    }
+
+                    bigint_free(&nuevoStock);
+                }
+
+                if (!actualizar_stock_moneda(moneda, &stockSugerido))
+                {
+                    bigint_array_free(&stockSugerido);
+                    printf("No se pudo persistir la sugerencia en stock.txt.\n");
+                    bigint_free(&faltante);
+                    bigint_free(&monto_cubierto);
+                    bigint_array_free(&sugerencia);
+                    bigint_free(&monto);
+                    bigint_array_free(&solucion);
+                    return 0;
+                }
+
+                bigint_array_free(stock);
+                *stock = stockSugerido;
+                imprimir_resultado_cambio(&monto_cubierto, denom, &sugerencia);
+                printf("Sugerencia cercana aplicada y stock persistido.\n");
+                registrar_historial("Cambio cercano aceptado con stock (portable).");
+                bigint_free(&faltante);
+                bigint_free(&monto_cubierto);
+                bigint_array_free(&sugerencia);
+                bigint_free(&monto);
+                bigint_array_free(&solucion);
+                return 1;
+            }
+
+            imprimir_resultado_cambio(&monto_cubierto, denom, &sugerencia);
+            printf("Sugerencia cercana aceptada en modo ilimitado.\n");
+            registrar_historial("Cambio cercano aceptado (portable, ilimitado).");
+            bigint_free(&faltante);
+            bigint_free(&monto_cubierto);
+            bigint_array_free(&sugerencia);
+            bigint_free(&monto);
+            bigint_array_free(&solucion);
+            return 1;
+        }
+        else
+        {
+            printf("No existe devolucion exacta con los parametros actuales.\n");
+            bigint_free(&faltante);
+            bigint_free(&monto_cubierto);
+            bigint_array_free(&sugerencia);
+        }
+
         bigint_free(&monto);
         bigint_array_free(&solucion);
         return 0;

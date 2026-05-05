@@ -636,6 +636,129 @@ static void imprimir_resultado(const BigIntArray *monedas, const BigIntArray *so
     dibujar_linea();
 }
 
+static void imprimir_sugerencia_cercana(const BigInt *solicitado,
+                                        const BigInt *cubierto,
+                                        const BigIntArray *monedas,
+                                        const BigIntArray *solucion,
+                                        int con_stock)
+{
+    BigInt faltante = {0};
+
+    if (solicitado == NULL || cubierto == NULL || monedas == NULL || solucion == NULL)
+        return;
+
+    if (!bigint_subtract(solicitado, cubierto, &faltante))
+    {
+        printf("No existe cambio exacto. Se encontro un cambio cercano parcial.\n");
+        imprimir_resultado(monedas, solucion, NULL, 0);
+        return;
+    }
+
+    printf("No existe cambio exacto.\n");
+    printf("Sugerencia cercana: cubrir %s c (faltan %s c).\n", cubierto->digits, faltante.digits);
+    if (con_stock)
+        printf("Esta sugerencia no se aplica automaticamente al stock actual.\n");
+
+    imprimir_resultado(monedas, solucion, NULL, 0);
+    bigint_free(&faltante);
+}
+
+static int preguntar_aceptar_sugerencia(const BigInt *solicitado,
+                                        const BigInt *cubierto,
+                                        int con_stock)
+{
+    BigInt faltante = {0};
+    char buffer[32];
+    char comando[32];
+
+    if (solicitado == NULL || cubierto == NULL)
+        return 0;
+
+    if (!bigint_subtract(solicitado, cubierto, &faltante))
+        return 0;
+
+    while (1)
+    {
+        if (con_stock)
+            printf("No hay cambio exacto. Sugerencia: devolver %s c (faltan %s c). Aceptar? (si/no): ", cubierto->digits, faltante.digits);
+        else
+            printf("No hay cambio exacto. Sugerencia: cubrir %s c (faltan %s c). Aceptar? (si/no): ", cubierto->digits, faltante.digits);
+
+        if (!leer_linea(buffer, sizeof(buffer)))
+        {
+            bigint_free(&faltante);
+            return -1;
+        }
+
+        strncpy(comando, buffer, sizeof(comando) - 1);
+        comando[sizeof(comando) - 1] = '\0';
+        a_minusculas(comando);
+
+        if (strcmp(comando, "si") == 0 || strcmp(comando, "s") == 0 || strcmp(comando, "yes") == 0 || strcmp(comando, "y") == 0)
+        {
+            bigint_free(&faltante);
+            return 1;
+        }
+
+        if (strcmp(comando, "no") == 0 || strcmp(comando, "n") == 0)
+        {
+            bigint_free(&faltante);
+            return 0;
+        }
+
+        printf("Respuesta invalida. Escriba si o no.\n");
+    }
+}
+
+static int aplicar_devolucion_stock(const char *monedaClave,
+                                    BigIntArray *stock,
+                                    const BigIntArray *solucion)
+{
+    BigIntArray stockNuevo = {0};
+    int okStockNuevo;
+
+    if (monedaClave == NULL || stock == NULL || solucion == NULL)
+        return 0;
+
+    okStockNuevo = copiar_arreglo_bigint(stock, &stockNuevo);
+    if (!okStockNuevo)
+        return 0;
+
+    for (size_t i = 0; i < stockNuevo.len; i++)
+    {
+        BigInt restante = {0};
+
+        if (bigint_is_zero(&solucion->items[i]))
+            continue;
+
+        if (!bigint_subtract(&stockNuevo.items[i], &solucion->items[i], &restante) ||
+            !bigint_array_set(&stockNuevo, i, &restante))
+        {
+            bigint_free(&restante);
+            okStockNuevo = 0;
+            break;
+        }
+
+        bigint_free(&restante);
+    }
+
+    if (!okStockNuevo)
+    {
+        limpiar_arreglo(&stockNuevo);
+        return 0;
+    }
+
+    if (!actualizar_stock_moneda(monedaClave, &stockNuevo))
+    {
+        limpiar_arreglo(&stockNuevo);
+        return 0;
+    }
+
+    limpiar_arreglo(stock);
+    *stock = stockNuevo;
+    return 1;
+}
+
 /* imprimir_stock_administrador: Muestra todos los stocks actuales al entrar al modo C. */
 static void imprimir_stock_administrador(const BigIntArray *monedas, const BigIntArray *stock)
 {
@@ -779,7 +902,7 @@ static int pedir_subopcion_cambio(void)
     char buffer[32];
     char comando[32];
 
-    printf("Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4 / limite|l, volver, modo o salir): ");
+    printf("Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4 / limite|5|l, volver, modo o salir): ");
     if (!leer_linea(buffer, sizeof(buffer)))
         return -1;
 
@@ -804,7 +927,7 @@ static int pedir_subopcion_cambio(void)
         return 6;
     if (strcmp(comando, "resumen") == 0 || strcmp(comando, "r") == 0 || strcmp(comando, "4") == 0)
         return 7;
-    if (strcmp(comando, "limite") == 0 || strcmp(comando, "l") == 0)
+    if (strcmp(comando, "limite") == 0 || strcmp(comando, "l") == 0 || strcmp(comando, "5") == 0)
         return 8;
 
     return 0;
@@ -1422,6 +1545,8 @@ int app_console_run(void)
                 int usar_restriccion = 0;
                 size_t min_monedas = 0;
                 size_t max_monedas = 0;
+                size_t min_cercano = 0;
+                size_t max_cercano = (size_t)-1;
 
                 /* Caso MODO USUARIO NORMAL (Opciones A y B). */
                 if (opcion == 'a' || opcion == 'b')
@@ -1756,6 +1881,9 @@ int app_console_run(void)
                         bigint_free(&cantidad);
                         continue;
                     }
+
+                    min_cercano = min_monedas;
+                    max_cercano = max_monedas;
                 }
 
                 /* Si estamos en modo de monedas ilimitado (El Algoritmo Clásico Original). */
@@ -1782,10 +1910,53 @@ int app_console_run(void)
                     }
                     else
                     {
-                        if (usar_restriccion)
-                            printf("No existe cambio exacto para esa cantidad con la restriccion indicada.\n");
+                        BigInt montoCubierto = {0};
+                        BigIntArray sugerencia = {0};
+                        int decision;
+                        int okCercano = calcular_cambio_cercano_con_rango(&cantidad,
+                                                                          &monedas,
+                                                                          min_cercano,
+                                                                          max_cercano,
+                                                                          &montoCubierto,
+                                                                          &sugerencia);
+
+                        if (okCercano)
+                        {
+                            decision = preguntar_aceptar_sugerencia(&cantidad, &montoCubierto, 0);
+
+                            if (decision == -1)
+                            {
+                                printf("Entrada finalizada.\n");
+                                bigint_free(&montoCubierto);
+                                limpiar_arreglo(&sugerencia);
+                                bigint_free(&cantidad);
+                                ejecutando = 0;
+                                break;
+                            }
+
+                            if (decision == 1)
+                            {
+                                imprimir_sugerencia_cercana(&cantidad, &montoCubierto, &monedas, &sugerencia, 0);
+                                registrar_historialf("Cambio cercano aceptado ilimitado | Moneda=%s | Solicitado=%s c | Cubierto=%s c",
+                                                     monedaClave,
+                                                     cantidad.digits,
+                                                     montoCubierto.digits);
+                            }
+                            else
+                            {
+                                printf("Operacion cancelada: no se aplico cambio.\n");
+                            }
+
+                            bigint_free(&montoCubierto);
+                            limpiar_arreglo(&sugerencia);
+                        }
                         else
-                            printf("No existe cambio exacto para esa cantidad.\n");
+                        {
+                            if (usar_restriccion)
+                                printf("No existe cambio exacto para esa cantidad con la restriccion indicada.\n");
+                            else
+                                printf("No existe cambio exacto para esa cantidad.\n");
+                        }
                     }
                 }
                 else
@@ -1798,55 +1969,14 @@ int app_console_run(void)
                     /* Si encontro una respuesta viable. */
                     if (resultado)
                     {
-                        BigIntArray stockNuevo = {0};
-                        int okStockNuevo = copiar_arreglo_bigint(&stock, &stockNuevo);
-
-                        if (!okStockNuevo)
+                        if (!aplicar_devolucion_stock(monedaClave, &stock, &solucion))
                         {
-                            printf("No se pudo preparar la actualizacion de stock.\n");
-                            limpiar_arreglo(&solucion);
-                            bigint_free(&cantidad);
-                            continue;
-                        }
-
-                        for (size_t i = 0; i < stockNuevo.len; i++)
-                        {
-                            BigInt restante = {0};
-
-                            if (bigint_is_zero(&solucion.items[i]))
-                                continue;
-
-                            if (!bigint_subtract(&stockNuevo.items[i], &solucion.items[i], &restante) ||
-                                !bigint_array_set(&stockNuevo, i, &restante))
-                            {
-                                bigint_free(&restante);
-                                okStockNuevo = 0;
-                                break;
-                            }
-
-                            bigint_free(&restante);
-                        }
-
-                        if (!okStockNuevo)
-                        {
-                            limpiar_arreglo(&stockNuevo);
                             printf("No se pudo aplicar la devolucion al stock.\n");
                             limpiar_arreglo(&solucion);
                             bigint_free(&cantidad);
                             continue;
                         }
 
-                        if (!actualizar_stock_moneda(monedaClave, &stockNuevo))
-                        {
-                            limpiar_arreglo(&stockNuevo);
-                            printf("No se pudo actualizar el archivo de stock.\n");
-                            limpiar_arreglo(&solucion);
-                            bigint_free(&cantidad);
-                            continue;
-                        }
-
-                        limpiar_arreglo(&stock);
-                        stock = stockNuevo;
                         imprimir_resultado(&monedas, &solucion, &stock, 1);
                         if (usar_restriccion)
                             registrar_historialf("Cambio con restriccion con stock | Moneda=%s | Monto=%s c | Restriccion=%zu-%zu",
@@ -1861,10 +1991,62 @@ int app_console_run(void)
                     }
                     else
                     {
-                        if (usar_restriccion)
-                            printf("No existe cambio exacto para esa cantidad con el stock actual y la restriccion indicada.\n");
+                        BigInt montoCubierto = {0};
+                        BigIntArray sugerencia = {0};
+                        int decision;
+                        int okCercano = calcular_cambio_cercano_stock_con_rango(&cantidad,
+                                                                                &monedas,
+                                                                                &stock,
+                                                                                min_cercano,
+                                                                                max_cercano,
+                                                                                &montoCubierto,
+                                                                                &sugerencia);
+
+                        if (okCercano)
+                        {
+                            decision = preguntar_aceptar_sugerencia(&cantidad, &montoCubierto, 1);
+
+                            if (decision == -1)
+                            {
+                                printf("Entrada finalizada.\n");
+                                bigint_free(&montoCubierto);
+                                limpiar_arreglo(&sugerencia);
+                                bigint_free(&cantidad);
+                                ejecutando = 0;
+                                break;
+                            }
+
+                            if (decision == 1)
+                            {
+                                if (!aplicar_devolucion_stock(monedaClave, &stock, &sugerencia))
+                                {
+                                    printf("No se pudo aplicar la sugerencia cercana al stock.\n");
+                                }
+                                else
+                                {
+                                    imprimir_sugerencia_cercana(&cantidad, &montoCubierto, &monedas, &sugerencia, 1);
+                                    imprimir_resultado(&monedas, &sugerencia, &stock, 1);
+                                    registrar_historialf("Cambio cercano aceptado con stock | Moneda=%s | Solicitado=%s c | Cubierto=%s c",
+                                                         monedaClave,
+                                                         cantidad.digits,
+                                                         montoCubierto.digits);
+                                }
+                            }
+                            else
+                            {
+                                printf("Operacion cancelada: no se aplico cambio.\n");
+                            }
+
+                            bigint_free(&montoCubierto);
+                            limpiar_arreglo(&sugerencia);
+                        }
                         else
-                            printf("No existe cambio exacto para esa cantidad con el stock actual.\n");
+                        {
+                            if (usar_restriccion)
+                                printf("No existe cambio exacto para esa cantidad con el stock actual y la restriccion indicada.\n");
+                            else
+                                printf("No existe cambio exacto para esa cantidad con el stock actual.\n");
+                        }
                     }
                 }
 
