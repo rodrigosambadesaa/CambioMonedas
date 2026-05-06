@@ -428,12 +428,62 @@ static void mostrar_resumen_desde_menu_principal(void)
     limpiar_arreglo(&monedas);
 }
 
+static void gestionar_operacion_global(const char *accion)
+{
+    if (accion == NULL)
+        return;
+
+    if (strcmp(accion, "snapshot") == 0)
+    {
+        if (crear_snapshot_stock("stock_snapshot.txt"))
+        {
+            printf("Snapshot de stock creado en stock_snapshot.txt\n");
+            registrar_historial("Snapshot de stock creado");
+        }
+        else
+        {
+            printf("No se pudo crear snapshot de stock.\n");
+        }
+        return;
+    }
+
+    if (strcmp(accion, "restaurar") == 0)
+    {
+        if (restaurar_snapshot_stock("stock_snapshot.txt"))
+        {
+            printf("Stock restaurado desde stock_snapshot.txt\n");
+            registrar_historial("Stock restaurado desde snapshot");
+        }
+        else
+        {
+            printf("No se pudo restaurar stock (verifique stock_snapshot.txt).\n");
+        }
+        return;
+    }
+
+    if (strcmp(accion, "reporte") == 0)
+    {
+        if (exportar_reporte_global("reporte_global.txt"))
+        {
+            printf("Reporte global generado en reporte_global.txt\n");
+            registrar_historial("Reporte global exportado");
+        }
+        else
+        {
+            printf("No se pudo generar reporte global.\n");
+        }
+    }
+}
+
 /*
  * Muestra menu inicial y devuelve opcion normalizada en minuscula.
  * Retorna:
  * - 'a', 'b' o 'c' si la entrada es valida
  * - -3 si usuario pide ver historial
  * - -4 si usuario pide ver resumen de moneda
+ * - -5 si usuario pide crear snapshot de stock
+ * - -6 si usuario pide restaurar snapshot de stock
+ * - -7 si usuario pide generar reporte global
  * - 0 si la entrada es invalida/vacia
  * - -1 si hubo EOF/error de lectura
  * - -2 si usuario pide salir
@@ -450,8 +500,11 @@ static int pedir_opcion(void)
     printf("|   c) Administrador de stock                       |\n");
     printf("|   h) Historial de transacciones                   |\n");
     printf("|   r) Resumen de moneda                            |\n");
+    printf("|   s) Snapshot stock                               |\n");
+    printf("|   u) Restaurar snapshot                           |\n");
+    printf("|   g) Generar reporte global                       |\n");
     dibujar_linea();
-    printf("Opcion (a/b/c/h/r, historial, resumen o salir): ");
+    printf("Opcion (a/b/c/h/r/s/u/g o salir): ");
 
     if (!leer_linea(buffer, sizeof(buffer)))
         return -1;
@@ -468,6 +521,12 @@ static int pedir_opcion(void)
         return -3;
     if (strcmp(comando, "resumen") == 0 || strcmp(comando, "r") == 0)
         return -4;
+    if (strcmp(comando, "snapshot") == 0 || strcmp(comando, "s") == 0)
+        return -5;
+    if (strcmp(comando, "restaurar") == 0 || strcmp(comando, "u") == 0)
+        return -6;
+    if (strcmp(comando, "reporte") == 0 || strcmp(comando, "g") == 0)
+        return -7;
 
     return (int)tolower((unsigned char)buffer[0]);
 }
@@ -1293,6 +1352,27 @@ int app_console_run(void)
                 if (opcion == -4)
                 {
                     mostrar_resumen_desde_menu_principal();
+                    pausar_pantalla();
+                    continue;
+                }
+
+                if (opcion == -5)
+                {
+                    gestionar_operacion_global("snapshot");
+                    pausar_pantalla();
+                    continue;
+                }
+
+                if (opcion == -6)
+                {
+                    gestionar_operacion_global("restaurar");
+                    pausar_pantalla();
+                    continue;
+                }
+
+                if (opcion == -7)
+                {
+                    gestionar_operacion_global("reporte");
                     pausar_pantalla();
                     continue;
                 }

@@ -71,6 +71,53 @@ static void pausar_pantalla(void)
         clearerr(stdin);
 }
 
+static void ejecutar_operacion_global(const char *accion)
+{
+    if (accion == NULL)
+        return;
+
+    if (strcmp(accion, "snapshot") == 0)
+    {
+        if (crear_snapshot_stock("stock_snapshot.txt"))
+        {
+            printf("Snapshot creado: stock_snapshot.txt\n");
+            registrar_historial("Snapshot de stock creado (portable)");
+        }
+        else
+        {
+            printf("No se pudo crear snapshot de stock.\n");
+        }
+        return;
+    }
+
+    if (strcmp(accion, "restaurar") == 0)
+    {
+        if (restaurar_snapshot_stock("stock_snapshot.txt"))
+        {
+            printf("Stock restaurado desde stock_snapshot.txt\n");
+            registrar_historial("Stock restaurado desde snapshot (portable)");
+        }
+        else
+        {
+            printf("No se pudo restaurar stock desde snapshot.\n");
+        }
+        return;
+    }
+
+    if (strcmp(accion, "reporte") == 0)
+    {
+        if (exportar_reporte_global("reporte_global.txt"))
+        {
+            printf("Reporte global generado: reporte_global.txt\n");
+            registrar_historial("Reporte global exportado (portable)");
+        }
+        else
+        {
+            printf("No se pudo generar reporte global.\n");
+        }
+    }
+}
+
 #define MAX_MONEDAS 64
 #define MAX_NOMBRE 64
 
@@ -966,7 +1013,7 @@ static int pedir_modo(ModoGUI *modo)
 {
     char entrada[32];
 
-    printf("Modo (limitado/ilimitado/historial o salir): ");
+    printf("Modo (limitado/ilimitado/historial/snapshot/restaurar/reporte o salir): ");
     if (!leer_linea(entrada, sizeof(entrada)))
         return 0;
 
@@ -975,6 +1022,12 @@ static int pedir_modo(ModoGUI *modo)
         return 0;
     if (strcmp(entrada, "historial") == 0 || strcmp(entrada, "h") == 0)
         return 2;
+    if (strcmp(entrada, "snapshot") == 0 || strcmp(entrada, "s") == 0)
+        return 3;
+    if (strcmp(entrada, "restaurar") == 0 || strcmp(entrada, "u") == 0)
+        return 4;
+    if (strcmp(entrada, "reporte") == 0 || strcmp(entrada, "g") == 0)
+        return 5;
 
     if (strcmp(entrada, "limitado") == 0 || strcmp(entrada, "b") == 0)
     {
@@ -1042,6 +1095,24 @@ int main(void)
             pausar_pantalla();
             continue;
         }
+        if (estadoModo == 3)
+        {
+            ejecutar_operacion_global("snapshot");
+            pausar_pantalla();
+            continue;
+        }
+        if (estadoModo == 4)
+        {
+            ejecutar_operacion_global("restaurar");
+            pausar_pantalla();
+            continue;
+        }
+        if (estadoModo == 5)
+        {
+            ejecutar_operacion_global("reporte");
+            pausar_pantalla();
+            continue;
+        }
         if (estadoModo < 0)
             continue;
 
@@ -1106,9 +1177,9 @@ int main(void)
 
             imprimir_panel(monedas[idxMoneda], &denom, &stock);
             if (requiereAdmin)
-                printf("Accion (calcular/caja/limite/especifico/historial/resumen/anadir/quitar/modo/volver/salir): ");
+                printf("Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/anadir/quitar/modo/volver/salir): ");
             else
-                printf("Accion (calcular/caja/limite/especifico/historial/resumen/modo/volver/salir): ");
+                printf("Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/modo/volver/salir): ");
 
             if (!leer_linea(accion, sizeof(accion)))
             {
@@ -1151,6 +1222,35 @@ int main(void)
             if (strcmp(accion, "resumen") == 0)
             {
                 mostrar_resumen_moneda(monedas[idxMoneda], &denom, requiereAdmin ? &stock : NULL, requiereAdmin);
+                pausar_pantalla();
+                bigint_free(&delta);
+                continue;
+            }
+
+            if (strcmp(accion, "snapshot") == 0)
+            {
+                ejecutar_operacion_global("snapshot");
+                pausar_pantalla();
+                bigint_free(&delta);
+                continue;
+            }
+
+            if (strcmp(accion, "restaurar") == 0)
+            {
+                ejecutar_operacion_global("restaurar");
+                if (modoActual == MODO_LIMITADO)
+                {
+                    bigint_array_free(&stock);
+                    cargar_stock_moneda(monedas[idxMoneda], &stock);
+                }
+                pausar_pantalla();
+                bigint_free(&delta);
+                continue;
+            }
+
+            if (strcmp(accion, "reporte") == 0)
+            {
+                ejecutar_operacion_global("reporte");
                 pausar_pantalla();
                 bigint_free(&delta);
                 continue;
