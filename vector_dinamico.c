@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "vector_dinamico.h"
 
 /*
@@ -9,9 +10,59 @@
  */
 struct STVECTOR
 {
-    TELEMENTO *datos;
+    void *datos;
     unsigned long tam;
+    size_t tam_elemento;
 };
+
+void crear_bytes(vectorP *v1, unsigned long tam1, size_t tam_elemento)
+{
+    if (v1 == NULL)
+        return;
+
+    if (tam1 == 0 || tam_elemento == 0)
+    {
+        *v1 = NULL;
+        return;
+    }
+
+    if ((size_t)tam1 > ((size_t)-1) / tam_elemento)
+    {
+        *v1 = NULL;
+        return;
+    }
+
+    *v1 = (vectorP)malloc(sizeof(struct STVECTOR));
+    if (*v1 == NULL)
+        return;
+
+    (*v1)->datos = calloc(tam1, tam_elemento);
+    if ((*v1)->datos == NULL)
+    {
+        free(*v1);
+        *v1 = NULL;
+        return;
+    }
+
+    (*v1)->tam = tam1;
+    (*v1)->tam_elemento = tam_elemento;
+}
+
+void *datos(vectorP v1)
+{
+    if (v1 == NULL)
+        return NULL;
+
+    return v1->datos;
+}
+
+size_t tam_elemento_vector(vectorP v1)
+{
+    if (v1 == NULL)
+        return 0;
+
+    return v1->tam_elemento;
+}
 
 /*
  * Crea un vector de tam1 posiciones.
@@ -23,51 +74,20 @@ struct STVECTOR
  */
 void crear(vectorP *v1, unsigned long tam1)
 {
-    unsigned long i;
-
-    /* Si el puntero de salida no existe, no se puede crear nada. */
-    if (v1 == NULL)
-        return;
-
-    /* Tamano 0 no se considera vector util para esta API. */
-    if (tam1 == 0)
-    {
-        *v1 = NULL;
-        return;
-    }
-
-    /* Reserva estructura principal. */
-    *v1 = (vectorP)malloc(sizeof(struct STVECTOR));
-    if (*v1 == NULL)
-        return;
-
-    /* Estado inicial consistente antes de reserva de datos. */
-    (*v1)->datos = NULL;
-    (*v1)->tam = tam1;
-
-    /* Reserva almacenamiento de elementos. */
-    (*v1)->datos = (TELEMENTO *)malloc(tam1 * sizeof(TELEMENTO));
-   
-    if ((*v1)->datos == NULL)
-    {
-        /* Si falla reserva interna, libera cabecera para evitar fuga. */
-        free(*v1);
-        *v1 = NULL;
-        return;
-    }
-
-    /* Inicializa todas las celdas a 0 para uso seguro inmediato. */
-    for (i = 0; i < tam1; i++)
-        (*v1)->datos[i] = 0;
+    crear_bytes(v1, tam1, sizeof(TELEMENTO));
 }
 
 /* Asigna un valor en posicion si el vector y el indice son validos. */
 void asignar(vectorP v1, unsigned long posicion, TELEMENTO valor)
 {
-    if (v1 == NULL || v1->datos == NULL || posicion >= v1->tam)
+    TELEMENTO *arr;
+
+    if (v1 == NULL || v1->datos == NULL || posicion >= v1->tam ||
+        v1->tam_elemento != sizeof(TELEMENTO))
         return;
 
-    v1->datos[posicion] = valor;
+    arr = (TELEMENTO *)v1->datos;
+    arr[posicion] = valor;
 }
 
 /* Libera memoria del vector y anula el puntero externo. */
@@ -85,10 +105,14 @@ void liberar(vectorP *v1)
 /* Obtiene valor en posicion; retorna 0 si indice/puntero es invalido. */
 TELEMENTO recuperar(vectorP v1, unsigned long posicion)
 {
-    if (v1 == NULL || v1->datos == NULL || posicion >= v1->tam)
+    TELEMENTO *arr;
+
+    if (v1 == NULL || v1->datos == NULL || posicion >= v1->tam ||
+        v1->tam_elemento != sizeof(TELEMENTO))
         return 0;
 
-    return v1->datos[posicion];
+    arr = (TELEMENTO *)v1->datos;
+    return arr[posicion];
 }
 
 /* Devuelve tamano reservado del vector. */

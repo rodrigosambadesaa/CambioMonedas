@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include "bigint.h"
@@ -203,7 +204,6 @@ int bigint_subtract(const BigInt *a, const BigInt *b, BigInt *out)
         int db = (lb > k) ? (b->digits[lb - 1 - k] - '0') : 0;
         int d = da - db - borrow;
 
-       
         if (d < 0)
         {
             d += 10;
@@ -271,7 +271,7 @@ int bigint_multiply(const BigInt *a, const BigInt *b, BigInt *out)
     }
 
     tmp = (char *)malloc(n + 1);
-   
+
     if (tmp == NULL)
     {
         free(acc);
@@ -316,7 +316,7 @@ int bigint_divmod(const BigInt *a, const BigInt *b, BigInt *quotient, BigInt *re
 
     if (!bigint_init(&rem, "0"))
         return 0;
-   
+
     if (!bigint_set(&d, b))
     {
         bigint_free(&rem);
@@ -341,13 +341,13 @@ int bigint_divmod(const BigInt *a, const BigInt *b, BigInt *quotient, BigInt *re
 
         if (!bigint_multiply(&rem, &(BigInt){"10"}, &rem10))
             goto cleanup;
-       
+
         if (!bigint_init(&digit, digTxt))
         {
             bigint_free(&rem10);
             goto cleanup;
         }
-       
+
         if (!bigint_add(&rem10, &digit, &nuevoRem))
         {
             bigint_free(&rem10);
@@ -359,7 +359,6 @@ int bigint_divmod(const BigInt *a, const BigInt *b, BigInt *quotient, BigInt *re
         bigint_free(&rem10);
         bigint_free(&digit);
 
-       
         while (bigint_compare(&rem, &d) >= 0)
         {
             BigInt tmp = {0};
@@ -382,7 +381,7 @@ int bigint_divmod(const BigInt *a, const BigInt *b, BigInt *quotient, BigInt *re
         if (nq == NULL)
             goto cleanup;
         qtmp.digits = nq;
-       
+
         if (!bigint_set(&rtmp, &rem) && !bigint_init(&rtmp, rem.digits))
         {
             bigint_free(&qtmp);
@@ -405,17 +404,32 @@ cleanup:
 /* bigint_array_create: Funcion de precision arbitraria para operar con numeros grandes. */
 int bigint_array_create(BigIntArray *arr, size_t len)
 {
+    unsigned long len_vector;
+
     if (arr == NULL || len == 0)
         return 0;
 
-    arr->items = (BigInt *)calloc(len, sizeof(BigInt));
-    if (arr->items == NULL)
+    if (len > (size_t)ULONG_MAX)
         return 0;
 
-    arr->len = len;
+    bigint_array_free(arr);
+
+    len_vector = (unsigned long)len;
+    crear_bytes(&arr->storage, len_vector, sizeof(BigInt));
+    if (arr->storage == NULL)
+        return 0;
+
+    arr->items = (BigInt *)datos(arr->storage);
+    if (arr->items == NULL)
+    {
+        liberar(&arr->storage);
+        return 0;
+    }
+
+    arr->len = (size_t)tamano(&arr->storage);
     for (size_t i = 0; i < len; i++)
     {
-       
+
         if (!bigint_init(&arr->items[i], "0"))
         {
             bigint_array_free(arr);
@@ -441,14 +455,22 @@ void bigint_array_free(BigIntArray *arr)
     if (arr == NULL)
         return;
 
-   
     if (arr->items != NULL)
     {
         for (size_t i = 0; i < arr->len; i++)
             bigint_free(&arr->items[i]);
+    }
+
+    if (arr->storage != NULL)
+    {
+        liberar(&arr->storage);
+    }
+    else if (arr->items != NULL)
+    {
         free(arr->items);
     }
 
     arr->items = NULL;
     arr->len = 0;
+    arr->storage = NULL;
 }

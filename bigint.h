@@ -2,6 +2,7 @@
 #define BIGINT_H
 
 #include <stddef.h>
+#include "vector_dinamico.h"
 
 typedef struct
 {
@@ -12,6 +13,7 @@ typedef struct
 {
     BigInt *items;
     size_t len;
+    vectorP storage;
 } BigIntArray;
 
 int bigint_init(BigInt *n, const char *text);
