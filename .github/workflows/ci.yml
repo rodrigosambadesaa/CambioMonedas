@@ -229,3 +229,11 @@ jobs:
 
       - name: Docker test all modes
         run: docker compose run --rm progvoraz-test
+
+      - name: Docker persistencia reporte global
+        run: |
+          cp reporte_global.txt reporte_global_before.txt || true
+          printf "g\n\nsalir\n" | docker compose run --rm progvoraz-console
+          test -f reporte_global.txt
+          test -s reporte_global.txt
+          rm -f reporte_global_before.txt

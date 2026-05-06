@@ -8,6 +8,7 @@ services:
       - ./monedas.txt:/app/monedas.txt:ro
       - ./stock.txt:/app/stock.txt
       - ./historial.txt:/app/historial.txt
+      - ./reporte_global.txt:/app/reporte_global.txt
     stdin_open: true
     tty: true
     command: [ "console" ]
@@ -21,6 +22,7 @@ services:
       - ./monedas.txt:/app/monedas.txt:ro
       - ./stock.txt:/app/stock.txt
       - ./historial.txt:/app/historial.txt
+      - ./reporte_global.txt:/app/reporte_global.txt
     stdin_open: true
     tty: true
     command: [ "gui" ]
@@ -34,4 +36,5 @@ services:
       - ./monedas.txt:/app/monedas.txt:ro
       - ./stock.txt:/app/stock.txt
       - ./historial.txt:/app/historial.txt
+      - ./reporte_global.txt:/app/reporte_global.txt
     command: [ "test" ]

@@ -13,10 +13,18 @@ fi
 stock_backup="$(mktemp)"
 cp stock.txt "$stock_backup"
 
+report_backup="$(mktemp)"
+if [[ -f reporte_global.txt ]]; then
+  cp reporte_global.txt "$report_backup"
+else
+  : > "$report_backup"
+fi
+
 cleanup() {
   cp "$stock_backup" stock.txt || true
+  cp "$report_backup" reporte_global.txt || true
   rm -f "$stock_backup"
-  rm -f stock_snapshot.txt reporte_global.txt
+  rm -f "$report_backup" stock_snapshot.txt
 }
 trap cleanup EXIT
 
