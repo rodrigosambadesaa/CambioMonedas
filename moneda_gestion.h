@@ -30,4 +30,26 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock);
  */
 int validar_consistencia_moneda(const char *nombreMoneda);
 
+/*
+ * Crea una copia completa del archivo stock.txt en la ruta indicada.
+ * Si rutaSnapshot es NULL o vacia, usa "stock_snapshot.txt".
+ * Devuelve 1 si pudo copiar; 0 en caso contrario.
+ */
+int crear_snapshot_stock(const char *rutaSnapshot);
+
+/*
+ * Restaura stock.txt desde una copia previa.
+ * Si rutaSnapshot es NULL o vacia, usa "stock_snapshot.txt".
+ * Devuelve 1 si pudo restaurar; 0 en caso contrario.
+ */
+int restaurar_snapshot_stock(const char *rutaSnapshot);
+
+/*
+ * Exporta un reporte global por moneda con cantidad de denominaciones,
+ * total de piezas y valor total de stock.
+ * Si rutaReporte es NULL o vacia, usa "reporte_global.txt".
+ * Devuelve 1 si pudo generar el archivo; 0 en caso contrario.
+ */
+int exportar_reporte_global(const char *rutaReporte);
+
 #endif

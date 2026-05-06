@@ -38,6 +38,9 @@
 #define ID_EDIT_LIMITE 1023
 #define ID_BTN_HISTORIAL 1024
 #define ID_BTN_RESUMEN 1025
+#define ID_BTN_SNAPSHOT 1026
+#define ID_BTN_RESTAURAR 1027
+#define ID_BTN_REPORTE 1028
 
 static HWND g_comboMoneda;
 static HWND g_listStock;
@@ -64,6 +67,9 @@ static HWND g_editPago;
 static HWND g_editLimite;
 static HWND g_btnHistorial;
 static HWND g_btnResumen;
+static HWND g_btnSnapshot;
+static HWND g_btnRestaurar;
+static HWND g_btnReporte;
 
 static char g_monedas[MAX_MONEDAS][MAX_NOMBRE];
 static int g_monedasCount = 0;
@@ -72,6 +78,8 @@ static int g_modo_stock_limitado = 1;
 
 static BigIntArray g_denom = {0};
 static BigIntArray g_stock = {0};
+
+static int cargar_moneda_seleccionada(void);
 
 /* registrar_historial: Guarda transacciones en historial.txt */
 static void registrar_historial(const char *mensaje)
@@ -196,6 +204,55 @@ static void mostrar_error(const char *titulo, const char *mensaje)
 static void mostrar_info(const char *titulo, const char *mensaje)
 {
     MessageBoxA(NULL, mensaje, titulo, MB_ICONINFORMATION | MB_OK);
+}
+
+static void ejecutar_operacion_global_gui(const char *accion)
+{
+    if (accion == NULL)
+        return;
+
+    if (strcmp(accion, "snapshot") == 0)
+    {
+        if (crear_snapshot_stock("stock_snapshot.txt"))
+        {
+            registrar_historial("Snapshot de stock creado (windows)");
+            mostrar_info("Snapshot", "Snapshot creado: stock_snapshot.txt");
+        }
+        else
+        {
+            mostrar_error("Snapshot", "No se pudo crear snapshot de stock.");
+        }
+        return;
+    }
+
+    if (strcmp(accion, "restaurar") == 0)
+    {
+        if (restaurar_snapshot_stock("stock_snapshot.txt"))
+        {
+            registrar_historial("Stock restaurado desde snapshot (windows)");
+            if (g_monedaActiva >= 0)
+                cargar_moneda_seleccionada();
+            mostrar_info("Restaurar", "Stock restaurado desde stock_snapshot.txt");
+        }
+        else
+        {
+            mostrar_error("Restaurar", "No se pudo restaurar stock desde snapshot.");
+        }
+        return;
+    }
+
+    if (strcmp(accion, "reporte") == 0)
+    {
+        if (exportar_reporte_global("reporte_global.txt"))
+        {
+            registrar_historial("Reporte global exportado (windows)");
+            mostrar_info("Reporte", "Reporte generado: reporte_global.txt");
+        }
+        else
+        {
+            mostrar_error("Reporte", "No se pudo generar reporte global.");
+        }
+    }
 }
 
 /* limpiar_resultado_cambio: Purga el TextBox o ListBox donde se muestran los billetes calculados por el backtracking. */
@@ -1488,6 +1545,15 @@ static void crear_controles(HWND hwnd)
     g_btnResumen = CreateWindowA("BUTTON", "Resumen", WS_CHILD | WS_VISIBLE,
                                  465, 628, 80, 28, hwnd, (HMENU)ID_BTN_RESUMEN, NULL, NULL);
 
+    g_btnSnapshot = CreateWindowA("BUTTON", "Snapshot", WS_CHILD | WS_VISIBLE,
+                                  20, 770, 90, 26, hwnd, (HMENU)ID_BTN_SNAPSHOT, NULL, NULL);
+
+    g_btnRestaurar = CreateWindowA("BUTTON", "Restaurar", WS_CHILD | WS_VISIBLE,
+                                   120, 770, 90, 26, hwnd, (HMENU)ID_BTN_RESTAURAR, NULL, NULL);
+
+    g_btnReporte = CreateWindowA("BUTTON", "Reporte", WS_CHILD | WS_VISIBLE,
+                                 220, 770, 90, 26, hwnd, (HMENU)ID_BTN_REPORTE, NULL, NULL);
+
     g_listResultado = CreateWindowA("LISTBOX", "", WS_CHILD | WS_VISIBLE | WS_BORDER | WS_HSCROLL | WS_VSCROLL | LBS_NOTIFY,
                                     20, 665, 570, 100, hwnd, (HMENU)ID_LIST_RESULTADO, NULL, NULL);
 }
@@ -1576,6 +1642,24 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
         if (id == ID_BTN_RESUMEN)
         {
             mostrar_resumen_moneda_gui();
+            return 0;
+        }
+
+        if (id == ID_BTN_SNAPSHOT)
+        {
+            ejecutar_operacion_global_gui("snapshot");
+            return 0;
+        }
+
+        if (id == ID_BTN_RESTAURAR)
+        {
+            ejecutar_operacion_global_gui("restaurar");
+            return 0;
+        }
+
+        if (id == ID_BTN_REPORTE)
+        {
+            ejecutar_operacion_global_gui("reporte");
             return 0;
         }
 

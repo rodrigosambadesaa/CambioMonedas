@@ -16,6 +16,7 @@ cp stock.txt "$stock_backup"
 cleanup() {
   cp "$stock_backup" stock.txt || true
   rm -f "$stock_backup"
+  rm -f stock_snapshot.txt reporte_global.txt
 }
 trap cleanup EXIT
 
@@ -93,6 +94,16 @@ run_case "Consola modo b (restriccion por limite)" \
   "Restriccion de monedas (N, =N, N-M, volver, modo o salir):" \
   "b\n${currency}\n5\n30\n=2\nvolver\nmodo\nsalir\n"
 
+run_case "Consola operacion global snapshot" \
+  ./progvoraz \
+  "Snapshot de stock creado en stock_snapshot.txt" \
+  "s\n\nsalir\n"
+
+run_case "Consola operacion global reporte" \
+  ./progvoraz \
+  "Reporte global generado en reporte_global.txt" \
+  "g\n\nsalir\n"
+
 run_case "Consola modo c (admin)" \
   ./progvoraz \
   "Accion admin (anadir/quitar/historial/resumen, volver, modo, salir):" \
@@ -100,17 +111,22 @@ run_case "Consola modo c (admin)" \
 
 run_case "GUI portable modo limitado" \
   ./progvoraz_gui \
-  "Accion (calcular/caja/limite/especifico/historial/resumen/anadir/quitar/modo/volver/salir):" \
+  "Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/anadir/quitar/modo/volver/salir):" \
   "limitado\n${currency}\ncalcular\n30\nsalir\n"
 
 run_case "GUI portable modo ilimitado" \
   ./progvoraz_gui \
-  "Accion (calcular/caja/limite/especifico/historial/resumen/modo/volver/salir):" \
+  "Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/modo/volver/salir):" \
   "ilimitado\n${currency}\ncalcular\n30\nsalir\n"
 
 run_case "GUI portable historial desde modo" \
   ./progvoraz_gui \
   "--- HISTORIAL DE TRANSACCIONES ---" \
   "historial\n\nsalir\n"
+
+run_case "GUI portable operacion global reporte" \
+  ./progvoraz_gui \
+  "Reporte global generado: reporte_global.txt" \
+  "reporte\n\nsalir\n"
 
 echo "Todas las pruebas en contenedor han finalizado correctamente."

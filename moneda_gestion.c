@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #ifdef _WIN32
 #include <io.h>
 #else
@@ -357,5 +358,274 @@ int validar_consistencia_moneda(const char *nombreMoneda)
 fin:
     bigint_array_free(&denom);
     bigint_array_free(&stock);
+    return ok;
+}
+
+static const char *ruta_o_default(const char *ruta, const char *defecto)
+{
+    if (ruta == NULL || *ruta == '\0')
+        return defecto;
+    return ruta;
+}
+
+static int copiar_archivo_binario(const char *origen, const char *destino)
+{
+    FILE *in = NULL;
+    FILE *out = NULL;
+    unsigned char buffer[4096];
+    size_t leidos;
+    int ok = 1;
+
+    if (origen == NULL || destino == NULL)
+        return 0;
+
+    in = fopen(origen, "rb");
+    if (in == NULL)
+        return 0;
+
+    out = fopen(destino, "wb");
+    if (out == NULL)
+    {
+        fclose(in);
+        return 0;
+    }
+
+    while ((leidos = fread(buffer, 1, sizeof(buffer), in)) > 0)
+    {
+        if (fwrite(buffer, 1, leidos, out) != leidos)
+        {
+            ok = 0;
+            break;
+        }
+    }
+
+    if (ferror(in))
+        ok = 0;
+
+    if (fclose(out) != 0)
+        ok = 0;
+    fclose(in);
+
+    if (!ok)
+        remove(destino);
+
+    return ok;
+}
+
+int crear_snapshot_stock(const char *rutaSnapshot)
+{
+    const char *ruta = ruta_o_default(rutaSnapshot, "stock_snapshot.txt");
+    return copiar_archivo_binario("stock.txt", ruta);
+}
+
+int restaurar_snapshot_stock(const char *rutaSnapshot)
+{
+    const char *ruta = ruta_o_default(rutaSnapshot, "stock_snapshot.txt");
+    return copiar_archivo_binario(ruta, "stock.txt");
+}
+
+static int cargar_claves_monedas_archivo(const char *archivo,
+                                         char claves[][MAX_TOKEN],
+                                         size_t max_claves,
+                                         size_t *cantidad)
+{
+    FILE *fp;
+    char token[MAX_TOKEN];
+
+    if (archivo == NULL || claves == NULL || cantidad == NULL)
+        return 0;
+
+    *cantidad = 0;
+    fp = fopen(archivo, "r");
+    if (fp == NULL)
+        return 0;
+
+    while (fscanf(fp, "%255s", token) == 1)
+    {
+        size_t i;
+        int repetida = 0;
+
+        if (strcmp(token, "-1") == 0 || es_texto_bigint_valido(token))
+            continue;
+
+        for (i = 0; i < *cantidad; i++)
+        {
+            if (strcmp(claves[i], token) == 0)
+            {
+                repetida = 1;
+                break;
+            }
+        }
+
+        if (repetida)
+            continue;
+
+        if (*cantidad >= max_claves)
+        {
+            fclose(fp);
+            return 0;
+        }
+
+        snprintf(claves[*cantidad], MAX_TOKEN, "%s", token);
+        (*cantidad)++;
+    }
+
+    fclose(fp);
+    return 1;
+}
+
+int exportar_reporte_global(const char *rutaReporte)
+{
+    const char *ruta = ruta_o_default(rutaReporte, "reporte_global.txt");
+    FILE *fp = NULL;
+    char monedas[128][MAX_TOKEN];
+    size_t cantidad_monedas = 0;
+    size_t i;
+    BigInt total_piezas_global = {0};
+    BigInt total_valor_global = {0};
+    int ok = 0;
+
+    if (!cargar_claves_monedas_archivo("monedas.txt", monedas, 128, &cantidad_monedas))
+        return 0;
+
+    fp = fopen(ruta, "w");
+    if (fp == NULL)
+        return 0;
+
+    if (!bigint_init(&total_piezas_global, "0") || !bigint_init(&total_valor_global, "0"))
+        goto cleanup;
+
+    {
+        time_t ahora = time(NULL);
+        struct tm *tm_info = localtime(&ahora);
+        if (tm_info != NULL)
+        {
+            fprintf(fp,
+                    "Reporte global de inventario\n"
+                    "Generado: %04d-%02d-%02d %02d:%02d:%02d\n\n",
+                    tm_info->tm_year + 1900,
+                    tm_info->tm_mon + 1,
+                    tm_info->tm_mday,
+                    tm_info->tm_hour,
+                    tm_info->tm_min,
+                    tm_info->tm_sec);
+        }
+        else
+        {
+            fprintf(fp, "Reporte global de inventario\n\n");
+        }
+    }
+
+    for (i = 0; i < cantidad_monedas; i++)
+    {
+        BigIntArray denom = {0};
+        BigIntArray stock = {0};
+        BigInt total_piezas = {0};
+        BigInt total_valor = {0};
+        size_t j;
+
+        if (!cargar_denominaciones_moneda(monedas[i], &denom) ||
+            !cargar_stock_moneda(monedas[i], &stock) ||
+            denom.len == 0 || stock.len != denom.len)
+        {
+            bigint_array_free(&denom);
+            bigint_array_free(&stock);
+            continue;
+        }
+
+        if (!bigint_init(&total_piezas, "0") || !bigint_init(&total_valor, "0"))
+        {
+            bigint_array_free(&denom);
+            bigint_array_free(&stock);
+            bigint_free(&total_piezas);
+            bigint_free(&total_valor);
+            goto cleanup;
+        }
+
+        for (j = 0; j < denom.len; j++)
+        {
+            BigInt nuevo_total_piezas = {0};
+            BigInt parcial_valor = {0};
+            BigInt nuevo_total_valor = {0};
+
+            if (!bigint_add(&total_piezas, &stock.items[j], &nuevo_total_piezas) ||
+                !bigint_multiply(&denom.items[j], &stock.items[j], &parcial_valor) ||
+                !bigint_add(&total_valor, &parcial_valor, &nuevo_total_valor))
+            {
+                bigint_free(&nuevo_total_piezas);
+                bigint_free(&parcial_valor);
+                bigint_free(&nuevo_total_valor);
+                bigint_array_free(&denom);
+                bigint_array_free(&stock);
+                bigint_free(&total_piezas);
+                bigint_free(&total_valor);
+                goto cleanup;
+            }
+
+            bigint_free(&total_piezas);
+            total_piezas = nuevo_total_piezas;
+            bigint_free(&total_valor);
+            total_valor = nuevo_total_valor;
+            bigint_free(&parcial_valor);
+        }
+
+        fprintf(fp,
+                "Moneda: %s\n"
+                "  Denominaciones: %zu\n"
+                "  Piezas en stock: %s\n"
+                "  Valor total: %s c\n\n",
+                monedas[i],
+                denom.len,
+                total_piezas.digits,
+                total_valor.digits);
+
+        {
+            BigInt nuevo_global_piezas = {0};
+            BigInt nuevo_global_valor = {0};
+
+            if (!bigint_add(&total_piezas_global, &total_piezas, &nuevo_global_piezas) ||
+                !bigint_add(&total_valor_global, &total_valor, &nuevo_global_valor))
+            {
+                bigint_free(&nuevo_global_piezas);
+                bigint_free(&nuevo_global_valor);
+                bigint_array_free(&denom);
+                bigint_array_free(&stock);
+                bigint_free(&total_piezas);
+                bigint_free(&total_valor);
+                goto cleanup;
+            }
+
+            bigint_free(&total_piezas_global);
+            total_piezas_global = nuevo_global_piezas;
+            bigint_free(&total_valor_global);
+            total_valor_global = nuevo_global_valor;
+        }
+
+        bigint_array_free(&denom);
+        bigint_array_free(&stock);
+        bigint_free(&total_piezas);
+        bigint_free(&total_valor);
+    }
+
+    fprintf(fp,
+            "Totales globales\n"
+            "  Monedas procesadas: %zu\n"
+            "  Piezas globales: %s\n"
+            "  Valor global: %s c\n",
+            cantidad_monedas,
+            total_piezas_global.digits,
+            total_valor_global.digits);
+
+    ok = 1;
+
+cleanup:
+    bigint_free(&total_piezas_global);
+    bigint_free(&total_valor_global);
+    if (fp != NULL)
+    {
+        fclose(fp);
+        if (!ok)
+            remove(ruta);
+    }
     return ok;
 }
