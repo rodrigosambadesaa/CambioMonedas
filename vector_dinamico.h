@@ -1,11 +1,31 @@
 #ifndef VECTOR_DINAMICO_H
 #define VECTOR_DINAMICO_H
 
+#include <stddef.h>
+
 /* Tipo base almacenado por el vector dinamico. */
 typedef int TELEMENTO;
 
 /* Puntero opaco a la estructura interna del vector. */
 typedef struct STVECTOR *vectorP;
+
+/*
+ * Reserva memoria para un vector generico de 'tam1' elementos,
+ * cada uno de tamano 'tam_elemento' bytes.
+ */
+void crear_bytes(vectorP *v1, unsigned long tam1, size_t tam_elemento);
+
+/*
+ * Retorna el puntero a la memoria contigua del vector generico.
+ * Devuelve NULL si el vector no existe.
+ */
+void *datos(vectorP v1);
+
+/*
+ * Retorna el tamano en bytes de cada elemento del vector generico.
+ * Devuelve 0 si el vector no existe.
+ */
+size_t tam_elemento_vector(vectorP v1);
 
 /*
  * Reserva memoria para un vector de tam1 elementos.
