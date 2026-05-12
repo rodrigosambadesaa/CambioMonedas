@@ -9,7 +9,7 @@
             ],
             "defines": [],
             "compilerPath": "gcc",
-            "cStandard": "c11",
+            "cStandard": "c23",
             "cppStandard": "c++17",
             "intelliSenseMode": "windows-gcc-x64"
         }

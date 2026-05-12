@@ -955,13 +955,16 @@ static int aplicar_cambio_administrador(BigIntArray *stock, size_t idx, const Bi
     return 1;
 }
 
-/* pedir_subopcion_cambio: Interfaz para modo "caja registradora" avanzado del modo limitado. */
-static int pedir_subopcion_cambio(void)
+/* pedir_subopcion_cambio: Interfaz para sub-opciones de usuario segun el modo activo. */
+static int pedir_subopcion_cambio(int permitir_limite)
 {
     char buffer[32];
     char comando[32];
 
-    printf("Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4 / limite|5|l, volver, modo o salir): ");
+    if (permitir_limite)
+        printf("Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4 / limite|5|l, volver, modo o salir): ");
+    else
+        printf("Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4, volver, modo o salir): ");
     if (!leer_linea(buffer, sizeof(buffer)))
         return -1;
 
@@ -986,7 +989,7 @@ static int pedir_subopcion_cambio(void)
         return 6;
     if (strcmp(comando, "resumen") == 0 || strcmp(comando, "r") == 0 || strcmp(comando, "4") == 0)
         return 7;
-    if (strcmp(comando, "limite") == 0 || strcmp(comando, "l") == 0 || strcmp(comando, "5") == 0)
+    if (permitir_limite && (strcmp(comando, "limite") == 0 || strcmp(comando, "l") == 0 || strcmp(comando, "5") == 0))
         return 8;
 
     return 0;
@@ -1631,7 +1634,7 @@ int app_console_run(void)
                 /* Caso MODO USUARIO NORMAL (Opciones A y B). */
                 if (opcion == 'a' || opcion == 'b')
                 {
-                    subopcionStock = pedir_subopcion_cambio();
+                    subopcionStock = pedir_subopcion_cambio(opcion == 'b');
 
                     /* Validacion estricta magiks menu... */
                     if (subopcionStock == -1)

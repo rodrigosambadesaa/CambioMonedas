@@ -9,7 +9,7 @@ TEST_APP := test_progvoraz
 TEST_SRC := tests/test_bigint_algoritmo.c vector_dinamico.c bigint.c algoritmo_cambio.c
 
 CC ?= gcc
-CFLAGS ?= -std=c11 -Wall -Wextra -Wpedantic
+CFLAGS ?= -std=c2x -Wall -Wextra -Wpedantic
 LDFLAGS ?=
 
 BIN_EXT :=

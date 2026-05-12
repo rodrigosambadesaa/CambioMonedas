@@ -139,14 +139,14 @@ En Linux esos comandos ejecutan GUI portable (panel administrador en terminal).
 ### Opcion 2: GCC directo
 
 ```bash
-gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz
+gcc -std=c2x -Wall -Wextra -Wpedantic -O2 main.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz
 ./progvoraz
 ```
 
 En Windows:
 
 ```powershell
-gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz.exe
+gcc -std=c2x -Wall -Wextra -Wpedantic -O2 main.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz.exe
 .\progvoraz.exe
 ```
 
@@ -157,7 +157,7 @@ En Linux el ejecutable no usa extension `.exe`.
 Compilacion:
 
 ```bash
-gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz
+gcc -std=c2x -Wall -Wextra -Wpedantic -O2 main.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz
 ```
 
 Ejecucion:
@@ -206,7 +206,7 @@ El repositorio ya incluye configuracion nativa de VS Code en `.vscode/`:
 
 - `.vscode/tasks.json`: tareas de build y run para consola y GUI.
 - `.vscode/launch.json`: perfiles de depuracion para consola y GUI.
-- `.vscode/c_cpp_properties.json`: configuracion de IntelliSense para C11.
+- `.vscode/c_cpp_properties.json`: configuracion de IntelliSense para C23.
 - `.vscode/extensions.json`: extensiones recomendadas.
 
 Flujo sugerido en VS Code:

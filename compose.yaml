@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     image: progvoraz:latest
+    pull_policy: build
     volumes:
       - ./monedas.txt:/app/monedas.txt:ro
       - ./stock.txt:/app/stock.txt
@@ -18,6 +19,7 @@ services:
       context: .
       dockerfile: Dockerfile
     image: progvoraz:latest
+    pull_policy: build
     volumes:
       - ./monedas.txt:/app/monedas.txt:ro
       - ./stock.txt:/app/stock.txt
@@ -32,6 +34,7 @@ services:
       context: .
       dockerfile: Dockerfile
     image: progvoraz:latest
+    pull_policy: build
     volumes:
       - ./monedas.txt:/app/monedas.txt:ro
       - ./stock.txt:/app/stock.txt
