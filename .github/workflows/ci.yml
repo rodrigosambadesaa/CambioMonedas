@@ -21,11 +21,11 @@ jobs:
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
-        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c app_console.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz
+        run: gcc -std=c2x -Wall -Wextra -Wpedantic -O2 main.c app_console.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz
 
       - name: Build GUI (Linux portable)
         if: runner.os == 'Linux'
-        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 gui_portable.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz_gui
+        run: gcc -std=c2x -Wall -Wextra -Wpedantic -O2 gui_portable.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz_gui
 
       - name: Unit tests (Linux)
         if: runner.os == 'Linux'
@@ -33,7 +33,7 @@ jobs:
 
       - name: Build (macOS)
         if: runner.os == 'macOS'
-        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c app_console.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz
+        run: gcc -std=c2x -Wall -Wextra -Wpedantic -O2 main.c app_console.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz
 
       - name: Swift toolchain info (macOS)
         if: runner.os == 'macOS'
@@ -47,7 +47,7 @@ jobs:
 
       - name: Build GUI (macOS portable fallback)
         if: runner.os == 'macOS'
-        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 gui_portable.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz_gui_portable
+        run: gcc -std=c2x -Wall -Wextra -Wpedantic -O2 gui_portable.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz_gui_portable
 
       - name: Unit tests (macOS)
         if: runner.os == 'macOS'
@@ -109,19 +109,19 @@ jobs:
       - name: Build (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 main.c app_console.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz.exe
+        run: gcc -std=c2x -Wall -Wextra -Wpedantic -O2 main.c app_console.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz.exe
 
       - name: Build GUI (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: gcc -std=c11 -Wall -Wextra -Wpedantic -O2 gui_window.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz_gui.exe -mwindows
+        run: gcc -std=c2x -Wall -Wextra -Wpedantic -O2 gui_window.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz_gui.exe -mwindows
 
       - name: Unit tests (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force .dist | Out-Null
-          gcc -std=c11 -Wall -Wextra -Wpedantic -O2 -I. tests/test_bigint_algoritmo.c vector_dinamico.c bigint.c algoritmo_cambio.c -o .dist/test_progvoraz.exe
+          gcc -std=c2x -Wall -Wextra -Wpedantic -O2 -I. tests/test_bigint_algoritmo.c vector_dinamico.c bigint.c algoritmo_cambio.c -o .dist/test_progvoraz.exe
           .\.dist\test_progvoraz.exe
 
       - name: Smoke test (Windows)

@@ -6,7 +6,7 @@
             "type": "shell",
             "command": "gcc",
             "args": [
-                "-std=c11",
+                "-std=c2x",
                 "-Wall",
                 "-Wextra",
                 "-Wpedantic",
@@ -33,7 +33,7 @@
             "type": "shell",
             "command": "gcc",
             "args": [
-                "-std=c11",
+                "-std=c2x",
                 "-Wall",
                 "-Wextra",
                 "-Wpedantic",
@@ -62,7 +62,7 @@
             "type": "shell",
             "command": "gcc",
             "args": [
-                "-std=c11",
+                "-std=c2x",
                 "-Wall",
                 "-Wextra",
                 "-Wpedantic",
@@ -85,7 +85,7 @@
             "type": "shell",
             "command": "gcc",
             "args": [
-                "-std=c11",
+                "-std=c2x",
                 "-Wall",
                 "-Wextra",
                 "-Wpedantic",
