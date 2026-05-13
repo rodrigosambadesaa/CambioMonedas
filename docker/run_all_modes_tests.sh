@@ -84,7 +84,7 @@ run_case_updates_stock() {
 
 run_case "Consola modo a (tradicional)" \
   ./progvoraz \
-  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4 / limite|5|l, volver, modo o salir):" \
+  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4, volver, modo o salir):" \
   "a\n${currency}\ntradicional\n30\nsalir\n"
 
 run_case "Consola modo b (tradicional)" \
