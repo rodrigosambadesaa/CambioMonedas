@@ -61,7 +61,7 @@ jobs:
       - name: Smoke test limite (Linux)
         if: runner.os == 'Linux'
         run: |
-          printf "a\neuro\n5\n30\n=2\nsalir\n" | ./progvoraz
+          printf "b\neuro\n5\n30\n=2\nsalir\n" | ./progvoraz
 
       - name: Smoke test reporte global (Linux)
         if: runner.os == 'Linux'
@@ -81,7 +81,7 @@ jobs:
       - name: Smoke test limite (macOS)
         if: runner.os == 'macOS'
         run: |
-          printf "a\neuro\n5\n30\n=2\nsalir\n" | ./progvoraz
+          printf "b\neuro\n5\n30\n=2\nsalir\n" | ./progvoraz
 
       - name: Smoke test reporte global (macOS)
         if: runner.os == 'macOS'
@@ -141,7 +141,7 @@ jobs:
         shell: pwsh
         run: |
           @"
-          a
+          b
           euro
           5
           30
