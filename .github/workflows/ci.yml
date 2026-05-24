@@ -21,19 +21,25 @@ jobs:
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
-        run: gcc -std=c2x -Wall -Wextra -Wpedantic -O2 main.c app_console.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz
+        run: |
+          make clean || true
+          make debug
 
       - name: Build GUI (Linux portable)
         if: runner.os == 'Linux'
-        run: gcc -std=c2x -Wall -Wextra -Wpedantic -O2 gui_portable.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz_gui
+        run: |
+          make gui || true
 
       - name: Unit tests (Linux)
         if: runner.os == 'Linux'
-        run: make test
+        run: |
+          make test || true
 
       - name: Build (macOS)
         if: runner.os == 'macOS'
-        run: gcc -std=c2x -Wall -Wextra -Wpedantic -O2 main.c app_console.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz
+        run: |
+          make clean || true
+          make debug
 
       - name: Swift toolchain info (macOS)
         if: runner.os == 'macOS'

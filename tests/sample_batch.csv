@@ -1,0 +1,4 @@
+mode,moneda,monto,range
+a,Euro,1500,
+b,Euro,1500,
+a,Dolar,12345,1-5

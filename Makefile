@@ -1,12 +1,12 @@
 APP := progvoraz
-SRC := main.c app_console.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c
+SRC := main.c app_console.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c csv_io.c logger.c json_io.c batch_cli.c
 GUI_APP := progvoraz_gui
 GUI_SRC_WIN := gui_window.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c
 GUI_SRC_MAC := gui_macos.swift
 GUI_SRC_PORTABLE := gui_portable.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c
 BUILD_DIR := .dist
 TEST_APP := test_progvoraz
-TEST_SRC := tests/test_bigint_algoritmo.c vector_dinamico.c bigint.c algoritmo_cambio.c
+TEST_SRC := tests/test_bigint_algoritmo.c vector_dinamico.c bigint.c algoritmo_cambio.c csv_io.c
 
 CC ?= gcc
 CFLAGS ?= -std=c2x -Wall -Wextra -Wpedantic
