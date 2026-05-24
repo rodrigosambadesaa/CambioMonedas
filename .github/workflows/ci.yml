@@ -115,12 +115,14 @@ jobs:
       - name: Build (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: gcc -std=c2x -Wall -Wextra -Wpedantic -O2 main.c app_console.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz.exe
+        run: |
+          gcc -std=c2x -Wall -Wextra -Wpedantic -O2 main.c app_console.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c csv_io.c logger.c json_io.c batch_cli.c -o progvoraz.exe
 
       - name: Build GUI (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: gcc -std=c2x -Wall -Wextra -Wpedantic -O2 gui_window.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz_gui.exe -mwindows
+        run: |
+          gcc -std=c2x -Wall -Wextra -Wpedantic -O2 gui_window.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c csv_io.c logger.c json_io.c -o progvoraz_gui.exe -mwindows
 
       - name: Unit tests (Windows)
         if: runner.os == 'Windows'
