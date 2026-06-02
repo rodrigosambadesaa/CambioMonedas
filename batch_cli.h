@@ -10,4 +10,9 @@
  */
 int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const char *rutaLog);
 
+/* Procesa entradas desde stdin y escribe resultados a stdout (modo streaming).
+ * Retorna 1 si pudo procesar, 0 en caso de error.
+ */
+int batch_process_stream(const char *rutaLog);
+
 #endif

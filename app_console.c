@@ -679,6 +679,27 @@ static void limpiar_arreglo(BigIntArray *arr)
 /* imprimir_resultado: Muestra la solucion del calculo de forma entendible por consola. */
 static void imprimir_resultado(const BigIntArray *monedas, const BigIntArray *solucion, const BigIntArray *stock, int usarStock)
 {
+    const char *json_env = getenv("PROGVORAZ_JSON");
+    int json_mode = json_env && json_env[0] != '\0';
+
+    if (json_mode)
+    {
+        /* Salida JSON compacta para integración */
+        printf("{\"resultado\": [");
+        for (size_t i = 0; i < monedas->len; i++)
+        {
+            if (i > 0)
+                printf(",");
+            printf("{\"denominacion\": \"%s\", \"cantidad\": \"%s\"",
+                   monedas->items[i].digits, solucion->items[i].digits);
+            if (usarStock && stock)
+                printf(", \"stock\": \"%s\"", stock->items[i].digits);
+            printf("}");
+        }
+        printf("]}\n");
+        return;
+    }
+
     dibujar_linea();
     printf("Resultado del cambio\n");
     dibujar_linea();
