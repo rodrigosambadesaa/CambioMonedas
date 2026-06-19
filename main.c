@@ -1,11 +1,61 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
+#include <strings.h>
 #include "app_console.h"
 #include "batch_cli.h"
 #include "json_io.h"
 #include "moneda_gestion.h"
 #include "server_http.h"
+#include "exchange_api.h"
+#include "algoritmo_cambio.h"
+
+/* map_currency_key: convierte un codigo ISO o nombre corto a la clave usada en monedas.txt
+ * Devuelve puntero a cadena estatica o NULL si no hay mapeo. */
+static const char *map_currency_key(const char *input)
+{
+    static char tmp[64];
+    if (!input || !*input)
+        return NULL;
+
+    /* Comparaciones comunes (case-insensitive) */
+    if (strcasecmp(input, "EUR") == 0 || strcasecmp(input, "E") == 0 || strcasecmp(input, "EURO") == 0)
+        return "euro";
+    if (strcasecmp(input, "USD") == 0 || strcasecmp(input, "US") == 0 || strcasecmp(input, "DOLAR") == 0 || strcasecmp(input, "DOLLAR") == 0)
+        return "dolar";
+    if (strcasecmp(input, "JPY") == 0 || strcasecmp(input, "YEN") == 0)
+        return "yen";
+    if (strcasecmp(input, "GBP") == 0 || strcasecmp(input, "GBP") == 0 || strcasecmp(input, "LIBRA") == 0 || strcasecmp(input, "POUND") == 0)
+        return "libra";
+    if (strcasecmp(input, "CHF") == 0 || strcasecmp(input, "FRANC") == 0 || strcasecmp(input, "FRANCO_SUIZO") == 0)
+        return "franco_suizo";
+    if (strcasecmp(input, "CAD") == 0)
+        return "dolar_canadiense";
+    if (strcasecmp(input, "AUD") == 0)
+        return "dolar_australiano";
+    if (strcasecmp(input, "CNY") == 0 || strcasecmp(input, "RMB") == 0)
+        return "yuan_chino";
+    if (strcasecmp(input, "MXN") == 0)
+        return "peso_mexicano";
+
+    /* Fallback: convierte a minusculas y reemplaza espacios por _ */
+    size_t i, j = 0;
+    for (i = 0; input[i] != '\0' && j + 1 < sizeof(tmp); i++)
+    {
+        char c = input[i];
+        if (c == ' ')
+            tmp[j++] = '_';
+        else
+            tmp[j++] = (char)tolower((unsigned char)c);
+    }
+    tmp[j] = '\0';
+    return tmp;
+}
+
+#ifndef _WIN32
+extern int setenv(const char *name, const char *value, int overwrite);
+#endif
 
 static void print_help(const char *prog)
 {
@@ -86,6 +136,11 @@ int main(int argc, char **argv)
 
     int server_flag = 0;
     const char *server_port = NULL;
+    int convert_flag = 0;
+    const char *convert_from = NULL;
+    const char *convert_to = NULL;
+    const char *convert_amount = NULL; /* in cents */
+    int convert_use_stock = 0;
 
     for (int i = 1; i < argc; i++)
     {
@@ -111,6 +166,17 @@ int main(int argc, char **argv)
             server_flag = 1;
         else if (strcmp(argv[i], "--port") == 0 && i + 1 < argc)
             server_port = argv[++i];
+        else if (strcmp(argv[i], "--convert") == 0 && i + 3 < argc)
+        {
+            convert_flag = 1;
+            convert_from = argv[++i];
+            convert_to = argv[++i];
+            convert_amount = argv[++i];
+        }
+        else if (strcmp(argv[i], "--convert-stock") == 0)
+        {
+            convert_use_stock = 1;
+        }
         else if (strcmp(argv[i], "--version") == 0 || strcmp(argv[i], "-v") == 0)
         {
             print_version();
@@ -169,6 +235,76 @@ int main(int argc, char **argv)
             return 2;
         }
         return 0;
+    }
+
+    /* Modo convert CLI no interactivo */
+    if (convert_flag)
+    {
+        double tasa = 0.0;
+        if (!fetch_exchange_rate(convert_from, convert_to, &tasa))
+        {
+            fprintf(stderr, "No se pudo obtener la tasa para %s->%s\n", convert_from, convert_to);
+            return 2;
+        }
+
+        /* Calcular monto destino en centimos: destino_cents = round(src_cents * tasa) */
+        double src_cents = atof(convert_amount);
+        double dst_cents = src_cents * tasa;
+        long long rounded = (long long)(dst_cents + 0.5);
+        char dst_str[64];
+        snprintf(dst_str, sizeof(dst_str), "%lld", rounded);
+
+        BigInt montoDestino = {0};
+        if (!bigint_init(&montoDestino, dst_str))
+        {
+            fprintf(stderr, "Error interno al crear BigInt destino.\n");
+            return 2;
+        }
+
+        BigIntArray monedas = {0};
+        BigIntArray stock = {0};
+        BigIntArray solucion = {0};
+        const char *to_key = map_currency_key(convert_to);
+        if (to_key == NULL || !validar_consistencia_moneda(to_key) || !cargar_denominaciones_moneda(to_key, &monedas))
+        {
+            fprintf(stderr, "Moneda destino no encontrada o inconsistente: %s\n", convert_to);
+            bigint_free(&montoDestino);
+            return 2;
+        }
+
+        if (convert_use_stock)
+        {
+            if (!cargar_stock_moneda(to_key, &stock))
+            {
+                fprintf(stderr, "No se encontro stock para moneda destino: %s\n", convert_to);
+                bigint_array_free(&monedas);
+                bigint_free(&montoDestino);
+                return 2;
+            }
+        }
+
+        int rc;
+        if (convert_use_stock)
+            rc = calcular_cambio_optimo_stock(&montoDestino, &monedas, &stock, &solucion);
+        else
+            rc = calcular_cambio_optimo(&montoDestino, &monedas, &solucion);
+
+        if (rc)
+        {
+            app_console_imprimir_resultado(&monedas, &solucion, convert_use_stock ? &stock : NULL, convert_use_stock ? 1 : 0);
+            printf("Convert CLI %s->%s | Origen=%s c | Destino=%s c | Tasa=%f\n",
+                   convert_from, convert_to, convert_amount, dst_str, tasa);
+        }
+        else
+        {
+            fprintf(stderr, "No se pudo calcular descomposicion en moneda destino.\n");
+        }
+
+        bigint_array_free(&monedas);
+        bigint_array_free(&stock);
+        bigint_array_free(&solucion);
+        bigint_free(&montoDestino);
+        return rc ? 0 : 2;
     }
 
     /* Modo GUI: lanzar ejecutable gráfico si disponible. */

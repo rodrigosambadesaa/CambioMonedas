@@ -36,7 +36,7 @@ run_case() {
   local output
 
   cp "$stock_backup" stock.txt
-  output="$(printf "%b" "$input" | "$exe" 2>&1 || true)"
+  output="$(printf "%b" "$input" | sh -lc "$exe" 2>&1 || true)"
 
   if ! grep -Fq -- "$expected" <<<"$output"; then
     echo "[FALLO] $name"
@@ -60,7 +60,7 @@ run_case_updates_stock() {
 
   cp "$stock_backup" stock.txt
   before="$(cat stock.txt)"
-  output="$(printf "%b" "$input" | "$exe" 2>&1 || true)"
+  output="$(printf "%b" "$input" | sh -lc "$exe" 2>&1 || true)"
   after="$(cat stock.txt)"
 
   if ! grep -Fq -- "$expected" <<<"$output"; then
@@ -86,6 +86,11 @@ run_case "Consola modo a (tradicional)" \
   ./progvoraz \
   "Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4, volver, modo o salir):" \
   "a\n${currency}\ntradicional\n30\nsalir\n"
+
+run_case "Entrypoint console mantiene menu interactivo sin TTY" \
+  "./docker/entrypoint.sh console" \
+  "Conversion aplicada: 250 euro-centimos -> 273 dolar-centimos" \
+  "x\neuro\n250\ndolar\nn\n\nsalir\n"
 
 run_case "Consola modo b (tradicional)" \
   ./progvoraz \
@@ -136,5 +141,20 @@ run_case "GUI portable operacion global reporte" \
   ./progvoraz_gui \
   "Reporte global generado: reporte_global.txt" \
   "reporte\n\nsalir\n"
+
+run_case "Consola conversion entre monedas" \
+  "PROGVORAZ_EXCHANGE_SOURCE=stub ./progvoraz" \
+  "Conversion aplicada: 250 euro-centimos -> 273 dolar-centimos" \
+  "x\neuro\n250\ndolar\nn\n\nsalir\n"
+
+run_case "GUI portable conversion entre monedas" \
+  "PROGVORAZ_EXCHANGE_SOURCE=stub ./progvoraz_gui" \
+  "Conversion aplicada: 250 euro-centimos -> 273 dolar-centimos" \
+  "convertir\neuro\n250\ndolar\nn\n\nsalir\n"
+
+run_case "Entrypoint stream sigue usando CSV Docker" \
+  "./docker/entrypoint.sh stream" \
+  "modo,moneda,monto,resultado,nota" \
+  "mode,moneda,monto,range\na,euro,250,\n"
 
 echo "Todas las pruebas en contenedor han finalizado correctamente."

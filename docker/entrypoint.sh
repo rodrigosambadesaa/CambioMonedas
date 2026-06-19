@@ -6,12 +6,15 @@ shift || true
 
 case "$mode" in
   console)
-    # Si no hay TTY en stdin asumimos modo streaming (docker non-interactive)
-    if [ ! -t 0 ]; then
-      exec /app/progvoraz --docker "$@"
-    else
-      exec /app/progvoraz "$@"
-    fi
+    exec /app/progvoraz "$@"
+    ;;
+  convert)
+    # Ejecuta conversión no interactiva: args esperados: <from> <to> <amount_cents>
+    exec /app/progvoraz --convert "$@"
+    ;;
+  convert-stock)
+    # Igual que convert pero solicita uso de stock en destino
+    exec /app/progvoraz --convert "$@" --convert-stock
     ;;
   gui)
     exec /app/progvoraz_gui "$@"

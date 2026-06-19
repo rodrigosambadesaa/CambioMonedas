@@ -17,6 +17,7 @@
 #include "bigint.h"
 #include "moneda_gestion.h"
 #include "algoritmo_cambio.h"
+#include "exchange_api.h"
 
 #include <time.h>
 
@@ -36,6 +37,54 @@ static void registrar_historial(const char *mensaje)
         }
         fclose(fp);
     }
+}
+
+/* forward prototypes: used by public wrapper below */
+static void dibujar_linea(void);
+static void imprimir_resultado(const BigIntArray *monedas, const BigIntArray *solucion, const BigIntArray *stock, int usarStock);
+/* Implementation moved here so wrapper can call it without forward-declaration issues. */
+static void imprimir_resultado(const BigIntArray *monedas, const BigIntArray *solucion, const BigIntArray *stock, int usarStock)
+{
+    const char *json_env = getenv("PROGVORAZ_JSON");
+    int json_mode = json_env && json_env[0] != '\0';
+
+    if (json_mode)
+    {
+        /* Salida JSON compacta para integración */
+        printf("{\"resultado\": [");
+        for (size_t i = 0; i < monedas->len; i++)
+        {
+            if (i > 0)
+                printf(",");
+            printf("{\"denominacion\": \"%s\", \"cantidad\": \"%s\"",
+                   monedas->items[i].digits, solucion->items[i].digits);
+            if (usarStock && stock)
+                printf(", \"stock\": \"%s\"", stock->items[i].digits);
+            printf("}");
+        }
+        printf("]}\n");
+        return;
+    }
+
+    dibujar_linea();
+    printf("Resultado del cambio\n");
+    dibujar_linea();
+
+    for (size_t i = 0; i < monedas->len; i++)
+    {
+        /* Si el modo de ejecucion estaba en 'usarStock' (Modo B o Caja)... */
+        if (usarStock)
+            printf("Moneda %s c  -> cantidad %s | stock %s\n", monedas->items[i].digits, solucion->items[i].digits, stock->items[i].digits);
+        else
+            printf("Moneda %s c  -> cantidad %s\n", monedas->items[i].digits, solucion->items[i].digits);
+    }
+
+    dibujar_linea();
+}
+/* Public wrapper: expone la impresion de resultados a otros modulos. */
+void app_console_imprimir_resultado(const BigIntArray *monedas, const BigIntArray *solucion, const BigIntArray *stock, int usarStock)
+{
+    imprimir_resultado(monedas, solucion, stock, usarStock);
 }
 
 static void registrar_historialf(const char *fmt, ...)
@@ -85,8 +134,16 @@ static void pausar_pantalla(void)
 #define MAX_MONEDA_NOMBRE 20
 #define MAX_MONEDAS_DISPONIBLES 512
 
-static void limpiar_arreglo(BigIntArray *arr);
+void limpiar_arreglo(BigIntArray *arr);
 static void mostrar_resumen_moneda(const char *monedaClave, const BigIntArray *monedas, const BigIntArray *stock, int usarStock);
+
+/* limpiar_arreglo: libera recursos asociados a un BigIntArray (wrapper sobre bigint_array_free). */
+void limpiar_arreglo(BigIntArray *arr)
+{
+    if (arr == NULL)
+        return;
+    bigint_array_free(arr);
+}
 
 /* limpiar_pantalla: Envia secuencias ANSI de escape para borrar la terminal. */
 static void limpiar_pantalla(void)
@@ -503,8 +560,9 @@ static int pedir_opcion(void)
     printf("|   s) Snapshot stock                               |\n");
     printf("|   u) Restaurar snapshot                           |\n");
     printf("|   g) Generar reporte global                       |\n");
+    printf("|   x) Conversion entre monedas                     |\n");
     dibujar_linea();
-    printf("Opcion (a/b/c/h/r/s/u/g o salir): ");
+    printf("Opcion (a/b/c/h/r/s/u/g/x o salir): ");
 
     if (!leer_linea(buffer, sizeof(buffer)))
         return -1;
@@ -527,6 +585,8 @@ static int pedir_opcion(void)
         return -6;
     if (strcmp(comando, "reporte") == 0 || strcmp(comando, "g") == 0)
         return -7;
+    if (strcmp(comando, "convertir") == 0 || strcmp(comando, "x") == 0)
+        return (int)'x';
 
     return (int)tolower((unsigned char)buffer[0]);
 }
@@ -670,51 +730,10 @@ static int copiar_arreglo_bigint(const BigIntArray *origen, BigIntArray *destino
 }
 
 /* limpiar_arreglo: Wrapper para destructores de BigInt. */
-static void limpiar_arreglo(BigIntArray *arr)
-{
-    if (arr != NULL)
-        bigint_array_free(arr);
-}
+void limpiar_arreglo(BigIntArray *arr);
+static void mostrar_resumen_moneda(const char *monedaClave, const BigIntArray *monedas, const BigIntArray *stock, int usarStock);
 
 /* imprimir_resultado: Muestra la solucion del calculo de forma entendible por consola. */
-static void imprimir_resultado(const BigIntArray *monedas, const BigIntArray *solucion, const BigIntArray *stock, int usarStock)
-{
-    const char *json_env = getenv("PROGVORAZ_JSON");
-    int json_mode = json_env && json_env[0] != '\0';
-
-    if (json_mode)
-    {
-        /* Salida JSON compacta para integración */
-        printf("{\"resultado\": [");
-        for (size_t i = 0; i < monedas->len; i++)
-        {
-            if (i > 0)
-                printf(",");
-            printf("{\"denominacion\": \"%s\", \"cantidad\": \"%s\"",
-                   monedas->items[i].digits, solucion->items[i].digits);
-            if (usarStock && stock)
-                printf(", \"stock\": \"%s\"", stock->items[i].digits);
-            printf("}");
-        }
-        printf("]}\n");
-        return;
-    }
-
-    dibujar_linea();
-    printf("Resultado del cambio\n");
-    dibujar_linea();
-
-    for (size_t i = 0; i < monedas->len; i++)
-    {
-        /* Si el modo de ejecucion estaba en 'usarStock' (Modo B o Caja)... */
-        if (usarStock)
-            printf("Moneda %s c  -> cantidad %s | stock %s\n", monedas->items[i].digits, solucion->items[i].digits, stock->items[i].digits);
-        else
-            printf("Moneda %s c  -> cantidad %s\n", monedas->items[i].digits, solucion->items[i].digits);
-    }
-
-    dibujar_linea();
-}
 
 static void imprimir_sugerencia_cercana(const BigInt *solicitado,
                                         const BigInt *cubierto,
@@ -1342,6 +1361,154 @@ static int aplicar_cambio_especifico_stock(const BigIntArray *monedas,
     return 1;
 }
 
+/* flujo_conversion_interactiva: Flujo interactivo que pide moneda origen, monto,
+ * moneda destino, obtiene la tasa desde la API y calcula el cambio en la moneda
+ * destino (usando stock o modo ilimitado segun seleccione el usuario). */
+static int flujo_conversion_interactiva(void)
+{
+    char origen[MAX_MONEDA_NOMBRE + 1];
+    char destino[MAX_MONEDA_NOMBRE + 1];
+    char claveOrigen[MAX_MONEDA_NOMBRE + 1];
+    char claveDestino[MAX_MONEDA_NOMBRE + 1];
+    char linea[64];
+    BigInt cantidad = {0};
+    BigInt cantidadDestino = {0};
+    BigIntArray monedas = {0};
+    BigIntArray stock = {0};
+    BigIntArray solucion = {0};
+    int estado;
+    int usarStock = 0;
+    double tasa = 0.0;
+
+    printf("--- Conversion entre monedas (API) ---\n");
+    printf("Moneda origen: ");
+    if (!leer_linea(origen, sizeof(origen)))
+        return 0;
+    if (origen[0] == '\0')
+    {
+        printf("Moneda origen vacia.\n");
+        return 0;
+    }
+    normalizar_clave(origen, claveOrigen, sizeof(claveOrigen));
+
+    estado = pedir_cantidad(&cantidad);
+    if (estado == -1)
+    {
+        printf("Entrada finalizada.\n");
+        bigint_free(&cantidad);
+        return 0;
+    }
+    if (estado == 2 || estado == 3)
+    {
+        bigint_free(&cantidad);
+        return 0;
+    }
+    if (estado == 0)
+    {
+        printf("Cantidad invalida.\n");
+        bigint_free(&cantidad);
+        return 0;
+    }
+
+    printf("Moneda destino: ");
+    if (!leer_linea(destino, sizeof(destino)))
+    {
+        bigint_free(&cantidad);
+        return 0;
+    }
+    if (destino[0] == '\0')
+    {
+        printf("Moneda destino vacia.\n");
+        bigint_free(&cantidad);
+        return 0;
+    }
+    normalizar_clave(destino, claveDestino, sizeof(claveDestino));
+
+    printf("Usar stock de destino? (s/n): ");
+    if (!leer_linea(linea, sizeof(linea)))
+    {
+        bigint_free(&cantidad);
+        return 0;
+    }
+    a_minusculas(linea);
+    if (linea[0] == 's' || linea[0] == 'y')
+        usarStock = 1;
+
+    if (!fetch_exchange_rate(claveOrigen, claveDestino, &tasa))
+    {
+        printf("No se pudo obtener la tasa de cambio para %s -> %s\n", claveOrigen, claveDestino);
+        bigint_free(&cantidad);
+        return 0;
+    }
+
+    /* Convertir cantidad (en centimos) multiplicando por la tasa. */
+    {
+        double src_cents = strtod(cantidad.digits, NULL);
+        double dst_cents = src_cents * tasa;
+        long long rounded = (long long)(dst_cents + 0.5);
+        char tmp[64];
+        snprintf(tmp, sizeof(tmp), "%lld", rounded);
+        if (!bigint_init(&cantidadDestino, tmp))
+        {
+            printf("Error interno al convertir monto destino.\n");
+            bigint_free(&cantidad);
+            return 0;
+        }
+    }
+
+    /* Cargar denominaciones destino. */
+    if (!validar_consistencia_moneda(claveDestino))
+    {
+        printf("Moneda destino inconsistente o no encontrada.\n");
+        goto cleanup;
+    }
+
+    if (!cargar_denominaciones_moneda(claveDestino, &monedas))
+    {
+        printf("No se encontraron denominaciones para la moneda destino.\n");
+        goto cleanup;
+    }
+
+    if (usarStock)
+    {
+        if (!cargar_stock_moneda(claveDestino, &stock))
+        {
+            printf("No se encontro stock para la moneda destino.\n");
+            goto cleanup;
+        }
+    }
+
+    if (usarStock)
+        estado = calcular_cambio_optimo_stock(&cantidadDestino, &monedas, &stock, &solucion);
+    else
+        estado = calcular_cambio_optimo(&cantidadDestino, &monedas, &solucion);
+
+    if (estado)
+    {
+        printf("Conversion aplicada: %s %s-centimos -> %s %s-centimos | tasa=%.6f\n",
+               cantidad.digits, claveOrigen, cantidadDestino.digits, claveDestino, tasa);
+        imprimir_resultado(&monedas, &solucion, usarStock ? &stock : NULL, usarStock ? 1 : 0);
+        registrar_historialf("Conversion %s->%s | Origen=%s c | Destino=%s c | Tasa=%f",
+                             claveOrigen,
+                             claveDestino,
+                             cantidad.digits,
+                             cantidadDestino.digits,
+                             tasa);
+    }
+    else
+    {
+        printf("No se pudo calcular el cambio en la moneda destino.\n");
+    }
+
+cleanup:
+    limpiar_arreglo(&monedas);
+    limpiar_arreglo(&stock);
+    limpiar_arreglo(&solucion);
+    bigint_free(&cantidad);
+    bigint_free(&cantidadDestino);
+    return 1;
+}
+
 /* app_console_run: Ejecuta la aplicación de consola completa. */
 int app_console_run(void)
 {
@@ -1363,7 +1530,7 @@ int app_console_run(void)
             while (1)
             {
                 opcion = pedir_opcion();
-                if (opcion == 'a' || opcion == 'b' || opcion == 'c')
+                if (opcion == 'a' || opcion == 'b' || opcion == 'c' || opcion == 'x')
                     break;
 
                 if (opcion == -3)
@@ -1422,6 +1589,16 @@ int app_console_run(void)
 
         if (!ejecutando)
             break;
+
+        /* Manejo de opcion especial: conversion entre monedas. */
+        if (opcion == 'x')
+        {
+            /* Ejecuta flujo interactivo de conversion y vuelve al menu principal. */
+            flujo_conversion_interactiva();
+            pausar_pantalla();
+            opcion = 0;
+            continue;
+        }
 
         /* Bucle de Sesion de Trabajo (Donde se opera con monedas repetidamente). */
         while (1)
