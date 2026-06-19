@@ -8,6 +8,7 @@
 #include "bigint.h"
 #include "moneda_gestion.h"
 #include "algoritmo_cambio.h"
+#include "exchange_api.h"
 
 #include <time.h>
 
@@ -1008,12 +1009,184 @@ static int calcular_y_aplicar_cambio(ModoGUI modo, const char *moneda, const Big
     return 1;
 }
 
+static void normalizar_clave_moneda(const char *origen, char *destino, size_t tam_destino)
+{
+    size_t i = 0;
+    size_t j = 0;
+
+    if (destino == NULL || tam_destino == 0)
+        return;
+
+    destino[0] = '\0';
+    if (origen == NULL)
+        return;
+
+    while (origen[i] != '\0' && j + 1 < tam_destino)
+    {
+        unsigned char c = (unsigned char)origen[i];
+
+        if (c == ' ')
+            destino[j++] = '_';
+        else
+            destino[j++] = (char)tolower(c);
+        i++;
+    }
+
+    destino[j] = '\0';
+}
+
+static int resolver_moneda_por_entrada(char monedas[MAX_MONEDAS][MAX_NOMBRE],
+                                       int nMonedas,
+                                       const char *entrada,
+                                       char salida[MAX_NOMBRE])
+{
+    char clave[MAX_NOMBRE];
+    char *fin;
+    long indice;
+
+    if (monedas == NULL || entrada == NULL || salida == NULL || nMonedas <= 0)
+        return 0;
+
+    indice = strtol(entrada, &fin, 10);
+    if (*fin == '\0' && indice >= 1 && indice <= nMonedas)
+    {
+        strncpy(salida, monedas[indice - 1], MAX_NOMBRE - 1);
+        salida[MAX_NOMBRE - 1] = '\0';
+        return 1;
+    }
+
+    normalizar_clave_moneda(entrada, clave, sizeof(clave));
+    for (int i = 0; i < nMonedas; i++)
+    {
+        if (strcmp(monedas[i], clave) == 0)
+        {
+            strncpy(salida, monedas[i], MAX_NOMBRE - 1);
+            salida[MAX_NOMBRE - 1] = '\0';
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static void ejecutar_conversion_gui_portable(char monedas[MAX_MONEDAS][MAX_NOMBRE], int nMonedas)
+{
+    char entrada[128];
+    char origen[MAX_NOMBRE];
+    char destino[MAX_NOMBRE];
+    char usarStockTxt[32];
+    BigInt montoOrigen = {0};
+    BigInt montoDestino = {0};
+    BigIntArray denom = {0};
+    BigIntArray stock = {0};
+    BigIntArray solucion = {0};
+    double tasa = 0.0;
+    int usarStock = 0;
+    int ok;
+
+    printf("\n--- Conversion entre monedas ---\n");
+    for (int i = 0; i < nMonedas; i++)
+        printf("  [%d] %s\n", i + 1, monedas[i]);
+
+    printf("Moneda origen (indice o nombre, o salir): ");
+    if (!leer_linea(entrada, sizeof(entrada)))
+        goto cleanup;
+    a_minusculas(entrada);
+    if (strcmp(entrada, "salir") == 0)
+        goto cleanup;
+    if (!resolver_moneda_por_entrada(monedas, nMonedas, entrada, origen))
+    {
+        printf("Moneda origen invalida.\n");
+        goto cleanup;
+    }
+
+    if (pedir_monto(&montoOrigen) <= 0)
+    {
+        printf("Monto invalido.\n");
+        goto cleanup;
+    }
+
+    printf("Moneda destino (indice o nombre, o salir): ");
+    if (!leer_linea(entrada, sizeof(entrada)))
+        goto cleanup;
+    a_minusculas(entrada);
+    if (strcmp(entrada, "salir") == 0)
+        goto cleanup;
+    if (!resolver_moneda_por_entrada(monedas, nMonedas, entrada, destino))
+    {
+        printf("Moneda destino invalida.\n");
+        goto cleanup;
+    }
+
+    printf("Usar stock de la moneda destino? (s/n): ");
+    if (!leer_linea(usarStockTxt, sizeof(usarStockTxt)))
+        goto cleanup;
+    a_minusculas(usarStockTxt);
+    if (usarStockTxt[0] == 's' || usarStockTxt[0] == 'y')
+        usarStock = 1;
+
+    if (!fetch_exchange_rate(origen, destino, &tasa))
+    {
+        printf("No se pudo obtener la tasa de cambio para %s -> %s.\n", origen, destino);
+        goto cleanup;
+    }
+
+    {
+        double src_cents = strtod(montoOrigen.digits, NULL);
+        double dst_cents = src_cents * tasa;
+        long long redondeado = (long long)(dst_cents + 0.5);
+        char buffer[64];
+
+        snprintf(buffer, sizeof(buffer), "%lld", redondeado);
+        if (!bigint_init(&montoDestino, buffer))
+        {
+            printf("No se pudo calcular el monto convertido.\n");
+            goto cleanup;
+        }
+    }
+
+    if (!validar_consistencia_moneda(destino) || !cargar_denominaciones_moneda(destino, &denom))
+    {
+        printf("No se pudieron cargar denominaciones de la moneda destino.\n");
+        goto cleanup;
+    }
+
+    if (usarStock && !cargar_stock_moneda(destino, &stock))
+    {
+        printf("No se pudo cargar el stock de la moneda destino.\n");
+        goto cleanup;
+    }
+
+    ok = usarStock
+             ? calcular_cambio_optimo_stock(&montoDestino, &denom, &stock, &solucion)
+             : calcular_cambio_optimo(&montoDestino, &denom, &solucion);
+
+    if (!ok)
+    {
+        printf("No se pudo descomponer %s c en la moneda destino.\n", montoDestino.digits);
+        goto cleanup;
+    }
+
+    printf("Conversion aplicada: %s %s-centimos -> %s %s-centimos | tasa=%.6f\n",
+           montoOrigen.digits, origen, montoDestino.digits, destino, tasa);
+    imprimir_resultado_cambio(&montoDestino, &denom, &solucion);
+    registrar_historialf("Conversion portable | %s->%s | Origen=%s c | Destino=%s c | Tasa=%.6f",
+                         origen, destino, montoOrigen.digits, montoDestino.digits, tasa);
+
+cleanup:
+    bigint_free(&montoOrigen);
+    bigint_free(&montoDestino);
+    bigint_array_free(&denom);
+    bigint_array_free(&stock);
+    bigint_array_free(&solucion);
+}
+
 /* pedir_modo: Funcion auxiliar. Ejecuta su logica, valida parametros de entrada y retorna un estado. */
 static int pedir_modo(ModoGUI *modo)
 {
     char entrada[32];
 
-    printf("Modo (limitado/ilimitado/historial/snapshot/restaurar/reporte o salir): ");
+    printf("Modo (limitado/ilimitado/convertir/historial/snapshot/restaurar/reporte o salir): ");
     if (!leer_linea(entrada, sizeof(entrada)))
         return 0;
 
@@ -1028,6 +1201,8 @@ static int pedir_modo(ModoGUI *modo)
         return 4;
     if (strcmp(entrada, "reporte") == 0 || strcmp(entrada, "g") == 0)
         return 5;
+    if (strcmp(entrada, "convertir") == 0 || strcmp(entrada, "x") == 0)
+        return 6;
 
     if (strcmp(entrada, "limitado") == 0 || strcmp(entrada, "b") == 0)
     {
@@ -1110,6 +1285,12 @@ int main(void)
         if (estadoModo == 5)
         {
             ejecutar_operacion_global("reporte");
+            pausar_pantalla();
+            continue;
+        }
+        if (estadoModo == 6)
+        {
+            ejecutar_conversion_gui_portable(monedas, nMonedas);
             pausar_pantalla();
             continue;
         }

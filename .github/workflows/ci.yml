@@ -22,13 +22,14 @@ jobs:
       - name: Build (Linux)
         if: runner.os == 'Linux'
         run: |
+          sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev || true
           make clean || true
-          make debug
+          make debug USE_LIBCURL=1
 
       - name: Build GUI (Linux portable)
         if: runner.os == 'Linux'
         run: |
-          make gui || true
+          make gui USE_LIBCURL=1 || true
 
       - name: Unit tests (Linux)
         if: runner.os == 'Linux'
@@ -39,7 +40,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           make clean || true
-          make debug
+          make debug USE_LIBCURL=1
 
       - name: Swift toolchain info (macOS)
         if: runner.os == 'macOS'
@@ -53,7 +54,7 @@ jobs:
 
       - name: Build GUI (macOS portable fallback)
         if: runner.os == 'macOS'
-        run: gcc -std=c2x -Wall -Wextra -Wpedantic -O2 gui_portable.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c -o progvoraz_gui_portable
+        run: gcc -std=c2x -Wall -Wextra -Wpedantic -O2 gui_portable.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c exchange_api.c -lcurl -o progvoraz_gui_portable
 
       - name: Unit tests (macOS)
         if: runner.os == 'macOS'
@@ -116,13 +117,13 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          gcc -std=c2x -Wall -Wextra -Wpedantic -O2 main.c app_console.c server_http.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c csv_io.c logger.c json_io.c batch_cli.c -o progvoraz.exe
+          gcc -std=c2x -Wall -Wextra -Wpedantic -O2 main.c app_console.c server_http.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c csv_io.c logger.c json_io.c batch_cli.c exchange_api.c -o progvoraz.exe
 
       - name: Build GUI (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          gcc -std=c2x -Wall -Wextra -Wpedantic -O2 gui_window.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c csv_io.c logger.c json_io.c -o progvoraz_gui.exe -mwindows
+          gcc -std=c2x -Wall -Wextra -Wpedantic -O2 gui_window.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c csv_io.c logger.c json_io.c exchange_api.c -o progvoraz_gui.exe -mwindows
 
       - name: Unit tests (Windows)
         if: runner.os == 'Windows'

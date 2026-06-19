@@ -23,6 +23,7 @@ dist/
 nbproject/
 
 # IDE and OS
+.vs/
 .vscode/*
 !.vscode/tasks.json
 !.vscode/launch.json

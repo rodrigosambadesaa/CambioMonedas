@@ -1,9 +1,9 @@
 APP := progvoraz
-SRC := main.c app_console.c server_http.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c csv_io.c logger.c json_io.c batch_cli.c
+SRC := main.c app_console.c server_http.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c csv_io.c logger.c json_io.c batch_cli.c exchange_api.c
 GUI_APP := progvoraz_gui
-GUI_SRC_WIN := gui_window.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c
+GUI_SRC_WIN := gui_window.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c exchange_api.c
 GUI_SRC_MAC := gui_macos.swift
-GUI_SRC_PORTABLE := gui_portable.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c
+GUI_SRC_PORTABLE := gui_portable.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c exchange_api.c
 BUILD_DIR := .dist
 TEST_APP := test_progvoraz
 TEST_SRC := tests/test_bigint_algoritmo.c vector_dinamico.c bigint.c algoritmo_cambio.c csv_io.c
@@ -11,6 +11,11 @@ TEST_SRC := tests/test_bigint_algoritmo.c vector_dinamico.c bigint.c algoritmo_c
 CC ?= gcc
 CFLAGS ?= -std=c2x -Wall -Wextra -Wpedantic
 LDFLAGS ?=
+
+ifeq ($(USE_LIBCURL),1)
+CFLAGS += -DUSE_LIBCURL
+LDFLAGS += -lcurl
+endif
 
 BIN_EXT :=
 ifeq ($(OS),Windows_NT)
