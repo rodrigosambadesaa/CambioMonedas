@@ -7,8 +7,10 @@
 static FILE *g_log = NULL;
 static char g_path[1024];
 
+/* funcion logger_init: contiene la logica principal de esta operacion. */
 int logger_init(const char *path)
 {
+    /* if: comprueba path == NULL antes de ejecutar esta rama. */
     if (path == NULL)
         return 0;
     strncpy(g_path, path, sizeof(g_path) - 1);
@@ -17,8 +19,10 @@ int logger_init(const char *path)
     return g_log != NULL;
 }
 
+/* funcion logger_close: contiene la logica principal de esta operacion. */
 void logger_close(void)
 {
+    /* if: comprueba g_log antes de ejecutar esta rama. */
     if (g_log)
     {
         fclose(g_log);
@@ -26,8 +30,10 @@ void logger_close(void)
     }
 }
 
+/* funcion logger_vlog: contiene la logica principal de esta operacion. */
 static void logger_vlog(const char *prefix, const char *fmt, va_list ap)
 {
+    /* if: comprueba !g_log antes de ejecutar esta rama. */
     if (!g_log)
         return;
     fprintf(g_log, "%s: ", prefix);
@@ -36,6 +42,7 @@ static void logger_vlog(const char *prefix, const char *fmt, va_list ap)
     fflush(g_log);
 }
 
+/* funcion logger_info: contiene la logica principal de esta operacion. */
 void logger_info(const char *fmt, ...)
 {
     va_list ap;
@@ -44,6 +51,7 @@ void logger_info(const char *fmt, ...)
     va_end(ap);
 }
 
+/* funcion logger_error: contiene la logica principal de esta operacion. */
 void logger_error(const char *fmt, ...)
 {
     va_list ap;
