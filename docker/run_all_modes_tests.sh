@@ -24,7 +24,7 @@ cleanup() {
   cp "$stock_backup" stock.txt || true
   cp "$report_backup" reporte_global.txt || true
   rm -f "$stock_backup"
-  rm -f "$report_backup" stock_snapshot.txt
+  rm -f "$report_backup" stock_snapshot.txt stock_out.json
 }
 trap cleanup EXIT
 
@@ -124,12 +124,12 @@ run_case "Consola modo c (admin)" \
 
 run_case "GUI portable modo limitado" \
   ./progvoraz_gui \
-  "Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/anadir/quitar/modo/volver/salir):" \
+  "Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/json/anadir/quitar/modo/volver/salir):" \
   "limitado\n${currency}\ncalcular\n30\nsalir\n"
 
 run_case "GUI portable modo ilimitado" \
   ./progvoraz_gui \
-  "Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/modo/volver/salir):" \
+  "Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/json/modo/volver/salir):" \
   "ilimitado\n${currency}\ncalcular\n30\nsalir\n"
 
 run_case "GUI portable historial desde modo" \
@@ -141,6 +141,11 @@ run_case "GUI portable operacion global reporte" \
   ./progvoraz_gui \
   "Reporte global generado: reporte_global.txt" \
   "reporte\n\nsalir\n"
+
+run_case "GUI portable operacion global json" \
+  ./progvoraz_gui \
+  "Stock exportado en JSON a stock_out.json" \
+  "json\n\nsalir\n"
 
 run_case "Consola conversion entre monedas" \
   "PROGVORAZ_EXCHANGE_SOURCE=stub ./progvoraz" \
