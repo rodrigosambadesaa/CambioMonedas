@@ -5,8 +5,10 @@
 
 static int fallos = 0;
 
+/* funcion check_int: contiene la logica principal de esta operacion. */
 static void check_int(int condicion, const char *mensaje)
 {
+    /* if: comprueba !condicion antes de ejecutar esta rama. */
     if (!condicion)
     {
         printf("FAIL: %s\n", mensaje);
@@ -14,8 +16,10 @@ static void check_int(int condicion, const char *mensaje)
     }
 }
 
+/* funcion check_bigint_texto: contiene la logica principal de esta operacion. */
 static void check_bigint_texto(const BigInt *valor, const char *esperado, const char *mensaje)
 {
+    /* if: comprueba valor == NULL || valor->digits == NULL || strcmp(valor->digits, esper... antes de ejecutar esta rama. */
     if (valor == NULL || valor->digits == NULL || strcmp(valor->digits, esperado) != 0)
     {
         printf("FAIL: %s (esperado=%s, obtenido=%s)\n",
@@ -26,17 +30,21 @@ static void check_bigint_texto(const BigInt *valor, const char *esperado, const 
     }
 }
 
+/* funcion crear_arreglo: contiene la logica principal de esta operacion. */
 static int crear_arreglo(BigIntArray *arr, const char *const *valores, size_t len)
 {
     size_t i;
 
+    /* if: comprueba !bigint_array_create(arr, len) antes de ejecutar esta rama. */
     if (!bigint_array_create(arr, len))
         return 0;
 
+    /* for: itera segun i = 0; i < len; i++ para recorrer el bloque. */
     for (i = 0; i < len; i++)
     {
         BigInt tmp = {0};
 
+        /* if: comprueba !bigint_init(&tmp, valores[i]) || antes de ejecutar esta rama. */
         if (!bigint_init(&tmp, valores[i]) ||
             !bigint_array_set(arr, i, &tmp))
         {
@@ -51,10 +59,12 @@ static int crear_arreglo(BigIntArray *arr, const char *const *valores, size_t le
     return 1;
 }
 
+/* funcion check_arreglo_texto: contiene la logica principal de esta operacion. */
 static void check_arreglo_texto(const BigIntArray *arr, const char *const *esperado, size_t len, const char *mensaje)
 {
     size_t i;
 
+    /* if: comprueba arr == NULL || arr->items == NULL || arr->len != len antes de ejecutar esta rama. */
     if (arr == NULL || arr->items == NULL || arr->len != len)
     {
         printf("FAIL: %s (longitud inesperada)\n", mensaje);
@@ -62,8 +72,10 @@ static void check_arreglo_texto(const BigIntArray *arr, const char *const *esper
         return;
     }
 
+    /* for: itera segun i = 0; i < len; i++ para recorrer el bloque. */
     for (i = 0; i < len; i++)
     {
+        /* if: comprueba strcmp(arr->items[i].digits, esperado[i]) != 0 antes de ejecutar esta rama. */
         if (strcmp(arr->items[i].digits, esperado[i]) != 0)
         {
             printf("FAIL: %s en indice %zu (esperado=%s, obtenido=%s)\n",
@@ -76,6 +88,7 @@ static void check_arreglo_texto(const BigIntArray *arr, const char *const *esper
     }
 }
 
+/* funcion test_bigint_basico: contiene la logica principal de esta operacion. */
 static void test_bigint_basico(void)
 {
     BigInt a = {0};
@@ -116,6 +129,7 @@ static void test_bigint_basico(void)
     bigint_free(&r);
 }
 
+/* funcion test_cambio_no_canonico_ilimitado: contiene la logica principal de esta operacion. */
 static void test_cambio_no_canonico_ilimitado(void)
 {
     const char *denom_txt[] = {"4", "3", "1"};
@@ -134,6 +148,7 @@ static void test_cambio_no_canonico_ilimitado(void)
     bigint_array_free(&solucion);
 }
 
+/* funcion test_cambio_no_canonico_con_stock: contiene la logica principal de esta operacion. */
 static void test_cambio_no_canonico_con_stock(void)
 {
     const char *denom_txt[] = {"4", "3", "1"};
@@ -156,6 +171,7 @@ static void test_cambio_no_canonico_con_stock(void)
     bigint_array_free(&solucion);
 }
 
+/* funcion test_sin_solucion_con_stock: contiene la logica principal de esta operacion. */
 static void test_sin_solucion_con_stock(void)
 {
     const char *denom_txt[] = {"5", "3"};
@@ -177,6 +193,7 @@ static void test_sin_solucion_con_stock(void)
     bigint_array_free(&solucion);
 }
 
+/* funcion test_cambio_cercano_con_rango_ilimitado: contiene la logica principal de esta operacion. */
 static void test_cambio_cercano_con_rango_ilimitado(void)
 {
     const char *denom_txt[] = {"10", "4"};
@@ -199,6 +216,7 @@ static void test_cambio_cercano_con_rango_ilimitado(void)
     bigint_array_free(&solucion);
 }
 
+/* funcion test_cambio_cercano_con_rango_stock: contiene la logica principal de esta operacion. */
 static void test_cambio_cercano_con_rango_stock(void)
 {
     const char *denom_txt[] = {"10", "4", "1"};
@@ -225,6 +243,7 @@ static void test_cambio_cercano_con_rango_stock(void)
     bigint_array_free(&solucion);
 }
 
+/* funcion main: contiene la logica principal de esta operacion. */
 int main(void)
 {
     test_bigint_basico();
@@ -234,6 +253,7 @@ int main(void)
     test_cambio_cercano_con_rango_ilimitado();
     test_cambio_cercano_con_rango_stock();
 
+    /* if: comprueba fallos != 0 antes de ejecutar esta rama. */
     if (fallos != 0)
     {
         printf("%d prueba(s) fallaron.\n", fallos);

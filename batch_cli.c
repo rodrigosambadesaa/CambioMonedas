@@ -9,43 +9,54 @@
 #include <stdlib.h>
 #include <ctype.h>
 
+/* funcion trim: contiene la logica principal de esta operacion. */
 static char *trim(char *s)
 {
+    /* if: comprueba s == NULL antes de ejecutar esta rama. */
     if (s == NULL)
         return s;
+    /* while: repite el bloque mientras se cumpla *s && (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n'). */
     while (*s && (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n'))
         s++;
     char *end = s + strlen(s) - 1;
+    /* while: repite el bloque mientras se cumpla end >= s && (*end == ' ' || *end == '\t' || *end == '\r' || *end == '.... */
     while (end >= s && (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n'))
         *end-- = '\0';
     return s;
 }
 
+/* funcion batch_process_file: contiene la logica principal de esta operacion. */
 int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const char *rutaLog)
 {
     FILE *in = NULL;
     FILE *out = NULL;
     int ok = 1;
+    /* if: comprueba rutaEntrada == NULL antes de ejecutar esta rama. */
     if (rutaEntrada == NULL)
         return 0;
 
+    /* if: comprueba rutaLog antes de ejecutar esta rama. */
     if (rutaLog)
         logger_init(rutaLog);
 
     in = fopen(rutaEntrada, "r");
+    /* if: comprueba !in antes de ejecutar esta rama. */
     if (!in)
     {
         logger_error("No se pudo abrir entrada %s", rutaEntrada);
+        /* if: comprueba rutaLog antes de ejecutar esta rama. */
         if (rutaLog)
             logger_close();
         return 0;
     }
 
     out = rutaSalida ? fopen(rutaSalida, "w") : stdout;
+    /* if: comprueba !out antes de ejecutar esta rama. */
     if (!out)
     {
         logger_error("No se pudo abrir salida %s", rutaSalida);
         fclose(in);
+        /* if: comprueba rutaLog antes de ejecutar esta rama. */
         if (rutaLog)
             logger_close();
         return 0;
@@ -59,15 +70,18 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
 
         char linea[4096];
         size_t lineno = 0;
+        /* while: repite el bloque mientras se cumpla fgets(linea, sizeof(linea), in). */
         while (fgets(linea, sizeof(linea), in))
         {
             lineno++;
             char *p = linea;
             /* separar por comas en 4 campos max */
             char *cols[4] = {NULL, NULL, NULL, NULL};
+            /* for: itera segun int i = 0; i < 4; i++ para recorrer el bloque. */
             for (int i = 0; i < 4; i++)
             {
                 char *c = strchr(p, ',');
+                /* if: comprueba c antes de ejecutar esta rama. */
                 if (c)
                 {
                     *c = '\0';
@@ -85,9 +99,11 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
             char *moneda = cols[1] ? cols[1] : "";
             char *monto_txt = cols[2] ? cols[2] : "0";
             size_t min_m = 0, max_m = (size_t)-1;
+            /* if: comprueba cols[3] && cols[3][0] antes de ejecutar esta rama. */
             if (cols[3] && cols[3][0])
             {
                 char *dash = strchr(cols[3], '-');
+                /* if: comprueba dash antes de ejecutar esta rama. */
                 if (dash)
                 {
                     *dash = '\0';
@@ -101,22 +117,28 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
             }
 
             /* Saltar cabecera si aparece. */
+            /* if: comprueba lineno == 1 antes de ejecutar esta rama. */
             if (lineno == 1)
             {
                 char tmp0[16];
                 strncpy(tmp0, cols[0] ? cols[0] : "", sizeof(tmp0) - 1);
                 tmp0[sizeof(tmp0) - 1] = '\0';
+                /* for: itera segun char *t = tmp0; *t; ++t para recorrer el bloque. */
                 for (char *t = tmp0; *t; ++t)
                     *t = (char)tolower((unsigned char)*t);
+                /* if: comprueba strcmp(tmp0, "mode") == 0 || strcmp(tmp0, "modo") == 0 || strcmp(tmp0... antes de ejecutar esta rama. */
                 if (strcmp(tmp0, "mode") == 0 || strcmp(tmp0, "modo") == 0 || strcmp(tmp0, "modo") == 0)
                     continue;
             }
 
             /* Normal flow: cargar denominaciones (y stock si modo b/c). */
             /* Normalizar moneda a minusculas. */
+            /* for: itera segun char *q = moneda; q && *q; ++q para recorrer el bloque. */
             for (char *q = moneda; q && *q; ++q)
                 *q = (char)tolower((unsigned char)*q);
+            /* for: itera segun char *q = moneda; q && *q; ++q para recorrer el bloque. */
             for (char *q = moneda; q && *q; ++q)
+                /* if: comprueba *q == ' ' antes de ejecutar esta rama. */
                 if (*q == ' ')
                     *q = '_';
             BigIntArray denom = {0};
@@ -125,6 +147,7 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
             BigIntArray sol = {0};
             char resultado_buf[256] = "";
 
+            /* if: comprueba !bigint_init(&monto, monto_txt) antes de ejecutar esta rama. */
             if (!bigint_init(&monto, monto_txt))
             {
                 const char *row[] = {"", "", monto_txt, "ERROR", "monto invalido"};
@@ -134,6 +157,7 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
                 continue;
             }
 
+            /* if: comprueba !cargar_denominaciones_moneda(moneda, &denom) antes de ejecutar esta rama. */
             if (!cargar_denominaciones_moneda(moneda, &denom))
             {
                 const char *row[] = {"", "", monto_txt, "ERROR", "moneda no encontrada"};
@@ -144,8 +168,10 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
             }
 
             int found = 0;
+            /* if: comprueba modo == 'b' || modo == 'c' antes de ejecutar esta rama. */
             if (modo == 'b' || modo == 'c')
             {
+                /* if: comprueba !cargar_stock_moneda(moneda, &stock) antes de ejecutar esta rama. */
                 if (!cargar_stock_moneda(moneda, &stock))
                 {
                     const char *row[] = {"", "", monto_txt, "ERROR", "stock no encontrado"};
@@ -157,8 +183,10 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
                 }
             }
 
+            /* if: comprueba modo == 'a' antes de ejecutar esta rama. */
             if (modo == 'a')
             {
+                /* if: comprueba max_m == (size_t)-1 antes de ejecutar esta rama. */
                 if (max_m == (size_t)-1)
                     found = calcular_cambio_optimo(&monto, &denom, &sol);
                 else
@@ -166,20 +194,24 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
             }
             else
             {
+                /* if: comprueba max_m == (size_t)-1 antes de ejecutar esta rama. */
                 if (max_m == (size_t)-1)
                     found = calcular_cambio_optimo_stock(&monto, &denom, &stock, &sol);
                 else
                     found = calcular_cambio_optimo_stock_con_rango(&monto, &denom, &stock, min_m, max_m, &sol);
             }
 
+            /* if: comprueba found antes de ejecutar esta rama. */
             if (found)
             {
                 /* serializar solucion simple: contar monedas totales y lista */
                 size_t total = 0;
+                /* for: itera segun size_t i = 0; i < sol.len; i++ para recorrer el bloque. */
                 for (size_t i = 0; i < sol.len; i++)
                     total += (size_t)strtoul(sol.items[i].digits, NULL, 10);
                 snprintf(resultado_buf, sizeof(resultado_buf), "OK total=%zu", total);
                 char note[512] = "";
+                /* for: itera segun size_t i = 0; i < sol.len && i < 8; i++ para recorrer el bloque. */
                 for (size_t i = 0; i < sol.len && i < 8; i++)
                 {
                     char tmp[64];
@@ -204,17 +236,22 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
         }
     }
 
+    /* if: comprueba in antes de ejecutar esta rama. */
     if (in)
         fclose(in);
+    /* if: comprueba out && out != stdout antes de ejecutar esta rama. */
     if (out && out != stdout)
         fclose(out);
+    /* if: comprueba rutaLog antes de ejecutar esta rama. */
     if (rutaLog)
         logger_close();
     return ok;
 }
 
+/* funcion batch_process_stream: contiene la logica principal de esta operacion. */
 int batch_process_stream(const char *rutaLog)
 {
+    /* if: comprueba rutaLog antes de ejecutar esta rama. */
     if (rutaLog)
         logger_init(rutaLog);
 
@@ -224,14 +261,17 @@ int batch_process_stream(const char *rutaLog)
 
     char linea[4096];
     size_t lineno = 0;
+    /* while: repite el bloque mientras se cumpla fgets(linea, sizeof(linea), stdin). */
     while (fgets(linea, sizeof(linea), stdin))
     {
         lineno++;
         char *p = linea;
         char *cols[4] = {NULL, NULL, NULL, NULL};
+        /* for: itera segun int i = 0; i < 4; i++ para recorrer el bloque. */
         for (int i = 0; i < 4; i++)
         {
             char *c = strchr(p, ',');
+            /* if: comprueba c antes de ejecutar esta rama. */
             if (c)
             {
                 *c = '\0';
@@ -249,9 +289,11 @@ int batch_process_stream(const char *rutaLog)
         char *moneda = cols[1] ? cols[1] : "";
         char *monto_txt = cols[2] ? cols[2] : "0";
         size_t min_m = 0, max_m = (size_t)-1;
+        /* if: comprueba cols[3] && cols[3][0] antes de ejecutar esta rama. */
         if (cols[3] && cols[3][0])
         {
             char *dash = strchr(cols[3], '-');
+            /* if: comprueba dash antes de ejecutar esta rama. */
             if (dash)
             {
                 *dash = '\0';
@@ -264,20 +306,26 @@ int batch_process_stream(const char *rutaLog)
             }
         }
 
+        /* if: comprueba lineno == 1 antes de ejecutar esta rama. */
         if (lineno == 1)
         {
             char tmp0[16];
             strncpy(tmp0, cols[0] ? cols[0] : "", sizeof(tmp0) - 1);
             tmp0[sizeof(tmp0) - 1] = '\0';
+            /* for: itera segun char *t = tmp0; *t; ++t para recorrer el bloque. */
             for (char *t = tmp0; *t; ++t)
                 *t = (char)tolower((unsigned char)*t);
+            /* if: comprueba strcmp(tmp0, "mode") == 0 || strcmp(tmp0, "modo") == 0 antes de ejecutar esta rama. */
             if (strcmp(tmp0, "mode") == 0 || strcmp(tmp0, "modo") == 0)
                 continue;
         }
 
+        /* for: itera segun char *q = moneda; q && *q; ++q para recorrer el bloque. */
         for (char *q = moneda; q && *q; ++q)
             *q = (char)tolower((unsigned char)*q);
+        /* for: itera segun char *q = moneda; q && *q; ++q para recorrer el bloque. */
         for (char *q = moneda; q && *q; ++q)
+            /* if: comprueba *q == ' ' antes de ejecutar esta rama. */
             if (*q == ' ')
                 *q = '_';
 
@@ -286,6 +334,7 @@ int batch_process_stream(const char *rutaLog)
         BigInt monto = {0};
         BigIntArray sol = {0};
 
+        /* if: comprueba !bigint_init(&monto, monto_txt) antes de ejecutar esta rama. */
         if (!bigint_init(&monto, monto_txt))
         {
             const char *row[] = {"", "", monto_txt, "ERROR", "monto invalido"};
@@ -295,6 +344,7 @@ int batch_process_stream(const char *rutaLog)
             continue;
         }
 
+        /* if: comprueba !cargar_denominaciones_moneda(moneda, &denom) antes de ejecutar esta rama. */
         if (!cargar_denominaciones_moneda(moneda, &denom))
         {
             const char *row[] = {"", "", monto_txt, "ERROR", "moneda no encontrada"};
@@ -305,8 +355,10 @@ int batch_process_stream(const char *rutaLog)
         }
 
         int found = 0;
+        /* if: comprueba modo == 'b' || modo == 'c' antes de ejecutar esta rama. */
         if (modo == 'b' || modo == 'c')
         {
+            /* if: comprueba !cargar_stock_moneda(moneda, &stock) antes de ejecutar esta rama. */
             if (!cargar_stock_moneda(moneda, &stock))
             {
                 const char *row[] = {"", "", monto_txt, "ERROR", "stock no encontrado"};
@@ -318,8 +370,10 @@ int batch_process_stream(const char *rutaLog)
             }
         }
 
+        /* if: comprueba modo == 'a' antes de ejecutar esta rama. */
         if (modo == 'a')
         {
+            /* if: comprueba max_m == (size_t)-1 antes de ejecutar esta rama. */
             if (max_m == (size_t)-1)
                 found = calcular_cambio_optimo(&monto, &denom, &sol);
             else
@@ -327,20 +381,24 @@ int batch_process_stream(const char *rutaLog)
         }
         else
         {
+            /* if: comprueba max_m == (size_t)-1 antes de ejecutar esta rama. */
             if (max_m == (size_t)-1)
                 found = calcular_cambio_optimo_stock(&monto, &denom, &stock, &sol);
             else
                 found = calcular_cambio_optimo_stock_con_rango(&monto, &denom, &stock, min_m, max_m, &sol);
         }
 
+        /* if: comprueba found antes de ejecutar esta rama. */
         if (found)
         {
             size_t total = 0;
+            /* for: itera segun size_t i = 0; i < sol.len; i++ para recorrer el bloque. */
             for (size_t i = 0; i < sol.len; i++)
                 total += (size_t)strtoul(sol.items[i].digits, NULL, 10);
             char resultado_buf[256];
             snprintf(resultado_buf, sizeof(resultado_buf), "OK total=%zu", total);
             char note[512] = "";
+            /* for: itera segun size_t i = 0; i < sol.len && i < 8; i++ para recorrer el bloque. */
             for (size_t i = 0; i < sol.len && i < 8; i++)
             {
                 char tmp[64];
@@ -364,6 +422,7 @@ int batch_process_stream(const char *rutaLog)
         bigint_array_free(&sol);
     }
 
+    /* if: comprueba rutaLog antes de ejecutar esta rama. */
     if (rutaLog)
         logger_close();
     return 1;

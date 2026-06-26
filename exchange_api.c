@@ -4,40 +4,52 @@
 #include <stdlib.h>
 #include <ctype.h>
 
+/* funcion normalize_currency_token: contiene la logica principal de esta operacion. */
 static void normalize_currency_token(const char *input, char *output, size_t output_size)
 {
     size_t i = 0;
     size_t j = 0;
 
+    /* if: comprueba output == NULL || output_size == 0 antes de ejecutar esta rama. */
     if (output == NULL || output_size == 0)
         return;
 
     output[0] = '\0';
+    /* if: comprueba input == NULL antes de ejecutar esta rama. */
     if (input == NULL)
         return;
 
+    /* while: repite el bloque mientras se cumpla input[i] != '\0' && j + 1 < output_size. */
     while (input[i] != '\0' && j + 1 < output_size)
     {
         unsigned char c = (unsigned char)input[i];
 
+        /* if: comprueba c == 0xC3 && input[i + 1] != '\0' antes de ejecutar esta rama. */
         if (c == 0xC3 && input[i + 1] != '\0')
         {
             unsigned char s = (unsigned char)input[i + 1];
             char replacement = '\0';
 
+            /* if: comprueba s == 0xA1 || s == 0x81 antes de ejecutar esta rama. */
             if (s == 0xA1 || s == 0x81)
                 replacement = 'a';
+            /* if: comprueba s == 0xA9 || s == 0x89 antes de continuar con esta alternativa. */
             else if (s == 0xA9 || s == 0x89)
                 replacement = 'e';
+            /* if: comprueba s == 0xAD || s == 0x8D antes de continuar con esta alternativa. */
             else if (s == 0xAD || s == 0x8D)
                 replacement = 'i';
+            /* if: comprueba s == 0xB3 || s == 0x93 antes de continuar con esta alternativa. */
             else if (s == 0xB3 || s == 0x93)
                 replacement = 'o';
+            /* if: comprueba s == 0xBA || s == 0x9A || s == 0xBC || s == 0x9C antes de continuar con esta alternativa. */
             else if (s == 0xBA || s == 0x9A || s == 0xBC || s == 0x9C)
                 replacement = 'u';
+            /* if: comprueba s == 0xB1 || s == 0x91 antes de continuar con esta alternativa. */
             else if (s == 0xB1 || s == 0x91)
                 replacement = 'n';
 
+            /* if: comprueba replacement != '\0' antes de ejecutar esta rama. */
             if (replacement != '\0')
             {
                 output[j++] = replacement;
@@ -46,6 +58,7 @@ static void normalize_currency_token(const char *input, char *output, size_t out
             }
         }
 
+        /* if: comprueba c == ' ' || c == '-' antes de ejecutar esta rama. */
         if (c == ' ' || c == '-')
             output[j++] = '_';
         else
@@ -56,44 +69,57 @@ static void normalize_currency_token(const char *input, char *output, size_t out
     output[j] = '\0';
 }
 
+/* funcion currency_to_iso_code: contiene la logica principal de esta operacion. */
 static int currency_to_iso_code(const char *input, char *output, size_t output_size)
 {
     char normalized[64];
 
+    /* if: comprueba output == NULL || output_size < 4 antes de ejecutar esta rama. */
     if (output == NULL || output_size < 4)
         return 0;
 
     normalize_currency_token(input, normalized, sizeof(normalized));
+    /* if: comprueba normalized[0] == '\0' antes de ejecutar esta rama. */
     if (normalized[0] == '\0')
         return 0;
 
+    /* if: comprueba strcmp(normalized, "eur") == 0 || strcmp(normalized, "euro") == 0 ||... antes de ejecutar esta rama. */
     if (strcmp(normalized, "eur") == 0 || strcmp(normalized, "euro") == 0 || strcmp(normalized, "euros") == 0)
         strncpy(output, "EUR", output_size);
+    /* if: comprueba strcmp(normalized, "usd") == 0 || strcmp(normalized, "us") == 0 || antes de continuar con esta alternativa. */
     else if (strcmp(normalized, "usd") == 0 || strcmp(normalized, "us") == 0 ||
              strcmp(normalized, "dolar") == 0 || strcmp(normalized, "dolares") == 0 ||
              strcmp(normalized, "dollar") == 0 || strcmp(normalized, "dollars") == 0)
         strncpy(output, "USD", output_size);
+    /* if: comprueba strcmp(normalized, "jpy") == 0 || strcmp(normalized, "yen") == 0 || s... antes de continuar con esta alternativa. */
     else if (strcmp(normalized, "jpy") == 0 || strcmp(normalized, "yen") == 0 || strcmp(normalized, "yenes") == 0)
         strncpy(output, "JPY", output_size);
+    /* if: comprueba strcmp(normalized, "gbp") == 0 || strcmp(normalized, "libra") == 0 || antes de continuar con esta alternativa. */
     else if (strcmp(normalized, "gbp") == 0 || strcmp(normalized, "libra") == 0 ||
              strcmp(normalized, "libras") == 0 || strcmp(normalized, "pound") == 0 ||
              strcmp(normalized, "pounds") == 0)
         strncpy(output, "GBP", output_size);
+    /* if: comprueba strcmp(normalized, "chf") == 0 || strcmp(normalized, "franco_suizo")... antes de continuar con esta alternativa. */
     else if (strcmp(normalized, "chf") == 0 || strcmp(normalized, "franco_suizo") == 0 ||
              strcmp(normalized, "francos_suizos") == 0)
         strncpy(output, "CHF", output_size);
+    /* if: comprueba strcmp(normalized, "cad") == 0 || strcmp(normalized, "dolar_canadiens... antes de continuar con esta alternativa. */
     else if (strcmp(normalized, "cad") == 0 || strcmp(normalized, "dolar_canadiense") == 0 ||
              strcmp(normalized, "dolares_canadienses") == 0)
         strncpy(output, "CAD", output_size);
+    /* if: comprueba strcmp(normalized, "aud") == 0 || strcmp(normalized, "dolar_australia... antes de continuar con esta alternativa. */
     else if (strcmp(normalized, "aud") == 0 || strcmp(normalized, "dolar_australiano") == 0 ||
              strcmp(normalized, "dolares_australianos") == 0)
         strncpy(output, "AUD", output_size);
+    /* if: comprueba strcmp(normalized, "cny") == 0 || strcmp(normalized, "rmb") == 0 || antes de continuar con esta alternativa. */
     else if (strcmp(normalized, "cny") == 0 || strcmp(normalized, "rmb") == 0 ||
              strcmp(normalized, "yuan_chino") == 0 || strcmp(normalized, "yuanes_chinos") == 0)
         strncpy(output, "CNY", output_size);
+    /* if: comprueba strcmp(normalized, "mxn") == 0 || strcmp(normalized, "peso_mexicano")... antes de continuar con esta alternativa. */
     else if (strcmp(normalized, "mxn") == 0 || strcmp(normalized, "peso_mexicano") == 0 ||
              strcmp(normalized, "pesos_mexicanos") == 0)
         strncpy(output, "MXN", output_size);
+    /* if: comprueba strlen(normalized) == 3 antes de continuar con esta alternativa. */
     else if (strlen(normalized) == 3)
     {
         output[0] = (char)toupper((unsigned char)normalized[0]);
@@ -110,6 +136,7 @@ static int currency_to_iso_code(const char *input, char *output, size_t output_s
     return 1;
 }
 
+/* funcion fetch_exchange_rate_from_stub: contiene la logica principal de esta operacion. */
 static int fetch_exchange_rate_from_stub(const char *from, const char *to, double *rate_out)
 {
     char from_code[8];
@@ -121,6 +148,7 @@ static int fetch_exchange_rate_from_stub(const char *from, const char *to, doubl
     char *p;
     double rate;
 
+    /* if: comprueba !currency_to_iso_code(from, from_code, sizeof(from_code)) || antes de ejecutar esta rama. */
     if (!currency_to_iso_code(from, from_code, sizeof(from_code)) ||
         !currency_to_iso_code(to, to_code, sizeof(to_code)))
         return 0;
@@ -128,6 +156,7 @@ static int fetch_exchange_rate_from_stub(const char *from, const char *to, doubl
     snprintf(key, sizeof(key), "%s_%s", from_code, to_code);
 
     f = fopen("rates_stub.json", "r");
+    /* if: comprueba !f antes de ejecutar esta rama. */
     if (!f)
         return 0;
 
@@ -136,14 +165,17 @@ static int fetch_exchange_rate_from_stub(const char *from, const char *to, doubl
     buf[r] = '\0';
 
     p = strstr(buf, key);
+    /* if: comprueba !p antes de ejecutar esta rama. */
     if (!p)
         return 0;
 
     p = strchr(p, ':');
+    /* if: comprueba !p antes de ejecutar esta rama. */
     if (!p)
         return 0;
 
     rate = atof(p + 1);
+    /* if: comprueba rate <= 0.0 antes de ejecutar esta rama. */
     if (rate <= 0.0)
         return 0;
 
@@ -171,11 +203,13 @@ struct memchunk
     size_t size;
 };
 
+/* funcion write_cb: contiene la logica principal de esta operacion. */
 static size_t write_cb(void *ptr, size_t size, size_t nmemb, void *userdata)
 {
     size_t realsize = size * nmemb;
     struct memchunk *m = (struct memchunk *)userdata;
     char *tmp = realloc(m->data, m->size + realsize + 1);
+    /* if: comprueba !tmp antes de ejecutar esta rama. */
     if (!tmp)
         return 0;
     m->data = tmp;
@@ -185,24 +219,29 @@ static size_t write_cb(void *ptr, size_t size, size_t nmemb, void *userdata)
     return realsize;
 }
 
+/* funcion fetch_exchange_rate: contiene la logica principal de esta operacion. */
 int fetch_exchange_rate(const char *from, const char *to, double *rate_out)
 {
     char from_code[8];
     char to_code[8];
     const char *source_mode;
 
+    /* if: comprueba !from || !to || !rate_out antes de ejecutar esta rama. */
     if (!from || !to || !rate_out)
         return 0;
 
+    /* if: comprueba !currency_to_iso_code(from, from_code, sizeof(from_code)) || antes de ejecutar esta rama. */
     if (!currency_to_iso_code(from, from_code, sizeof(from_code)) ||
         !currency_to_iso_code(to, to_code, sizeof(to_code)))
         return 0;
 
     source_mode = getenv("PROGVORAZ_EXCHANGE_SOURCE");
+    /* if: comprueba source_mode != NULL && strcmp(source_mode, "stub") == 0 antes de ejecutar esta rama. */
     if (source_mode != NULL && strcmp(source_mode, "stub") == 0)
         return fetch_exchange_rate_from_stub(from_code, to_code, rate_out);
 
     CURL *curl = curl_easy_init();
+    /* if: comprueba !curl antes de ejecutar esta rama. */
     if (!curl)
         return fetch_exchange_rate_from_stub(from_code, to_code, rate_out);
 
@@ -219,6 +258,7 @@ int fetch_exchange_rate(const char *from, const char *to, double *rate_out)
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
 
     res = curl_easy_perform(curl);
+    /* if: comprueba res != CURLE_OK antes de ejecutar esta rama. */
     if (res != CURLE_OK)
     {
         curl_easy_cleanup(curl);
@@ -229,9 +269,11 @@ int fetch_exchange_rate(const char *from, const char *to, double *rate_out)
     /* Try to find "result":<number> in the JSON */
     double rate = 0.0;
     char *p = strstr(chunk.data, "\"result\"");
+    /* if: comprueba p antes de ejecutar esta rama. */
     if (p)
     {
         p = strchr(p, ':');
+        /* if: comprueba p antes de ejecutar esta rama. */
         if (p)
             rate = atof(p + 1);
     }
@@ -239,6 +281,7 @@ int fetch_exchange_rate(const char *from, const char *to, double *rate_out)
     curl_easy_cleanup(curl);
     free(chunk.data);
 
+    /* if: comprueba rate <= 0.0 antes de ejecutar esta rama. */
     if (rate <= 0.0)
         return fetch_exchange_rate_from_stub(from_code, to_code, rate_out);
 
@@ -253,6 +296,7 @@ int fetch_exchange_rate(const char *from, const char *to, double *rate_out)
  * { "EUR_USD": 1.09, "USD_EUR": 0.917 }
  */
 
+/* funcion fetch_exchange_rate: contiene la logica principal de esta operacion. */
 int fetch_exchange_rate(const char *from, const char *to, double *rate_out)
 {
     return fetch_exchange_rate_from_stub(from, to, rate_out);

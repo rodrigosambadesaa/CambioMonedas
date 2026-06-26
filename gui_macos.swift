@@ -208,6 +208,55 @@ func registerHistory(_ msg: String) {
     }
 }
 
+func createStockSnapshot(snapshotPath: String = "stock_snapshot.txt") -> Bool {
+    let fm = FileManager.default
+    if fm.fileExists(atPath: snapshotPath) {
+        try? fm.removeItem(atPath: snapshotPath)
+    }
+    do {
+        try fm.copyItem(atPath: "stock.txt", toPath: snapshotPath)
+        return true
+    } catch {
+        return false
+    }
+}
+
+func restoreStockSnapshot(snapshotPath: String = "stock_snapshot.txt") -> Bool {
+    let fm = FileManager.default
+    guard fm.fileExists(atPath: snapshotPath) else { return false }
+    do {
+        if fm.fileExists(atPath: "stock.txt") {
+            try fm.removeItem(atPath: "stock.txt")
+        }
+        try fm.copyItem(atPath: snapshotPath, toPath: "stock.txt")
+        return true
+    } catch {
+        return false
+    }
+}
+
+func runProgvorazCLI(arguments: [String]) -> (ok: Bool, output: String) {
+    let process = Process()
+    let pipe = Pipe()
+
+    process.currentDirectoryURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+    process.executableURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath + "/progvoraz")
+    process.arguments = arguments
+    process.standardOutput = pipe
+    process.standardError = pipe
+
+    do {
+        try process.run()
+    } catch {
+        return (false, "No se pudo ejecutar progvoraz: \(error.localizedDescription)")
+    }
+
+    process.waitUntilExit()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    let output = String(data: data, encoding: .utf8) ?? ""
+    return (process.terminationStatus == 0, output.trimmingCharacters(in: .whitespacesAndNewlines))
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource {
     var window: NSWindow!
     var coinPopup: NSPopUpButton!
@@ -220,6 +269,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
     var limitField: NSTextField!
     var historyBtn: NSButton!
     var summaryBtn: NSButton!
+    var originField: NSTextField!
+    var convertAmountField: NSTextField!
+    var convertUseStockCheck: NSButton!
     var table: NSTableView!
     var resultView: NSTextView!
     var statusLabel: NSTextField!
@@ -389,8 +441,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         content.addSubview(historyBtn)
 
         summaryBtn = NSButton(title: "Resumen", target: self, action: #selector(showSummary))
-        summaryBtn.frame = NSRect(x: 550, y: 34, width: 170, height: 26)
+        summaryBtn.frame = NSRect(x: 550, y: 34, width: 80, height: 26)
         content.addSubview(summaryBtn)
+
+        let snapshotBtn = NSButton(title: "Snapshot", target: self, action: #selector(createSnapshot))
+        snapshotBtn.frame = NSRect(x: 20, y: 34, width: 90, height: 26)
+        content.addSubview(snapshotBtn)
+
+        let restoreBtn = NSButton(title: "Restaurar", target: self, action: #selector(restoreSnapshot))
+        restoreBtn.frame = NSRect(x: 120, y: 34, width: 90, height: 26)
+        content.addSubview(restoreBtn)
+
+        let reportBtn = NSButton(title: "Reporte", target: self, action: #selector(exportReport))
+        reportBtn.frame = NSRect(x: 220, y: 34, width: 80, height: 26)
+        content.addSubview(reportBtn)
+
+        let convertBtn = NSButton(title: "Convertir", target: self, action: #selector(convertCurrency))
+        convertBtn.frame = NSRect(x: 310, y: 34, width: 80, height: 26)
+        content.addSubview(convertBtn)
 
         let resultTitle = NSTextField(labelWithString: "Resultado")
         resultTitle.frame = NSRect(x: 20, y: 42, width: 120, height: 22)
@@ -404,8 +472,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         resultScroll.hasVerticalScroller = true
         content.addSubview(resultScroll)
 
+        let originLabel = NSTextField(labelWithString: "Origen")
+        originLabel.frame = NSRect(x: 20, y: 8, width: 50, height: 22)
+        content.addSubview(originLabel)
+
+        originField = NSTextField(frame: NSRect(x: 70, y: 6, width: 110, height: 24))
+        content.addSubview(originField)
+
+        let convertAmountLabel = NSTextField(labelWithString: "Monto c")
+        convertAmountLabel.frame = NSRect(x: 190, y: 8, width: 55, height: 22)
+        content.addSubview(convertAmountLabel)
+
+        convertAmountField = NSTextField(frame: NSRect(x: 245, y: 6, width: 110, height: 24))
+        content.addSubview(convertAmountField)
+
+        convertUseStockCheck = NSButton(checkboxWithTitle: "Usar stock destino", target: nil, action: nil)
+        convertUseStockCheck.frame = NSRect(x: 365, y: 6, width: 150, height: 24)
+        content.addSubview(convertUseStockCheck)
+
         statusLabel = NSTextField(labelWithString: "")
-        statusLabel.frame = NSRect(x: 20, y: 12, width: 740, height: 24)
+        statusLabel.frame = NSRect(x: 525, y: 8, width: 235, height: 24)
         content.addSubview(statusLabel)
 
         window.makeKeyAndOrderFront(nil)
@@ -677,6 +763,72 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         resultView.string = lines.joined(separator: "\n")
         setStatus("Resumen mostrado (modo limitado).")
         registerHistory("Resumen consultado (macOS) | Moneda=\(coin) | Piezas=\(normalize(totalUnits)) | Valor=\(normalize(totalValueStock)) c")
+    }
+
+    @objc func createSnapshot() {
+        if createStockSnapshot() {
+            setStatus("Snapshot creado: stock_snapshot.txt")
+            registerHistory("Snapshot de stock creado (macOS).")
+        } else {
+            setStatus("No se pudo crear stock_snapshot.txt", error: true)
+        }
+    }
+
+    @objc func restoreSnapshot() {
+        if !restoreStockSnapshot() {
+            setStatus("No se pudo restaurar stock_snapshot.txt", error: true)
+            return
+        }
+
+        if activeCoin != nil {
+            loadCoin()
+        }
+        setStatus("Stock restaurado desde stock_snapshot.txt")
+        registerHistory("Stock restaurado desde snapshot (macOS).")
+    }
+
+    @objc func exportReport() {
+        let result = runProgvorazCLI(arguments: ["--export-report", "reporte_global.txt"])
+        if result.ok {
+            setStatus("Reporte generado: reporte_global.txt")
+            resultView.string = result.output.isEmpty ? "Reporte global generado: reporte_global.txt" : result.output
+            registerHistory("Reporte global exportado (macOS).")
+        } else {
+            setStatus(result.output.isEmpty ? "No se pudo generar el reporte global." : result.output, error: true)
+        }
+    }
+
+    @objc func convertCurrency() {
+        guard let destination = activeCoin, !destination.isEmpty else {
+            setStatus("Primero carga la moneda destino para convertir.", error: true)
+            return
+        }
+
+        let origin = originField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let amount = normalize(convertAmountField.stringValue)
+        if origin.isEmpty {
+            setStatus("Indica la moneda origen.", error: true)
+            return
+        }
+        if !isDigits(amount) {
+            setStatus("El monto de conversion debe ser un entero no negativo en centimos.", error: true)
+            return
+        }
+
+        var args = ["--convert", origin, destination, amount]
+        if convertUseStockCheck.state == .on {
+            args.append("--convert-stock")
+        }
+
+        let result = runProgvorazCLI(arguments: args)
+        if result.ok {
+            resultView.string = result.output
+            convertAmountField.stringValue = ""
+            setStatus("Conversion completada hacia \(destination).")
+            registerHistory("Conversion macOS | \(origin)->\(destination) | Origen=\(amount) c")
+        } else {
+            setStatus(result.output.isEmpty ? "No se pudo completar la conversion." : result.output, error: true)
+        }
     }
 
     func calculateLimitedChange(amount: String, minCoins: Int, maxCoins: Int) -> [String]? {
