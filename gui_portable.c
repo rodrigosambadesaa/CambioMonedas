@@ -9,6 +9,7 @@
 #include "moneda_gestion.h"
 #include "algoritmo_cambio.h"
 #include "exchange_api.h"
+#include "json_io.h"
 
 #include <time.h>
 
@@ -133,6 +134,22 @@ static void ejecutar_operacion_global(const char *accion)
         else
         {
             printf("No se pudo generar reporte global.\n");
+        }
+        return;
+    }
+
+    /* if: comprueba strcmp(accion, "json") == 0 antes de ejecutar esta rama. */
+    if (strcmp(accion, "json") == 0)
+    {
+        /* if: comprueba export_stock_json("stock_out.json") antes de ejecutar esta rama. */
+        if (export_stock_json("stock_out.json"))
+        {
+            printf("Stock exportado en JSON a stock_out.json\n");
+            registrar_historial("Stock exportado a JSON (portable)");
+        }
+        else
+        {
+            printf("No se pudo exportar el stock a JSON.\n");
         }
     }
 }
@@ -1360,7 +1377,7 @@ static int pedir_modo(ModoGUI *modo)
 {
     char entrada[32];
 
-    printf("Modo (limitado/ilimitado/convertir/historial/snapshot/restaurar/reporte o salir): ");
+    printf("Modo (limitado/ilimitado/convertir/historial/snapshot/restaurar/reporte/json o salir): ");
     /* if: comprueba !leer_linea(entrada, sizeof(entrada)) antes de ejecutar esta rama. */
     if (!leer_linea(entrada, sizeof(entrada)))
         return 0;
@@ -1381,6 +1398,9 @@ static int pedir_modo(ModoGUI *modo)
     /* if: comprueba strcmp(entrada, "reporte") == 0 || strcmp(entrada, "g") == 0 antes de ejecutar esta rama. */
     if (strcmp(entrada, "reporte") == 0 || strcmp(entrada, "g") == 0)
         return 5;
+    /* if: comprueba strcmp(entrada, "json") == 0 || strcmp(entrada, "j") == 0 antes de ejecutar esta rama. */
+    if (strcmp(entrada, "json") == 0 || strcmp(entrada, "j") == 0)
+        return 7;
     /* if: comprueba strcmp(entrada, "convertir") == 0 || strcmp(entrada, "x") == 0 antes de ejecutar esta rama. */
     if (strcmp(entrada, "convertir") == 0 || strcmp(entrada, "x") == 0)
         return 6;
@@ -1479,6 +1499,13 @@ int main(void)
             pausar_pantalla();
             continue;
         }
+        /* if: comprueba estadoModo == 7 antes de ejecutar esta rama. */
+        if (estadoModo == 7)
+        {
+            ejecutar_operacion_global("json");
+            pausar_pantalla();
+            continue;
+        }
         /* if: comprueba estadoModo == 6 antes de ejecutar esta rama. */
         if (estadoModo == 6)
         {
@@ -1562,9 +1589,9 @@ int main(void)
             imprimir_panel(monedas[idxMoneda], &denom, &stock);
             /* if: comprueba requiereAdmin antes de ejecutar esta rama. */
             if (requiereAdmin)
-                printf("Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/anadir/quitar/modo/volver/salir): ");
+                printf("Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/json/anadir/quitar/modo/volver/salir): ");
             else
-                printf("Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/modo/volver/salir): ");
+                printf("Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/json/modo/volver/salir): ");
 
             /* if: comprueba !leer_linea(accion, sizeof(accion)) antes de ejecutar esta rama. */
             if (!leer_linea(accion, sizeof(accion)))
@@ -1646,6 +1673,14 @@ int main(void)
             if (strcmp(accion, "reporte") == 0)
             {
                 ejecutar_operacion_global("reporte");
+                pausar_pantalla();
+                bigint_free(&delta);
+                continue;
+            }
+            /* if: comprueba strcmp(accion, "json") == 0 antes de ejecutar esta rama. */
+            if (strcmp(accion, "json") == 0)
+            {
+                ejecutar_operacion_global("json");
                 pausar_pantalla();
                 bigint_free(&delta);
                 continue;

@@ -18,6 +18,7 @@
 #include "moneda_gestion.h"
 #include "algoritmo_cambio.h"
 #include "exchange_api.h"
+#include "json_io.h"
 
 #include <time.h>
 
@@ -621,6 +622,22 @@ static void gestionar_operacion_global(const char *accion)
         {
             printf("No se pudo generar reporte global.\n");
         }
+        return;
+    }
+
+    /* if: comprueba strcmp(accion, "json") == 0 antes de ejecutar esta rama. */
+    if (strcmp(accion, "json") == 0)
+    {
+        /* if: comprueba export_stock_json("stock_out.json") antes de ejecutar esta rama. */
+        if (export_stock_json("stock_out.json"))
+        {
+            printf("Stock exportado en JSON a stock_out.json\n");
+            registrar_historial("Stock exportado a JSON");
+        }
+        else
+        {
+            printf("No se pudo exportar el stock a JSON.\n");
+        }
     }
 }
 
@@ -633,6 +650,7 @@ static void gestionar_operacion_global(const char *accion)
  * - -5 si usuario pide crear snapshot de stock
  * - -6 si usuario pide restaurar snapshot de stock
  * - -7 si usuario pide generar reporte global
+ * - -8 si usuario pide exportar stock JSON
  * - 0 si la entrada es invalida/vacia
  * - -1 si hubo EOF/error de lectura
  * - -2 si usuario pide salir
@@ -653,9 +671,10 @@ static int pedir_opcion(void)
     printf("|   s) Snapshot stock                               |\n");
     printf("|   u) Restaurar snapshot                           |\n");
     printf("|   g) Generar reporte global                       |\n");
+    printf("|   j) Exportar stock JSON                          |\n");
     printf("|   x) Conversion entre monedas                     |\n");
     dibujar_linea();
-    printf("Opcion (a/b/c/h/r/s/u/g/x o salir): ");
+    printf("Opcion (a/b/c/h/r/s/u/g/j/x o salir): ");
 
     /* if: comprueba !leer_linea(buffer, sizeof(buffer)) antes de ejecutar esta rama. */
     if (!leer_linea(buffer, sizeof(buffer)))
@@ -686,6 +705,9 @@ static int pedir_opcion(void)
     /* if: comprueba strcmp(comando, "reporte") == 0 || strcmp(comando, "g") == 0 antes de ejecutar esta rama. */
     if (strcmp(comando, "reporte") == 0 || strcmp(comando, "g") == 0)
         return -7;
+    /* if: comprueba strcmp(comando, "json") == 0 || strcmp(comando, "j") == 0 antes de ejecutar esta rama. */
+    if (strcmp(comando, "json") == 0 || strcmp(comando, "j") == 0)
+        return -8;
     /* if: comprueba strcmp(comando, "convertir") == 0 || strcmp(comando, "x") == 0 antes de ejecutar esta rama. */
     if (strcmp(comando, "convertir") == 0 || strcmp(comando, "x") == 0)
         return (int)'x';
@@ -1834,6 +1856,14 @@ int app_console_run(void)
                 if (opcion == -7)
                 {
                     gestionar_operacion_global("reporte");
+                    pausar_pantalla();
+                    continue;
+                }
+
+                /* if: comprueba opcion == -8 antes de ejecutar esta rama. */
+                if (opcion == -8)
+                {
+                    gestionar_operacion_global("json");
                     pausar_pantalla();
                     continue;
                 }

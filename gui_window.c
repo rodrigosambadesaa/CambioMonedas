@@ -10,6 +10,7 @@
 #include "moneda_gestion.h"
 #include "algoritmo_cambio.h"
 #include "exchange_api.h"
+#include "json_io.h"
 
 #define MAX_MONEDAS 32
 #define MAX_NOMBRE 32
@@ -42,10 +43,11 @@
 #define ID_BTN_SNAPSHOT 1026
 #define ID_BTN_RESTAURAR 1027
 #define ID_BTN_REPORTE 1028
-#define ID_EDIT_CONVERT_ORIGEN 1029
-#define ID_EDIT_CONVERT_MONTO 1030
-#define ID_CHECK_CONVERT_STOCK 1031
-#define ID_BTN_CONVERTIR 1032
+#define ID_BTN_EXPORT_JSON 1029
+#define ID_EDIT_CONVERT_ORIGEN 1030
+#define ID_EDIT_CONVERT_MONTO 1031
+#define ID_CHECK_CONVERT_STOCK 1032
+#define ID_BTN_CONVERTIR 1033
 
 static HWND g_comboMoneda;
 static HWND g_listStock;
@@ -75,6 +77,7 @@ static HWND g_btnResumen;
 static HWND g_btnSnapshot;
 static HWND g_btnRestaurar;
 static HWND g_btnReporte;
+static HWND g_btnExportJson;
 static HWND g_editConvertOrigen;
 static HWND g_editConvertMonto;
 static HWND g_checkConvertStock;
@@ -293,6 +296,22 @@ static void ejecutar_operacion_global_gui(const char *accion)
         else
         {
             mostrar_error("Reporte", "No se pudo generar reporte global.");
+        }
+        return;
+    }
+
+    /* if: comprueba strcmp(accion, "json") == 0 antes de ejecutar esta rama. */
+    if (strcmp(accion, "json") == 0)
+    {
+        /* if: comprueba export_stock_json("stock_out.json") antes de ejecutar esta rama. */
+        if (export_stock_json("stock_out.json"))
+        {
+            registrar_historial("Stock exportado a JSON (windows)");
+            mostrar_info("JSON", "Stock exportado: stock_out.json");
+        }
+        else
+        {
+            mostrar_error("JSON", "No se pudo exportar stock_out.json.");
         }
     }
 }
@@ -1887,6 +1906,9 @@ static void crear_controles(HWND hwnd)
     g_btnReporte = CreateWindowA("BUTTON", "Reporte", WS_CHILD | WS_VISIBLE,
                                  220, 770, 90, 26, hwnd, (HMENU)ID_BTN_REPORTE, NULL, NULL);
 
+    g_btnExportJson = CreateWindowA("BUTTON", "JSON", WS_CHILD | WS_VISIBLE,
+                                    320, 770, 90, 26, hwnd, (HMENU)ID_BTN_EXPORT_JSON, NULL, NULL);
+
     CreateWindowA("STATIC", "Conversion a moneda cargada", WS_CHILD | WS_VISIBLE | SS_LEFT,
                   20, 806, 180, 20, hwnd, NULL, NULL, NULL);
 
@@ -2032,6 +2054,13 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
         if (id == ID_BTN_REPORTE)
         {
             ejecutar_operacion_global_gui("reporte");
+            return 0;
+        }
+
+        /* if: comprueba id == ID_BTN_EXPORT_JSON antes de ejecutar esta rama. */
+        if (id == ID_BTN_EXPORT_JSON)
+        {
+            ejecutar_operacion_global_gui("json");
             return 0;
         }
 
