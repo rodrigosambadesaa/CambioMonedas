@@ -54,7 +54,7 @@ jobs:
 
       - name: Build GUI (macOS portable fallback)
         if: runner.os == 'macOS'
-        run: gcc -std=c2x -Wall -Wextra -Wpedantic -O2 gui_portable.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c exchange_api.c -lcurl -o progvoraz_gui_portable
+        run: gcc -std=c2x -Wall -Wextra -Wpedantic -O2 gui_portable.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c exchange_api.c json_io.c -lcurl -o progvoraz_gui_portable
 
       - name: Unit tests (macOS)
         if: runner.os == 'macOS'
