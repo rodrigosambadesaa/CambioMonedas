@@ -456,8 +456,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
         reportBtn.frame = NSRect(x: 220, y: 34, width: 80, height: 26)
         content.addSubview(reportBtn)
 
+        let jsonBtn = NSButton(title: "JSON", target: self, action: #selector(exportStockJSON))
+        jsonBtn.frame = NSRect(x: 310, y: 34, width: 70, height: 26)
+        content.addSubview(jsonBtn)
+
         let convertBtn = NSButton(title: "Convertir", target: self, action: #selector(convertCurrency))
-        convertBtn.frame = NSRect(x: 310, y: 34, width: 80, height: 26)
+        convertBtn.frame = NSRect(x: 390, y: 34, width: 80, height: 26)
         content.addSubview(convertBtn)
 
         let resultTitle = NSTextField(labelWithString: "Resultado")
@@ -795,6 +799,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource 
             registerHistory("Reporte global exportado (macOS).")
         } else {
             setStatus(result.output.isEmpty ? "No se pudo generar el reporte global." : result.output, error: true)
+        }
+    }
+
+    @objc func exportStockJSON() {
+        let result = runProgvorazCLI(arguments: ["--export-stock-json", "stock_out.json"])
+        if result.ok {
+            setStatus("Stock exportado: stock_out.json")
+            resultView.string = result.output.isEmpty ? "Stock exportado: stock_out.json" : result.output
+            registerHistory("Stock exportado a JSON (macOS).")
+        } else {
+            setStatus(result.output.isEmpty ? "No se pudo exportar stock_out.json." : result.output, error: true)
         }
     }
 
