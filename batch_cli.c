@@ -19,8 +19,11 @@ static char *trim(char *s)
     /* while: repite el bloque mientras se cumpla *s && (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n'). */
     while (*s && (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n'))
         s++;
-    char *end = s + strlen(s) - 1;
-    /* while: repite el bloque mientras se cumpla end >= s && (*end == ' ' || *end == '\t' || *end == '\r' || *end == '.... */
+    size_t len = strlen(s);
+    if (len == 0)
+        return s;
+    char *end = s + len - 1;
+    /* while: repite el bloque mientras se cumpla end >= s && (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n'). */
     while (end >= s && (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n'))
         *end-- = '\0';
     return s;
@@ -224,7 +227,11 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
                     *t = (char)tolower((unsigned char)*t);
                 /* if: comprueba strcmp(tmp0, "mode") == 0 || strcmp(tmp0, "modo") == 0 || strcmp(tmp0... antes de ejecutar esta rama. */
                 if (strcmp(tmp0, "mode") == 0 || strcmp(tmp0, "modo") == 0)
+                {
+                    free(linea);
+                    linea = NULL;
                     continue;
+                }
             }
 
             /* Normal flow: cargar denominaciones (y stock si modo b/c). */
@@ -403,7 +410,11 @@ int batch_process_stream(const char *rutaLog)
                 *t = (char)tolower((unsigned char)*t);
             /* if: comprueba strcmp(tmp0, "mode") == 0 || strcmp(tmp0, "modo") == 0 antes de ejecutar esta rama. */
             if (strcmp(tmp0, "mode") == 0 || strcmp(tmp0, "modo") == 0)
+            {
+                free(linea);
+                linea = NULL;
                 continue;
+            }
         }
 
         moneda = (char *)progvoraz_map_currency_key(moneda);

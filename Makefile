@@ -38,7 +38,7 @@ RUN_TARGET := ./$(TARGET)
 RUN_TEST_TARGET := ./$(TEST_TARGET)
 endif
 
-.PHONY: all debug release run gui run-gui test clean help
+.PHONY: all debug release debug-sanitize run gui run-gui test test-sanitize valgrind fd-check stress-test memory-safety docker-debug docker-sanitize docker-valgrind docker-stress docker-fd-check clean help
 
 all: debug
 
@@ -47,6 +47,10 @@ debug: $(TARGET)
 
 release: CFLAGS += -O3 -flto
 release: $(TARGET)
+
+debug-sanitize: CFLAGS += -g -O1 -fsanitize=address,leak,undefined -fno-omit-frame-pointer
+debug-sanitize: LDFLAGS += -fsanitize=address,leak,undefined
+debug-sanitize: $(TARGET)
 
 $(TARGET): $(SRC)
 	$(CC) $(CFLAGS) $(SRC) -o $(TARGET) $(LDFLAGS)
@@ -63,6 +67,41 @@ $(TEST_TARGET): $(TEST_SRC) | $(BUILD_DIR)
 test: CFLAGS += -O0 -g
 test: $(TEST_TARGET)
 	$(RUN_TEST_TARGET)
+
+test-sanitize: CFLAGS += -g -O1 -fsanitize=address,leak,undefined -fno-omit-frame-pointer
+test-sanitize: LDFLAGS += -fsanitize=address,leak,undefined
+test-sanitize: $(TEST_TARGET) debug-sanitize
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1:abort_on_error=1 $(RUN_TEST_TARGET)
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1:abort_on_error=1 ./$(TARGET) --help >/dev/null
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1:abort_on_error=1 ./$(TARGET) --input tests/sample_batch.csv --output /tmp/progvoraz_asan.csv --log /tmp/progvoraz_asan.log
+	printf 'mode,currency,amount,range\na,EUR,127,\nb,EUR,127,\na,NOPE,10,\na,EUR,,\n' | ASAN_OPTIONS=detect_leaks=1:halt_on_error=1:abort_on_error=1 ./$(TARGET) --stream >/tmp/progvoraz_asan_stream.csv
+
+valgrind:
+	scripts/valgrind_all_modes.sh
+
+fd-check:
+	scripts/fd_check.sh
+
+stress-test:
+	scripts/stress_test.sh
+
+memory-safety:
+	scripts/memory_safety_suite.sh
+
+docker-debug:
+	docker build -f docker/Dockerfile.debug -t progvoraz-debug .
+
+docker-sanitize: docker-debug
+	docker run --rm --memory=256m progvoraz-debug make test-sanitize
+
+docker-valgrind: docker-debug
+	docker run --rm --memory=256m progvoraz-debug make valgrind
+
+docker-stress: docker-debug
+	docker run --rm --memory=256m progvoraz-debug make stress-test
+
+docker-fd-check: docker-debug
+	docker run --rm --memory=256m progvoraz-debug make fd-check
 
 ifeq ($(OS),Windows_NT)
 GUI_TARGET := $(GUI_APP).exe
@@ -109,4 +148,10 @@ help:
 	@echo "  make gui      -> compila interfaz GUI (Windows nativa / macOS/Linux portable)"
 	@echo "  make run-gui  -> ejecuta interfaz GUI"
 	@echo "  make test     -> compila y ejecuta pruebas unitarias"
+	@echo "  make debug-sanitize -> compila con ASan/LSan/UBSan"
+	@echo "  make test-sanitize  -> ejecuta pruebas y modos CLI con sanitizers"
+	@echo "  make valgrind       -> ejecuta Valgrind en modos principales"
+	@echo "  make fd-check       -> comprueba crecimiento de file descriptors"
+	@echo "  make stress-test    -> ejecuta estrés repetido"
+	@echo "  make memory-safety  -> batería completa reproducible"
 	@echo "  make clean    -> elimina artefactos"
