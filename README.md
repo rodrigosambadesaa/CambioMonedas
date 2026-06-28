@@ -2,6 +2,16 @@
 
 Proyecto de cambio de monedas escrito en C, originalmente creado en 2014 con NetBeans y actualizado para un flujo moderno orientado a GitHub.
 
+## Idiomas / Languages
+
+- Espanol: modo por defecto.
+- English: disponible con `--lang en` o `PROGVORAZ_LANG=en`.
+
+Documentacion en ingles:
+
+- `README.en.md`
+- `EJECUCION.en.md`
+
 ## Que hace
 
 - Calcula cambio en modo de monedas infinitas.

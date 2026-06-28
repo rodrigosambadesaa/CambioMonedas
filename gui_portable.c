@@ -11,6 +11,7 @@
 #include "exchange_api.h"
 #include "gui_launcher.h"
 #include "json_io.h"
+#include "progvoraz_locale.h"
 
 #include <time.h>
 
@@ -165,6 +166,7 @@ typedef enum
 } ModoGUI;
 
 static void a_minusculas(char *texto);
+#define TR(es, en) progvoraz_tr((es), (en))
 
 /* leer_linea: Funcion auxiliar. Ejecuta su logica, valida parametros de entrada y retorna un estado. */
 /* funcion leer_linea: contiene la logica principal de esta operacion. */
@@ -194,9 +196,9 @@ static int leer_linea(char *buffer, size_t tam)
         {
             /* if: comprueba progvoraz_launch_gui_nonblocking() antes de ejecutar esta rama. */
             if (progvoraz_launch_gui_nonblocking())
-                printf("Interfaz GUI lanzada en segundo plano.\n");
+                printf("%s\n", TR("Interfaz GUI lanzada en segundo plano.", "GUI launched in the background."));
             else
-                printf("No se encontro ejecutable GUI (progvoraz_gui).\n");
+                printf("%s\n", TR("No se encontro ejecutable GUI (progvoraz_gui).", "GUI executable not found (progvoraz_gui)."));
             continue;
         }
 
@@ -1252,7 +1254,10 @@ static int resolver_moneda_por_entrada(char monedas[MAX_MONEDAS][MAX_NOMBRE],
         return 1;
     }
 
-    normalizar_clave_moneda(entrada, clave, sizeof(clave));
+    {
+        const char *mapped = progvoraz_map_currency_key(entrada);
+        snprintf(clave, sizeof(clave), "%s", mapped != NULL ? mapped : "");
+    }
     /* for: itera segun int i = 0; i < nMonedas; i++ para recorrer el bloque. */
     for (int i = 0; i < nMonedas; i++)
     {
@@ -1284,49 +1289,49 @@ static void ejecutar_conversion_gui_portable(char monedas[MAX_MONEDAS][MAX_NOMBR
     int usarStock = 0;
     int ok;
 
-    printf("\n--- Conversion entre monedas ---\n");
+    printf("\n--- %s ---\n", TR("Conversion entre monedas", "Currency conversion"));
     /* for: itera segun int i = 0; i < nMonedas; i++ para recorrer el bloque. */
     for (int i = 0; i < nMonedas; i++)
         printf("  [%d] %s\n", i + 1, monedas[i]);
 
-    printf("Moneda origen (indice o nombre, o salir): ");
+    printf("%s", TR("Moneda origen (indice o nombre, o salir): ", "Source currency (index or name, or exit): "));
     /* if: comprueba !leer_linea(entrada, sizeof(entrada)) antes de ejecutar esta rama. */
     if (!leer_linea(entrada, sizeof(entrada)))
         goto cleanup;
     a_minusculas(entrada);
     /* if: comprueba strcmp(entrada, "salir") == 0 antes de ejecutar esta rama. */
-    if (strcmp(entrada, "salir") == 0)
+    if (progvoraz_cmd_is_exit(entrada))
         goto cleanup;
     /* if: comprueba !resolver_moneda_por_entrada(monedas, nMonedas, entrada, origen) antes de ejecutar esta rama. */
     if (!resolver_moneda_por_entrada(monedas, nMonedas, entrada, origen))
     {
-        printf("Moneda origen invalida.\n");
+        printf("%s\n", TR("Moneda origen invalida.", "Invalid source currency."));
         goto cleanup;
     }
 
     /* if: comprueba pedir_monto(&montoOrigen) <= 0 antes de ejecutar esta rama. */
     if (pedir_monto(&montoOrigen) <= 0)
     {
-        printf("Monto invalido.\n");
+        printf("%s\n", TR("Monto invalido.", "Invalid amount."));
         goto cleanup;
     }
 
-    printf("Moneda destino (indice o nombre, o salir): ");
+    printf("%s", TR("Moneda destino (indice o nombre, o salir): ", "Target currency (index or name, or exit): "));
     /* if: comprueba !leer_linea(entrada, sizeof(entrada)) antes de ejecutar esta rama. */
     if (!leer_linea(entrada, sizeof(entrada)))
         goto cleanup;
     a_minusculas(entrada);
     /* if: comprueba strcmp(entrada, "salir") == 0 antes de ejecutar esta rama. */
-    if (strcmp(entrada, "salir") == 0)
+    if (progvoraz_cmd_is_exit(entrada))
         goto cleanup;
     /* if: comprueba !resolver_moneda_por_entrada(monedas, nMonedas, entrada, destino) antes de ejecutar esta rama. */
     if (!resolver_moneda_por_entrada(monedas, nMonedas, entrada, destino))
     {
-        printf("Moneda destino invalida.\n");
+        printf("%s\n", TR("Moneda destino invalida.", "Invalid target currency."));
         goto cleanup;
     }
 
-    printf("Usar stock de la moneda destino? (s/n): ");
+    printf("%s", TR("Usar stock de la moneda destino? (s/n): ", "Use target currency stock? (y/n): "));
     /* if: comprueba !leer_linea(usarStockTxt, sizeof(usarStockTxt)) antes de ejecutar esta rama. */
     if (!leer_linea(usarStockTxt, sizeof(usarStockTxt)))
         goto cleanup;
@@ -1338,7 +1343,7 @@ static void ejecutar_conversion_gui_portable(char monedas[MAX_MONEDAS][MAX_NOMBR
     /* if: comprueba !fetch_exchange_rate(origen, destino, &tasa) antes de ejecutar esta rama. */
     if (!fetch_exchange_rate(origen, destino, &tasa))
     {
-        printf("No se pudo obtener la tasa de cambio para %s -> %s.\n", origen, destino);
+        printf(TR("No se pudo obtener la tasa de cambio para %s -> %s.\n", "Could not get the exchange rate for %s -> %s.\n"), origen, destino);
         goto cleanup;
     }
 
@@ -1352,7 +1357,7 @@ static void ejecutar_conversion_gui_portable(char monedas[MAX_MONEDAS][MAX_NOMBR
         /* if: comprueba !bigint_init(&montoDestino, buffer) antes de ejecutar esta rama. */
         if (!bigint_init(&montoDestino, buffer))
         {
-            printf("No se pudo calcular el monto convertido.\n");
+            printf("%s\n", TR("No se pudo calcular el monto convertido.", "Could not calculate the converted amount."));
             goto cleanup;
         }
     }
@@ -1360,14 +1365,14 @@ static void ejecutar_conversion_gui_portable(char monedas[MAX_MONEDAS][MAX_NOMBR
     /* if: comprueba !validar_consistencia_moneda(destino) || !cargar_denominaciones_moned... antes de ejecutar esta rama. */
     if (!validar_consistencia_moneda(destino) || !cargar_denominaciones_moneda(destino, &denom))
     {
-        printf("No se pudieron cargar denominaciones de la moneda destino.\n");
+        printf("%s\n", TR("No se pudieron cargar denominaciones de la moneda destino.", "Could not load target currency denominations."));
         goto cleanup;
     }
 
     /* if: comprueba usarStock && !cargar_stock_moneda(destino, &stock) antes de ejecutar esta rama. */
     if (usarStock && !cargar_stock_moneda(destino, &stock))
     {
-        printf("No se pudo cargar el stock de la moneda destino.\n");
+        printf("%s\n", TR("No se pudo cargar el stock de la moneda destino.", "Could not load the target currency stock."));
         goto cleanup;
     }
 
@@ -1378,11 +1383,12 @@ static void ejecutar_conversion_gui_portable(char monedas[MAX_MONEDAS][MAX_NOMBR
     /* if: comprueba !ok antes de ejecutar esta rama. */
     if (!ok)
     {
-        printf("No se pudo descomponer %s c en la moneda destino.\n", montoDestino.digits);
+        printf(TR("No se pudo descomponer %s c en la moneda destino.\n", "Could not decompose %s c in the target currency.\n"), montoDestino.digits);
         goto cleanup;
     }
 
-    printf("Conversion aplicada: %s %s-centimos -> %s %s-centimos | tasa=%.6f\n",
+    printf(TR("Conversion aplicada: %s %s-centimos -> %s %s-centimos | tasa=%.6f\n",
+              "Conversion applied: %s %s-cents -> %s %s-cents | rate=%.6f\n"),
            montoOrigen.digits, origen, montoDestino.digits, destino, tasa);
     imprimir_resultado_cambio(&montoDestino, &denom, &solucion);
     registrar_historialf("Conversion portable | %s->%s | Origen=%s c | Destino=%s c | Tasa=%.6f",
@@ -1402,49 +1408,50 @@ static int pedir_modo(ModoGUI *modo)
 {
     char entrada[32];
 
-    printf("Modo (limitado/ilimitado/convertir/historial/snapshot/restaurar/reporte/json/gui o salir): ");
+    printf("%s", TR("Modo (limitado/ilimitado/convertir/historial/snapshot/restaurar/reporte/json/gui o salir): ",
+                    "Mode (limited/unlimited/convert/history/snapshot/restore/report/json/gui or exit): "));
     /* if: comprueba !leer_linea(entrada, sizeof(entrada)) antes de ejecutar esta rama. */
     if (!leer_linea(entrada, sizeof(entrada)))
         return 0;
 
     a_minusculas(entrada);
     /* if: comprueba strcmp(entrada, "salir") == 0 antes de ejecutar esta rama. */
-    if (strcmp(entrada, "salir") == 0)
+    if (progvoraz_cmd_is_exit(entrada))
         return 0;
     /* if: comprueba strcmp(entrada, "historial") == 0 || strcmp(entrada, "h") == 0 antes de ejecutar esta rama. */
-    if (strcmp(entrada, "historial") == 0 || strcmp(entrada, "h") == 0)
+    if (progvoraz_cmd_is_history(entrada) || strcmp(entrada, "h") == 0)
         return 2;
     /* if: comprueba strcmp(entrada, "snapshot") == 0 || strcmp(entrada, "s") == 0 antes de ejecutar esta rama. */
-    if (strcmp(entrada, "snapshot") == 0 || strcmp(entrada, "s") == 0)
+    if (progvoraz_cmd_is_snapshot(entrada) || strcmp(entrada, "s") == 0)
         return 3;
     /* if: comprueba strcmp(entrada, "restaurar") == 0 || strcmp(entrada, "u") == 0 antes de ejecutar esta rama. */
-    if (strcmp(entrada, "restaurar") == 0 || strcmp(entrada, "u") == 0)
+    if (progvoraz_cmd_is_restore(entrada) || strcmp(entrada, "u") == 0)
         return 4;
     /* if: comprueba strcmp(entrada, "reporte") == 0 || strcmp(entrada, "g") == 0 antes de ejecutar esta rama. */
-    if (strcmp(entrada, "reporte") == 0 || strcmp(entrada, "g") == 0)
+    if (progvoraz_cmd_is_report(entrada) || strcmp(entrada, "g") == 0)
         return 5;
     /* if: comprueba strcmp(entrada, "json") == 0 || strcmp(entrada, "j") == 0 antes de ejecutar esta rama. */
-    if (strcmp(entrada, "json") == 0 || strcmp(entrada, "j") == 0)
+    if (progvoraz_cmd_is_json(entrada) || strcmp(entrada, "j") == 0)
         return 7;
     /* if: comprueba strcmp(entrada, "convertir") == 0 || strcmp(entrada, "x") == 0 antes de ejecutar esta rama. */
-    if (strcmp(entrada, "convertir") == 0 || strcmp(entrada, "x") == 0)
+    if (progvoraz_cmd_is_convert(entrada) || strcmp(entrada, "x") == 0)
         return 6;
 
     /* if: comprueba strcmp(entrada, "limitado") == 0 || strcmp(entrada, "b") == 0 antes de ejecutar esta rama. */
-    if (strcmp(entrada, "limitado") == 0 || strcmp(entrada, "b") == 0)
+    if (progvoraz_cmd_is_limited(entrada) || strcmp(entrada, "b") == 0)
     {
         *modo = MODO_LIMITADO;
         return 1;
     }
 
     /* if: comprueba strcmp(entrada, "ilimitado") == 0 || strcmp(entrada, "a") == 0 antes de ejecutar esta rama. */
-    if (strcmp(entrada, "ilimitado") == 0 || strcmp(entrada, "a") == 0)
+    if (progvoraz_cmd_is_unlimited(entrada) || strcmp(entrada, "a") == 0)
     {
         *modo = MODO_ILIMITADO;
         return 1;
     }
 
-    printf("Modo invalido.\n");
+    printf("%s\n", TR("Modo invalido.", "Invalid mode."));
     return -1;
 }
 
@@ -1471,13 +1478,15 @@ int main(void)
     int nMonedas = 0;
     ModoGUI modoActual = MODO_LIMITADO;
 
+    progvoraz_locale_init_from_env();
     printf("ProgVoraz GUI portable iniciado en %s\n", so);
-    printf("Nota: en este SO se usa panel administrador y calculo de devolucion en terminal (sin WinAPI).\n");
+    printf("%s\n", TR("Nota: en este SO se usa panel administrador y calculo de devolucion en terminal (sin WinAPI).",
+                      "Note: on this OS a terminal-based admin panel and change calculator are used (no WinAPI)."));
 
     /* if: comprueba !cargar_nombres_moneda(monedas, &nMonedas) antes de ejecutar esta rama. */
     if (!cargar_nombres_moneda(monedas, &nMonedas))
     {
-        printf("No se pudieron cargar monedas desde monedas.txt\n");
+        printf("%s\n", TR("No se pudieron cargar monedas desde monedas.txt", "Could not load currencies from monedas.txt"));
         return 1;
     }
 
@@ -1542,12 +1551,15 @@ int main(void)
         if (estadoModo < 0)
             continue;
 
-        printf("\nMonedas disponibles (modo %s):\n", modoActual == MODO_LIMITADO ? "stock limitado" : "stock ilimitado");
+        printf("\n%s (%s %s):\n",
+               TR("Monedas disponibles", "Available currencies"),
+               TR("mode", "mode"),
+               modoActual == MODO_LIMITADO ? TR("stock limitado", "limited stock") : TR("stock ilimitado", "unlimited stock"));
         /* for: itera segun int i = 0; i < nMonedas; i++ para recorrer el bloque. */
         for (int i = 0; i < nMonedas; i++)
             printf("  [%d] %s\n", i + 1, monedas[i]);
 
-        printf("Selecciona moneda por indice o nombre (o gui/salir): ");
+        printf("%s", TR("Selecciona moneda por indice o nombre (o gui/salir): ", "Select a currency by index or name (or gui/exit): "));
         /* if: comprueba !leer_linea(entrada, sizeof(entrada)) antes de ejecutar esta rama. */
         if (!leer_linea(entrada, sizeof(entrada)))
             break;
@@ -1556,7 +1568,7 @@ int main(void)
         cmd[sizeof(cmd) - 1] = '\0';
         a_minusculas(cmd);
         /* if: comprueba strcmp(cmd, "salir") == 0 antes de ejecutar esta rama. */
-        if (strcmp(cmd, "salir") == 0)
+        if (progvoraz_cmd_is_exit(cmd))
             break;
 
         {
@@ -1586,7 +1598,7 @@ int main(void)
         /* if: comprueba idxMoneda < 0 antes de ejecutar esta rama. */
         if (idxMoneda < 0)
         {
-            printf("Moneda invalida.\n");
+            printf("%s\n", TR("Moneda invalida.", "Invalid currency."));
             continue;
         }
 
@@ -1595,7 +1607,8 @@ int main(void)
             !cargar_denominaciones_moneda(monedas[idxMoneda], &denom) ||
             !cargar_stock_moneda(monedas[idxMoneda], &stock))
         {
-            printf("No se pudo cargar denominaciones/stock para esa moneda (archivo inconsistente).\n");
+            printf("%s\n", TR("No se pudo cargar denominaciones/stock para esa moneda (archivo inconsistente).",
+                               "Could not load denominations/stock for that currency (inconsistent file)."));
             bigint_array_free(&denom);
             bigint_array_free(&stock);
             continue;
@@ -1614,9 +1627,11 @@ int main(void)
             imprimir_panel(monedas[idxMoneda], &denom, &stock);
             /* if: comprueba requiereAdmin antes de ejecutar esta rama. */
             if (requiereAdmin)
-                printf("Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/json/anadir/quitar/modo/volver/gui/salir): ");
+                printf("%s", TR("Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/json/anadir/quitar/modo/volver/gui/salir): ",
+                               "Action (calculate/register/limit/specific/history/summary/snapshot/restore/report/json/add/remove/mode/back/gui/exit): "));
             else
-                printf("Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/json/modo/volver/gui/salir): ");
+                printf("%s", TR("Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/json/modo/volver/gui/salir): ",
+                               "Action (calculate/register/limit/specific/history/summary/snapshot/restore/report/json/mode/back/gui/exit): "));
 
             /* if: comprueba !leer_linea(accion, sizeof(accion)) antes de ejecutar esta rama. */
             if (!leer_linea(accion, sizeof(accion)))
@@ -1630,7 +1645,7 @@ int main(void)
             a_minusculas(accion);
 
             /* if: comprueba strcmp(accion, "salir") == 0 antes de ejecutar esta rama. */
-            if (strcmp(accion, "salir") == 0)
+            if (progvoraz_cmd_is_exit(accion))
             {
                 bigint_free(&delta);
                 bigint_array_free(&denom);
@@ -1639,21 +1654,21 @@ int main(void)
             }
 
             /* if: comprueba strcmp(accion, "volver") == 0 antes de ejecutar esta rama. */
-            if (strcmp(accion, "volver") == 0)
+            if (progvoraz_cmd_is_back(accion))
             {
                 bigint_free(&delta);
                 break;
             }
 
             /* if: comprueba strcmp(accion, "modo") == 0 antes de ejecutar esta rama. */
-            if (strcmp(accion, "modo") == 0)
+            if (progvoraz_cmd_is_mode(accion))
             {
                 bigint_free(&delta);
                 break;
             }
 
             /* if: comprueba strcmp(accion, "historial") == 0 antes de ejecutar esta rama. */
-            if (strcmp(accion, "historial") == 0)
+            if (progvoraz_cmd_is_history(accion))
             {
                 mostrar_historial_transacciones();
                 pausar_pantalla();
@@ -1662,7 +1677,7 @@ int main(void)
             }
 
             /* if: comprueba strcmp(accion, "resumen") == 0 antes de ejecutar esta rama. */
-            if (strcmp(accion, "resumen") == 0)
+            if (progvoraz_cmd_is_summary(accion))
             {
                 mostrar_resumen_moneda(monedas[idxMoneda], &denom, requiereAdmin ? &stock : NULL, requiereAdmin);
                 pausar_pantalla();
@@ -1671,7 +1686,7 @@ int main(void)
             }
 
             /* if: comprueba strcmp(accion, "snapshot") == 0 antes de ejecutar esta rama. */
-            if (strcmp(accion, "snapshot") == 0)
+            if (progvoraz_cmd_is_snapshot(accion))
             {
                 ejecutar_operacion_global("snapshot");
                 pausar_pantalla();
@@ -1680,7 +1695,7 @@ int main(void)
             }
 
             /* if: comprueba strcmp(accion, "restaurar") == 0 antes de ejecutar esta rama. */
-            if (strcmp(accion, "restaurar") == 0)
+            if (progvoraz_cmd_is_restore(accion))
             {
                 ejecutar_operacion_global("restaurar");
                 /* if: comprueba modoActual == MODO_LIMITADO antes de ejecutar esta rama. */
@@ -1695,7 +1710,7 @@ int main(void)
             }
 
             /* if: comprueba strcmp(accion, "reporte") == 0 antes de ejecutar esta rama. */
-            if (strcmp(accion, "reporte") == 0)
+            if (progvoraz_cmd_is_report(accion))
             {
                 ejecutar_operacion_global("reporte");
                 pausar_pantalla();
@@ -1703,7 +1718,7 @@ int main(void)
                 continue;
             }
             /* if: comprueba strcmp(accion, "json") == 0 antes de ejecutar esta rama. */
-            if (strcmp(accion, "json") == 0)
+            if (progvoraz_cmd_is_json(accion))
             {
                 ejecutar_operacion_global("json");
                 pausar_pantalla();
@@ -1711,7 +1726,7 @@ int main(void)
                 continue;
             }
             /* if: comprueba strcmp(accion, "calcular") == 0 antes de ejecutar esta rama. */
-            if (strcmp(accion, "calcular") == 0)
+            if (progvoraz_cmd_is_calculate(accion))
             {
                 calcular_y_aplicar_cambio(modoActual, monedas[idxMoneda], &denom, &stock, 0, 0);
                 bigint_free(&delta);
@@ -1719,30 +1734,31 @@ int main(void)
             }
 
             /* if: comprueba strcmp(accion, "caja") == 0 antes de ejecutar esta rama. */
-            if (strcmp(accion, "caja") == 0)
+            if (progvoraz_cmd_is_register(accion))
             {
                 calcular_y_aplicar_cambio(modoActual, monedas[idxMoneda], &denom, &stock, 1, 0);
                 bigint_free(&delta);
                 continue;
             }
             /* if: comprueba strcmp(accion, "limite") == 0 antes de ejecutar esta rama. */
-            if (strcmp(accion, "limite") == 0)
+            if (progvoraz_cmd_is_limit(accion))
             {
                 calcular_y_aplicar_cambio(modoActual, monedas[idxMoneda], &denom, &stock, 0, 1);
                 bigint_free(&delta);
                 continue;
             }
             /* if: comprueba strcmp(accion, "especifico") == 0 antes de ejecutar esta rama. */
-            if (strcmp(accion, "especifico") == 0)
+            if (progvoraz_cmd_is_specific(accion))
             {
                 BigIntArray entregadas = {0};
                 BigIntArray devolucion = {0};
 
                 /* if: comprueba !pedir_cantidades_por_denominacion(&denom, "Monedas/Billetes entregad... antes de ejecutar esta rama. */
-                if (!pedir_cantidades_por_denominacion(&denom, "Monedas/Billetes entregados por el usuario:", &entregadas) ||
-                    !pedir_cantidades_por_denominacion(&denom, "Cambio especifico solicitado (cantidades a devolver):", &devolucion))
+                if (!pedir_cantidades_por_denominacion(&denom, TR("Monedas/Billetes entregados por el usuario:", "Coins/bills delivered by the user:"), &entregadas) ||
+                    !pedir_cantidades_por_denominacion(&denom, TR("Cambio especifico solicitado (cantidades a devolver):", "Specific requested change (quantities to return):"), &devolucion))
                 {
-                    printf("No se pudieron leer cantidades para cambio especifico.\n");
+                    printf("%s\n", TR("No se pudieron leer cantidades para cambio especifico.",
+                                      "Could not read the quantities for the specific change."));
                     bigint_array_free(&entregadas);
                     bigint_array_free(&devolucion);
                     bigint_free(&delta);
@@ -1756,11 +1772,12 @@ int main(void)
                     /* if: comprueba !requiereAdmin antes de ejecutar esta rama. */
                     if (!requiereAdmin)
                     {
-                        printf("Cambio especifico aplicado en modo ilimitado.\n");
+                        printf("%s\n", TR("Cambio especifico aplicado en modo ilimitado.",
+                                          "Specific change applied in unlimited mode."));
                         registrar_historial("Cambio especifico aplicado (ilimitado, portable).");
                     }
 
-                    printf("Cambio especifico entregado:\n");
+                    printf("%s\n", TR("Cambio especifico entregado:", "Specific change delivered:"));
                     /* for: itera segun size_t i = 0; i < denom.len; i++ para recorrer el bloque. */
                     for (size_t i = 0; i < denom.len; i++)
                     {
@@ -1780,20 +1797,21 @@ int main(void)
             /* if: comprueba !requiereAdmin antes de ejecutar esta rama. */
             if (!requiereAdmin)
             {
-                printf("Accion invalida para modo stock ilimitado.\n");
+                printf("%s\n", TR("Accion invalida para modo stock ilimitado.",
+                                  "Invalid action for unlimited stock mode."));
                 bigint_free(&delta);
                 continue;
             }
 
             /* if: comprueba strcmp(accion, "anadir") == 0 antes de ejecutar esta rama. */
-            if (strcmp(accion, "anadir") == 0)
+            if (progvoraz_cmd_is_add(accion))
                 esSuma = 1;
             /* if: comprueba strcmp(accion, "quitar") == 0 antes de continuar con esta alternativa. */
-            else if (strcmp(accion, "quitar") == 0)
+            else if (progvoraz_cmd_is_remove(accion))
                 esSuma = 0;
             else
             {
-                printf("Accion invalida.\n");
+                printf("%s\n", TR("Accion invalida.", "Invalid action."));
                 bigint_free(&delta);
                 continue;
             }
@@ -1801,7 +1819,7 @@ int main(void)
             /* if: comprueba pedir_indice(denom.len, &idxDen) <= 0 antes de ejecutar esta rama. */
             if (pedir_indice(denom.len, &idxDen) <= 0)
             {
-                printf("Indice invalido.\n");
+                printf("%s\n", TR("Indice invalido.", "Invalid index."));
                 bigint_free(&delta);
                 continue;
             }
@@ -1809,7 +1827,7 @@ int main(void)
             /* if: comprueba pedir_cantidad(&delta) <= 0 antes de ejecutar esta rama. */
             if (pedir_cantidad(&delta) <= 0)
             {
-                printf("Cantidad invalida.\n");
+                printf("%s\n", TR("Cantidad invalida.", "Invalid quantity."));
                 bigint_free(&delta);
                 continue;
             }
@@ -1821,7 +1839,7 @@ int main(void)
                 /* if: comprueba !bigint_add(&stock.items[idxDen], &delta, &nuevo) antes de ejecutar esta rama. */
                 if (!bigint_add(&stock.items[idxDen], &delta, &nuevo))
                 {
-                    printf("No se pudo sumar stock.\n");
+                    printf("%s\n", TR("No se pudo sumar stock.", "Could not add stock."));
                     bigint_free(&delta);
                     bigint_free(&nuevo);
                     continue;
@@ -1833,7 +1851,8 @@ int main(void)
                 /* if: comprueba bigint_compare(&stock.items[idxDen], &delta) < 0 || !bigint_subtract(... antes de ejecutar esta rama. */
                 if (bigint_compare(&stock.items[idxDen], &delta) < 0 || !bigint_subtract(&stock.items[idxDen], &delta, &nuevo))
                 {
-                    printf("No se pudo quitar stock (insuficiente o error).\n");
+                    printf("%s\n", TR("No se pudo quitar stock (insuficiente o error).",
+                                      "Could not remove stock (insufficient stock or error)."));
                     bigint_free(&delta);
                     bigint_free(&nuevo);
                     continue;
@@ -1843,7 +1862,7 @@ int main(void)
             /* if: comprueba !bigint_array_set(&stock, idxDen, &nuevo) antes de ejecutar esta rama. */
             if (!bigint_array_set(&stock, idxDen, &nuevo))
             {
-                printf("No se pudo aplicar cambio en memoria.\n");
+                printf("%s\n", TR("No se pudo aplicar cambio en memoria.", "Could not apply the change in memory."));
                 bigint_free(&delta);
                 bigint_free(&nuevo);
                 continue;
@@ -1851,7 +1870,7 @@ int main(void)
 
             /* if: comprueba !actualizar_stock_moneda(monedas[idxMoneda], &stock) antes de ejecutar esta rama. */
             if (!actualizar_stock_moneda(monedas[idxMoneda], &stock))
-                printf("No se pudo persistir stock en archivo.\n");
+                printf("%s\n", TR("No se pudo persistir stock en archivo.", "Could not persist the stock to file."));
             else
             {
                 registrar_historialf("Admin %s (portable) | Moneda=%s | Denom=%s c | Cantidad=%s",
@@ -1859,7 +1878,7 @@ int main(void)
                                      monedas[idxMoneda],
                                      denom.items[idxDen].digits,
                                      delta.digits);
-                printf("Stock actualizado correctamente.\n");
+                printf("%s\n", TR("Stock actualizado correctamente.", "Stock updated successfully."));
             }
 
             bigint_free(&delta);

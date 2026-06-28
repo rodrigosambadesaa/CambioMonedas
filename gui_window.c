@@ -11,6 +11,7 @@
 #include "algoritmo_cambio.h"
 #include "exchange_api.h"
 #include "json_io.h"
+#include "progvoraz_locale.h"
 
 #define MAX_MONEDAS 32
 #define MAX_NOMBRE 32
@@ -48,6 +49,8 @@
 #define ID_EDIT_CONVERT_MONTO 1031
 #define ID_CHECK_CONVERT_STOCK 1032
 #define ID_BTN_CONVERTIR 1033
+
+#define TR(es, en) progvoraz_tr((es), (en))
 
 static HWND g_comboMoneda;
 static HWND g_listStock;
@@ -256,11 +259,11 @@ static void ejecutar_operacion_global_gui(const char *accion)
         if (crear_snapshot_stock("stock_snapshot.txt"))
         {
             registrar_historial("Snapshot de stock creado (windows)");
-            mostrar_info("Snapshot", "Snapshot creado: stock_snapshot.txt");
+            mostrar_info(TR("Snapshot", "Snapshot"), TR("Snapshot creado: stock_snapshot.txt", "Snapshot created: stock_snapshot.txt"));
         }
         else
         {
-            mostrar_error("Snapshot", "No se pudo crear snapshot de stock.");
+            mostrar_error(TR("Snapshot", "Snapshot"), TR("No se pudo crear snapshot de stock.", "Could not create the stock snapshot."));
         }
         return;
     }
@@ -275,11 +278,11 @@ static void ejecutar_operacion_global_gui(const char *accion)
             /* if: comprueba g_monedaActiva >= 0 antes de ejecutar esta rama. */
             if (g_monedaActiva >= 0)
                 cargar_moneda_seleccionada();
-            mostrar_info("Restaurar", "Stock restaurado desde stock_snapshot.txt");
+            mostrar_info(TR("Restaurar", "Restore"), TR("Stock restaurado desde stock_snapshot.txt", "Stock restored from stock_snapshot.txt"));
         }
         else
         {
-            mostrar_error("Restaurar", "No se pudo restaurar stock desde snapshot.");
+            mostrar_error(TR("Restaurar", "Restore"), TR("No se pudo restaurar stock desde snapshot.", "Could not restore stock from snapshot."));
         }
         return;
     }
@@ -291,11 +294,11 @@ static void ejecutar_operacion_global_gui(const char *accion)
         if (exportar_reporte_global("reporte_global.txt"))
         {
             registrar_historial("Reporte global exportado (windows)");
-            mostrar_info("Reporte", "Reporte generado: reporte_global.txt");
+            mostrar_info(TR("Reporte", "Report"), TR("Reporte generado: reporte_global.txt", "Report generated: reporte_global.txt"));
         }
         else
         {
-            mostrar_error("Reporte", "No se pudo generar reporte global.");
+            mostrar_error(TR("Reporte", "Report"), TR("No se pudo generar reporte global.", "Could not generate the global report."));
         }
         return;
     }
@@ -307,11 +310,11 @@ static void ejecutar_operacion_global_gui(const char *accion)
         if (export_stock_json("stock_out.json"))
         {
             registrar_historial("Stock exportado a JSON (windows)");
-            mostrar_info("JSON", "Stock exportado: stock_out.json");
+            mostrar_info("JSON", TR("Stock exportado: stock_out.json", "Stock exported: stock_out.json"));
         }
         else
         {
-            mostrar_error("JSON", "No se pudo exportar stock_out.json.");
+            mostrar_error("JSON", TR("No se pudo exportar stock_out.json.", "Could not export stock_out.json."));
         }
     }
 }
@@ -1785,25 +1788,25 @@ static int aplicar_cambio_especifico(void)
 /* funcion crear_controles: contiene la logica principal de esta operacion. */
 static void crear_controles(HWND hwnd)
 {
-    CreateWindowA("STATIC", "Panel Principal", WS_CHILD | WS_VISIBLE | SS_LEFT,
+    CreateWindowA("STATIC", TR("Panel Principal", "Main Panel"), WS_CHILD | WS_VISIBLE | SS_LEFT,
                   20, 20, 220, 20, hwnd, NULL, NULL, NULL);
 
-    CreateWindowA("STATIC", "Moneda:", WS_CHILD | WS_VISIBLE,
+    CreateWindowA("STATIC", TR("Moneda:", "Currency:"), WS_CHILD | WS_VISIBLE,
                   20, 50, 60, 20, hwnd, NULL, NULL, NULL);
 
     g_comboMoneda = CreateWindowA("COMBOBOX", "", WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST,
                                   80, 48, 180, 400, hwnd, (HMENU)ID_COMBO_MONEDA, NULL, NULL);
 
-    g_btnCargar = CreateWindowA("BUTTON", "Cargar", WS_CHILD | WS_VISIBLE,
+    g_btnCargar = CreateWindowA("BUTTON", TR("Cargar", "Load"), WS_CHILD | WS_VISIBLE,
                                 270, 47, 90, 24, hwnd, (HMENU)ID_BTN_CARGAR, NULL, NULL);
 
-    g_btnRecargar = CreateWindowA("BUTTON", "Recargar", WS_CHILD | WS_VISIBLE,
+    g_btnRecargar = CreateWindowA("BUTTON", TR("Recargar", "Reload"), WS_CHILD | WS_VISIBLE,
                                   370, 47, 90, 24, hwnd, (HMENU)ID_BTN_RECARGAR, NULL, NULL);
 
-    g_radioLimitado = CreateWindowA("BUTTON", "Stock limitado", WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON,
+    g_radioLimitado = CreateWindowA("BUTTON", TR("Stock limitado", "Limited stock"), WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON,
                                     20, 76, 130, 20, hwnd, (HMENU)ID_RADIO_LIMITADO, NULL, NULL);
 
-    g_radioIlimitado = CreateWindowA("BUTTON", "Stock ilimitado", WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON,
+    g_radioIlimitado = CreateWindowA("BUTTON", TR("Stock ilimitado", "Unlimited stock"), WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON,
                                      160, 76, 130, 20, hwnd, (HMENU)ID_RADIO_ILIMITADO, NULL, NULL);
 
     configurar_modo_stock(1);
@@ -1811,25 +1814,25 @@ static void crear_controles(HWND hwnd)
     g_listStock = CreateWindowA("LISTBOX", "", WS_CHILD | WS_VISIBLE | WS_BORDER | WS_HSCROLL | WS_VSCROLL | LBS_NOTIFY,
                                 20, 102, 440, 140, hwnd, (HMENU)ID_LIST_STOCK, NULL, NULL);
 
-    CreateWindowA("STATIC", "Panel Administrador", WS_CHILD | WS_VISIBLE | SS_LEFT,
+    CreateWindowA("STATIC", TR("Panel Administrador", "Administrator Panel"), WS_CHILD | WS_VISIBLE | SS_LEFT,
                   20, 250, 220, 20, hwnd, NULL, NULL, NULL);
 
-    CreateWindowA("STATIC", "Denominacion:", WS_CHILD | WS_VISIBLE,
+    CreateWindowA("STATIC", TR("Denominacion:", "Denomination:"), WS_CHILD | WS_VISIBLE,
                   20, 285, 90, 20, hwnd, NULL, NULL, NULL);
 
     g_comboDenom = CreateWindowA("COMBOBOX", "", WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST,
                                  115, 282, 150, 400, hwnd, (HMENU)ID_COMBO_DENOM, NULL, NULL);
 
-    CreateWindowA("STATIC", "Cantidad:", WS_CHILD | WS_VISIBLE,
+    CreateWindowA("STATIC", TR("Cantidad:", "Quantity:"), WS_CHILD | WS_VISIBLE,
                   280, 285, 60, 20, hwnd, NULL, NULL, NULL);
 
     g_editCantidad = CreateWindowA("EDIT", "", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
                                    345, 282, 115, 24, hwnd, (HMENU)ID_EDIT_CANTIDAD, NULL, NULL);
 
-    g_btnAgregar = CreateWindowA("BUTTON", "Anadir", WS_CHILD | WS_VISIBLE,
+    g_btnAgregar = CreateWindowA("BUTTON", TR("Anadir", "Add"), WS_CHILD | WS_VISIBLE,
                                  190, 320, 120, 30, hwnd, (HMENU)ID_BTN_AGREGAR, NULL, NULL);
 
-    g_btnQuitar = CreateWindowA("BUTTON", "Quitar", WS_CHILD | WS_VISIBLE,
+    g_btnQuitar = CreateWindowA("BUTTON", TR("Quitar", "Remove"), WS_CHILD | WS_VISIBLE,
                                 320, 320, 120, 30, hwnd, (HMENU)ID_BTN_QUITAR, NULL, NULL);
 
     CreateWindowA("STATIC", "Lote (una cantidad por linea en orden de denominaciones):", WS_CHILD | WS_VISIBLE,
@@ -1862,7 +1865,7 @@ static void crear_controles(HWND hwnd)
     g_btnCambioEspecifico = CreateWindowA("BUTTON", "Aplicar cambio especifico", WS_CHILD | WS_VISIBLE,
                                           420, 538, 170, 30, hwnd, (HMENU)ID_BTN_CAMBIO_ESPECIFICO, NULL, NULL);
 
-    CreateWindowA("STATIC", "Panel Devolucion", WS_CHILD | WS_VISIBLE | SS_LEFT,
+    CreateWindowA("STATIC", TR("Panel Devolucion", "Change Panel"), WS_CHILD | WS_VISIBLE | SS_LEFT,
                   20, 580, 220, 20, hwnd, NULL, NULL, NULL);
 
     g_checkCaja = CreateWindowA("BUTTON", "Caja Reg.", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
@@ -1888,28 +1891,28 @@ static void crear_controles(HWND hwnd)
     g_editLimite = CreateWindowA("EDIT", "", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
                                  215, 630, 60, 24, hwnd, (HMENU)ID_EDIT_LIMITE, NULL, NULL);
 
-    g_btnCalcular = CreateWindowA("BUTTON", "Calcular", WS_CHILD | WS_VISIBLE,
+    g_btnCalcular = CreateWindowA("BUTTON", TR("Calcular", "Calculate"), WS_CHILD | WS_VISIBLE,
                                   285, 628, 80, 28, hwnd, (HMENU)ID_BTN_CALCULAR, NULL, NULL);
 
-    g_btnHistorial = CreateWindowA("BUTTON", "Historial", WS_CHILD | WS_VISIBLE,
+    g_btnHistorial = CreateWindowA("BUTTON", TR("Historial", "History"), WS_CHILD | WS_VISIBLE,
                                    375, 628, 80, 28, hwnd, (HMENU)ID_BTN_HISTORIAL, NULL, NULL);
 
-    g_btnResumen = CreateWindowA("BUTTON", "Resumen", WS_CHILD | WS_VISIBLE,
+    g_btnResumen = CreateWindowA("BUTTON", TR("Resumen", "Summary"), WS_CHILD | WS_VISIBLE,
                                  465, 628, 80, 28, hwnd, (HMENU)ID_BTN_RESUMEN, NULL, NULL);
 
     g_btnSnapshot = CreateWindowA("BUTTON", "Snapshot", WS_CHILD | WS_VISIBLE,
                                   20, 770, 90, 26, hwnd, (HMENU)ID_BTN_SNAPSHOT, NULL, NULL);
 
-    g_btnRestaurar = CreateWindowA("BUTTON", "Restaurar", WS_CHILD | WS_VISIBLE,
+    g_btnRestaurar = CreateWindowA("BUTTON", TR("Restaurar", "Restore"), WS_CHILD | WS_VISIBLE,
                                    120, 770, 90, 26, hwnd, (HMENU)ID_BTN_RESTAURAR, NULL, NULL);
 
-    g_btnReporte = CreateWindowA("BUTTON", "Reporte", WS_CHILD | WS_VISIBLE,
+    g_btnReporte = CreateWindowA("BUTTON", TR("Reporte", "Report"), WS_CHILD | WS_VISIBLE,
                                  220, 770, 90, 26, hwnd, (HMENU)ID_BTN_REPORTE, NULL, NULL);
 
     g_btnExportJson = CreateWindowA("BUTTON", "JSON", WS_CHILD | WS_VISIBLE,
                                     320, 770, 90, 26, hwnd, (HMENU)ID_BTN_EXPORT_JSON, NULL, NULL);
 
-    CreateWindowA("STATIC", "Conversion a moneda cargada", WS_CHILD | WS_VISIBLE | SS_LEFT,
+    CreateWindowA("STATIC", TR("Conversion a moneda cargada", "Conversion to loaded currency"), WS_CHILD | WS_VISIBLE | SS_LEFT,
                   20, 806, 180, 20, hwnd, NULL, NULL, NULL);
 
     CreateWindowA("STATIC", "Origen:", WS_CHILD | WS_VISIBLE,
@@ -1927,7 +1930,7 @@ static void crear_controles(HWND hwnd)
     g_checkConvertStock = CreateWindowA("BUTTON", "Usar stock destino", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
                                         385, 831, 130, 22, hwnd, (HMENU)ID_CHECK_CONVERT_STOCK, NULL, NULL);
 
-    g_btnConvertir = CreateWindowA("BUTTON", "Convertir", WS_CHILD | WS_VISIBLE,
+    g_btnConvertir = CreateWindowA("BUTTON", TR("Convertir", "Convert"), WS_CHILD | WS_VISIBLE,
                                    525, 827, 90, 30, hwnd, (HMENU)ID_BTN_CONVERTIR, NULL, NULL);
 
     g_listResultado = CreateWindowA("LISTBOX", "", WS_CHILD | WS_VISIBLE | WS_BORDER | WS_HSCROLL | WS_VSCROLL | LBS_NOTIFY,
@@ -2145,6 +2148,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     (void)hPrevInstance;
     (void)lpCmdLine;
+    progvoraz_locale_init_from_env();
 
     wc.lpfnWndProc = wnd_proc;
     wc.hInstance = hInstance;
@@ -2156,7 +2160,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (!RegisterClassA(&wc))
         return 1;
 
-    hwnd = CreateWindowA("ProgVorazGUI", "ProgVoraz - Interfaz Grafica",
+    hwnd = CreateWindowA("ProgVorazGUI", TR("ProgVoraz - Interfaz Grafica", "ProgVoraz - Graphical Interface"),
                          WS_OVERLAPPEDWINDOW & ~WS_THICKFRAME & ~WS_MAXIMIZEBOX,
                          CW_USEDEFAULT, CW_USEDEFAULT, 660, 940,
                          NULL, NULL, hInstance, NULL);

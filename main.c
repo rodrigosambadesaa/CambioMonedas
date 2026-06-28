@@ -11,6 +11,7 @@
 #include "exchange_api.h"
 #include "algoritmo_cambio.h"
 #include "gui_launcher.h"
+#include "progvoraz_locale.h"
 
 // Explicación del propósito de cada variable de este archivo, función por función:
 // Función 1: map_currency_key
@@ -23,61 +24,6 @@
 //     - linea: buffer para almacenar la línea leída del archivo de versión.
 // Función 4: file_exists
 
-/* map_currency_key: convierte un codigo ISO o nombre corto a la clave usada en monedas.txt
- * Devuelve puntero a cadena estatica o NULL si no hay mapeo. */
-/* funcion map_currency_key: contiene la logica principal de esta operacion. */
-static const char *map_currency_key(const char *input)
-{
-    static char tmp[64];
-    /* if: comprueba !input || !*input antes de ejecutar esta rama. */
-    if (!input || !*input)
-        return NULL;
-
-    /* Comparaciones comunes (case-insensitive) */
-    /* if: comprueba strcasecmp(input, "EUR") == 0 || strcasecmp(input, "E") == 0 || strca... antes de ejecutar esta rama. */
-    if (strcasecmp(input, "EUR") == 0 || strcasecmp(input, "E") == 0 || strcasecmp(input, "EURO") == 0)
-        return "euro";
-    /* if: comprueba strcasecmp(input, "USD") == 0 || strcasecmp(input, "US") == 0 || strc... antes de ejecutar esta rama. */
-    if (strcasecmp(input, "USD") == 0 || strcasecmp(input, "US") == 0 || strcasecmp(input, "DOLAR") == 0 || strcasecmp(input, "DOLLAR") == 0)
-        return "dolar";
-    /* if: comprueba strcasecmp(input, "JPY") == 0 || strcasecmp(input, "YEN") == 0 antes de ejecutar esta rama. */
-    if (strcasecmp(input, "JPY") == 0 || strcasecmp(input, "YEN") == 0)
-        return "yen";
-    /* if: comprueba strcasecmp(input, "GBP") == 0 || strcasecmp(input, "GBP") == 0 || str... antes de ejecutar esta rama. */
-    if (strcasecmp(input, "GBP") == 0 || strcasecmp(input, "GBP") == 0 || strcasecmp(input, "LIBRA") == 0 || strcasecmp(input, "POUND") == 0)
-        return "libra";
-    /* if: comprueba strcasecmp(input, "CHF") == 0 || strcasecmp(input, "FRANC") == 0 || s... antes de ejecutar esta rama. */
-    if (strcasecmp(input, "CHF") == 0 || strcasecmp(input, "FRANC") == 0 || strcasecmp(input, "FRANCO_SUIZO") == 0)
-        return "franco_suizo";
-    /* if: comprueba strcasecmp(input, "CAD") == 0 antes de ejecutar esta rama. */
-    if (strcasecmp(input, "CAD") == 0)
-        return "dolar_canadiense";
-    /* if: comprueba strcasecmp(input, "AUD") == 0 antes de ejecutar esta rama. */
-    if (strcasecmp(input, "AUD") == 0)
-        return "dolar_australiano";
-    /* if: comprueba strcasecmp(input, "CNY") == 0 || strcasecmp(input, "RMB") == 0 antes de ejecutar esta rama. */
-    if (strcasecmp(input, "CNY") == 0 || strcasecmp(input, "RMB") == 0)
-        return "yuan_chino";
-    /* if: comprueba strcasecmp(input, "MXN") == 0 antes de ejecutar esta rama. */
-    if (strcasecmp(input, "MXN") == 0)
-        return "peso_mexicano";
-
-    /* Fallback: convierte a minusculas y reemplaza espacios por _ */
-    size_t i, j = 0;
-    /* for: itera segun i = 0; input[i] != '\0' && j + 1 < sizeof(tmp); i++ para recorrer el bloque. */
-    for (i = 0; input[i] != '\0' && j + 1 < sizeof(tmp); i++)
-    {
-        char c = input[i];
-        /* if: comprueba c == ' ' antes de ejecutar esta rama. */
-        if (c == ' ')
-            tmp[j++] = '_';
-        else
-            tmp[j++] = (char)tolower((unsigned char)c);
-    }
-    tmp[j] = '\0';
-    return tmp;
-}
-
 #ifndef _WIN32
 extern int setenv(const char *name, const char *value, int overwrite);
 #endif
@@ -85,25 +31,26 @@ extern int setenv(const char *name, const char *value, int overwrite);
 /* funcion print_help: contiene la logica principal de esta operacion. */
 static void print_help(const char *prog)
 {
-    printf("Uso: %s [opciones]\n", prog);
-    printf("Opciones:\n");
-    printf("  --input <ruta>    Procesar archivo CSV en modo batch.\n");
-    printf("  --output <ruta>   Archivo de salida CSV (por defecto stdout).\n");
-    printf("  --log <ruta>      Archivo de log para modo batch/stream.\n");
-    printf("  --gui             Lanzar interfaz GUI (progvoraz_gui).\n");
-    printf("  --docker          Modo no interactivo legacy (lee CSV desde stdin y escribe CSV a stdout).\n");
-    printf("  --stream          Alias nativo de --docker para stdin/stdout CSV.\n");
-    printf("  --json            Habilitar salida/flags JSON (variable de entorno).\n");
-    printf("  --config <ruta>   Archivo de configuracion alternativo.\n");
-    printf("  --export-stock-json <ruta>  Exportar stock actual a JSON.\n");
-    printf("  --export-report <ruta>      Exportar reporte global de inventario.\n");
-    printf("  --server          Iniciar servidor HTTP local.\n");
-    printf("  --port <n>        Puerto para --server (por defecto 8080).\n");
+    printf("%s: %s [options]\n", progvoraz_tr("Uso", "Usage"), prog);
+    printf("%s:\n", progvoraz_tr("Opciones", "Options"));
+    printf("  --lang <es|en>    %s\n", progvoraz_tr("Selecciona idioma de interfaz.", "Select interface language."));
+    printf("  --input <ruta>    %s\n", progvoraz_tr("Procesar archivo CSV en modo batch.", "Process a CSV file in batch mode."));
+    printf("  --output <ruta>   %s\n", progvoraz_tr("Archivo de salida CSV (por defecto stdout).", "CSV output file (stdout by default)."));
+    printf("  --log <ruta>      %s\n", progvoraz_tr("Archivo de log para modo batch/stream.", "Log file for batch/stream mode."));
+    printf("  --gui             %s\n", progvoraz_tr("Lanzar interfaz GUI (progvoraz_gui).", "Launch the GUI application (progvoraz_gui)."));
+    printf("  --docker          %s\n", progvoraz_tr("Modo no interactivo legacy (lee CSV desde stdin y escribe CSV a stdout).", "Legacy non-interactive mode (reads CSV from stdin and writes CSV to stdout)."));
+    printf("  --stream          %s\n", progvoraz_tr("Alias nativo de --docker para stdin/stdout CSV.", "Native alias for --docker using CSV stdin/stdout."));
+    printf("  --json            %s\n", progvoraz_tr("Habilitar salida/flags JSON (variable de entorno).", "Enable JSON output/flags (environment variable)."));
+    printf("  --config <ruta>   %s\n", progvoraz_tr("Archivo de configuracion alternativo.", "Alternate configuration file."));
+    printf("  --export-stock-json <ruta>  %s\n", progvoraz_tr("Exportar stock actual a JSON.", "Export current stock to JSON."));
+    printf("  --export-report <ruta>      %s\n", progvoraz_tr("Exportar reporte global de inventario.", "Export the global inventory report."));
+    printf("  --server          %s\n", progvoraz_tr("Iniciar servidor HTTP local.", "Start the local HTTP server."));
+    printf("  --port <n>        %s\n", progvoraz_tr("Puerto para --server (por defecto 8080).", "Port for --server (default 8080)."));
     printf("  --convert <origen> <destino> <monto_centimos>\n");
-    printf("                    Convierte y descompone un monto en la moneda destino.\n");
-    printf("  --convert-stock   Usa stock real al calcular el cambio de --convert.\n");
-    printf("  --version         Muestra la version y sale.\n");
-    printf("  --help            Muestra esta ayuda.\n");
+    printf("                    %s\n", progvoraz_tr("Convierte y descompone un monto en la moneda destino.", "Convert and decompose an amount into the target currency."));
+    printf("  --convert-stock   %s\n", progvoraz_tr("Usa stock real al calcular el cambio de --convert.", "Use real stock when calculating --convert."));
+    printf("  --version         %s\n", progvoraz_tr("Muestra la version y sale.", "Show the version and exit."));
+    printf("  --help            %s\n", progvoraz_tr("Muestra esta ayuda.", "Show this help message."));
 }
 
 /* funcion print_version: contiene la logica principal de esta operacion. */
@@ -122,13 +69,13 @@ static void print_version(void)
         }
         else
         {
-            printf("ProgVoraz (version desconocida)\n");
+            printf("%s\n", progvoraz_tr("ProgVoraz (version desconocida)", "ProgVoraz (unknown version)"));
         }
         fclose(f);
     }
     else
     {
-        printf("ProgVoraz (version desconocida)\n");
+        printf("%s\n", progvoraz_tr("ProgVoraz (version desconocida)", "ProgVoraz (unknown version)"));
     }
 }
 
@@ -148,6 +95,7 @@ int main(int argc, char **argv)
 
     int server_flag = 0;
     const char *server_port = NULL;
+    const char *lang_code = NULL;
     int convert_flag = 0;
     const char *convert_from = NULL;
     const char *convert_to = NULL;
@@ -155,10 +103,17 @@ int main(int argc, char **argv)
     int convert_use_stock = 0;
 
     /* for: itera segun int i = 1; i < argc; i++ para recorrer el bloque. */
+    progvoraz_locale_init_from_env();
     for (int i = 1; i < argc; i++)
     {
+        /* if: comprueba strcmp(argv[i], "--lang") == 0 && i + 1 < argc antes de ejecutar esta rama. */
+        if (strcmp(argv[i], "--lang") == 0 && i + 1 < argc)
+        {
+            lang_code = argv[++i];
+            progvoraz_locale_set_from_code(lang_code);
+        }
         /* if: comprueba strcmp(argv[i], "--input") == 0 && i + 1 < argc antes de ejecutar esta rama. */
-        if (strcmp(argv[i], "--input") == 0 && i + 1 < argc)
+        else if (strcmp(argv[i], "--input") == 0 && i + 1 < argc)
             input = argv[++i];
         /* if: comprueba strcmp(argv[i], "--output") == 0 && i + 1 < argc antes de continuar con esta alternativa. */
         else if (strcmp(argv[i], "--output") == 0 && i + 1 < argc)
@@ -225,6 +180,9 @@ int main(int argc, char **argv)
     /* if: comprueba configpath antes de ejecutar esta rama. */
     if (configpath)
         _putenv_s("PROGVORAZ_CONFIG", configpath);
+    /* if: comprueba lang_code != NULL antes de ejecutar esta rama. */
+    if (lang_code != NULL)
+        _putenv_s("PROGVORAZ_LANG", progvoraz_lang_code());
 #else
     /* if: comprueba json_flag antes de ejecutar esta rama. */
     if (json_flag)
@@ -232,6 +190,9 @@ int main(int argc, char **argv)
     /* if: comprueba configpath antes de ejecutar esta rama. */
     if (configpath)
         setenv("PROGVORAZ_CONFIG", configpath, 1);
+    /* if: comprueba lang_code != NULL antes de ejecutar esta rama. */
+    if (lang_code != NULL)
+        setenv("PROGVORAZ_LANG", progvoraz_lang_code(), 1);
 #endif
 
     /* Operaciones no interactivas adicionales: exportar stock JSON o reporte. */
@@ -244,7 +205,7 @@ int main(int argc, char **argv)
             printf("Stock exportado a %s\n", export_stock_json_path);
             return 0;
         }
-        fprintf(stderr, "No se pudo exportar stock a %s\n", export_stock_json_path);
+        fprintf(stderr, "%s %s\n", progvoraz_tr("No se pudo exportar stock a", "Could not export stock to"), export_stock_json_path);
         return 2;
     }
 
@@ -257,7 +218,7 @@ int main(int argc, char **argv)
             printf("Reporte global exportado a %s\n", export_report_path);
             return 0;
         }
-        fprintf(stderr, "No se pudo exportar reporte a %s\n", export_report_path);
+        fprintf(stderr, "%s %s\n", progvoraz_tr("No se pudo exportar reporte a", "Could not export report to"), export_report_path);
         return 2;
     }
 
@@ -269,7 +230,7 @@ int main(int argc, char **argv)
         /* if: comprueba rc != 0 antes de ejecutar esta rama. */
         if (rc != 0)
         {
-            fprintf(stderr, "No se pudo iniciar el servidor HTTP (rc=%d).\n", rc);
+            fprintf(stderr, progvoraz_tr("No se pudo iniciar el servidor HTTP (rc=%d).\n", "Could not start the HTTP server (rc=%d).\n"), rc);
             return 2;
         }
         return 0;
@@ -284,7 +245,7 @@ int main(int argc, char **argv)
         /* if: comprueba !fetch_exchange_rate(convert_from, convert_to, &tasa) antes de ejecutar esta rama. */
         if (!fetch_exchange_rate(convert_from, convert_to, &tasa))
         {
-            fprintf(stderr, "No se pudo obtener la tasa para %s->%s\n", convert_from, convert_to);
+            fprintf(stderr, progvoraz_tr("No se pudo obtener la tasa para %s->%s\n", "Could not obtain the rate for %s->%s\n"), convert_from, convert_to);
             return 2;
         }
 
@@ -299,18 +260,18 @@ int main(int argc, char **argv)
         /* if: comprueba !bigint_init(&montoDestino, dst_str) antes de ejecutar esta rama. */
         if (!bigint_init(&montoDestino, dst_str))
         {
-            fprintf(stderr, "Error interno al crear BigInt destino.\n");
+            fprintf(stderr, "%s\n", progvoraz_tr("Error interno al crear BigInt destino.", "Internal error while creating destination BigInt."));
             return 2;
         }
 
         BigIntArray monedas = {0};
         BigIntArray stock = {0};
         BigIntArray solucion = {0};
-        const char *to_key = map_currency_key(convert_to);
+        const char *to_key = progvoraz_map_currency_key(convert_to);
         /* if: comprueba to_key == NULL || !validar_consistencia_moneda(to_key) || !cargar_den... antes de ejecutar esta rama. */
         if (to_key == NULL || !validar_consistencia_moneda(to_key) || !cargar_denominaciones_moneda(to_key, &monedas))
         {
-            fprintf(stderr, "Moneda destino no encontrada o inconsistente: %s\n", convert_to);
+            fprintf(stderr, progvoraz_tr("Moneda destino no encontrada o inconsistente: %s\n", "Target currency not found or inconsistent: %s\n"), convert_to);
             bigint_free(&montoDestino);
             return 2;
         }
@@ -321,7 +282,7 @@ int main(int argc, char **argv)
             /* if: comprueba !cargar_stock_moneda(to_key, &stock) antes de ejecutar esta rama. */
             if (!cargar_stock_moneda(to_key, &stock))
             {
-                fprintf(stderr, "No se encontro stock para moneda destino: %s\n", convert_to);
+                fprintf(stderr, progvoraz_tr("No se encontro stock para moneda destino: %s\n", "No stock found for target currency: %s\n"), convert_to);
                 bigint_array_free(&monedas);
                 bigint_free(&montoDestino);
                 return 2;
@@ -339,12 +300,13 @@ int main(int argc, char **argv)
         if (rc)
         {
             app_console_imprimir_resultado(&monedas, &solucion, convert_use_stock ? &stock : NULL, convert_use_stock ? 1 : 0);
-            printf("Convert CLI %s->%s | Origen=%s c | Destino=%s c | Tasa=%f\n",
+            printf(progvoraz_tr("Convert CLI %s->%s | Origen=%s c | Destino=%s c | Tasa=%f\n",
+                                "Convert CLI %s->%s | Source=%s c | Target=%s c | Rate=%f\n"),
                    convert_from, convert_to, convert_amount, dst_str, tasa);
         }
         else
         {
-            fprintf(stderr, "No se pudo calcular descomposicion en moneda destino.\n");
+            fprintf(stderr, "%s\n", progvoraz_tr("No se pudo calcular descomposicion en moneda destino.", "Could not calculate the decomposition in the target currency."));
         }
 
         bigint_array_free(&monedas);
@@ -362,7 +324,7 @@ int main(int argc, char **argv)
 
         /* if: comprueba !launched antes de ejecutar esta rama. */
         if (!launched)
-            fprintf(stderr, "No se encontro ejecutable GUI (progvoraz_gui).\n");
+            fprintf(stderr, "%s\n", progvoraz_tr("No se encontro ejecutable GUI (progvoraz_gui).", "GUI executable not found (progvoraz_gui)."));
 
         return launched ? 0 : 2;
     }
