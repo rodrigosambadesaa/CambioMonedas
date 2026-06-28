@@ -167,4 +167,19 @@ run_case "Entrypoint stream sigue usando CSV Docker" \
   "modo,moneda,monto,resultado,nota" \
   "mode,moneda,monto,range\na,euro,250,\n"
 
+run_case "Consola modo ingles" \
+  "PROGVORAZ_LANG=en ./progvoraz" \
+  "Change option (traditional|1 / specific|2 / history|3 / summary|4, back, mode, gui or exit):" \
+  "a\ndollar\ntraditional\n30\nexit\n"
+
+run_case "GUI portable modo ingles" \
+  "PROGVORAZ_LANG=en ./progvoraz_gui" \
+  "Action (calculate/register/limit/specific/history/summary/snapshot/restore/report/json/mode/back/gui/exit):" \
+  "unlimited\ndollar\ncalculate\n30\nexit\n"
+
+run_case "Entrypoint stream modo ingles" \
+  "PROGVORAZ_LANG=en ./docker/entrypoint.sh stream" \
+  "mode,currency,amount,result,note" \
+  "mode,currency,amount,range\na,dollar,250,\n"
+
 echo "Todas las pruebas en contenedor han finalizado correctamente."

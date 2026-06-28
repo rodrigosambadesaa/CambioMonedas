@@ -4,6 +4,7 @@
 #include "algoritmo_cambio.h"
 #include "csv_io.h"
 #include "logger.h"
+#include "progvoraz_locale.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -23,6 +24,33 @@ static char *trim(char *s)
     while (end >= s && (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n'))
         *end-- = '\0';
     return s;
+}
+
+static void write_csv_header(FILE *out)
+{
+    const char *hdr_es[] = {"modo", "moneda", "monto", "resultado", "nota"};
+    const char *hdr_en[] = {"mode", "currency", "amount", "result", "note"};
+    csv_write_row(out, progvoraz_lang_is_english() ? hdr_en : hdr_es, 5);
+}
+
+static const char *batch_note_invalid_amount(void)
+{
+    return progvoraz_tr("monto invalido", "invalid amount");
+}
+
+static const char *batch_note_currency_not_found(void)
+{
+    return progvoraz_tr("moneda no encontrada", "currency not found");
+}
+
+static const char *batch_note_stock_not_found(void)
+{
+    return progvoraz_tr("stock no encontrado", "stock not found");
+}
+
+static const char *batch_note_no_solution(void)
+{
+    return progvoraz_tr("sin solucion", "no solution");
 }
 
 /* funcion batch_process_file: contiene la logica principal de esta operacion. */
@@ -65,8 +93,7 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
     /* Reuse core processing implemented below via helper. */
     {
         /* Cabecera CSV de salida */
-        const char *hdr[] = {"modo", "moneda", "monto", "resultado", "nota"};
-        csv_write_row(out, hdr, 5);
+        write_csv_header(out);
 
         char linea[4096];
         size_t lineno = 0;
@@ -127,20 +154,12 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
                 for (char *t = tmp0; *t; ++t)
                     *t = (char)tolower((unsigned char)*t);
                 /* if: comprueba strcmp(tmp0, "mode") == 0 || strcmp(tmp0, "modo") == 0 || strcmp(tmp0... antes de ejecutar esta rama. */
-                if (strcmp(tmp0, "mode") == 0 || strcmp(tmp0, "modo") == 0 || strcmp(tmp0, "modo") == 0)
+                if (strcmp(tmp0, "mode") == 0 || strcmp(tmp0, "modo") == 0)
                     continue;
             }
 
             /* Normal flow: cargar denominaciones (y stock si modo b/c). */
-            /* Normalizar moneda a minusculas. */
-            /* for: itera segun char *q = moneda; q && *q; ++q para recorrer el bloque. */
-            for (char *q = moneda; q && *q; ++q)
-                *q = (char)tolower((unsigned char)*q);
-            /* for: itera segun char *q = moneda; q && *q; ++q para recorrer el bloque. */
-            for (char *q = moneda; q && *q; ++q)
-                /* if: comprueba *q == ' ' antes de ejecutar esta rama. */
-                if (*q == ' ')
-                    *q = '_';
+            moneda = (char *)progvoraz_map_currency_key(moneda);
             BigIntArray denom = {0};
             BigIntArray stock = {0};
             BigInt monto = {0};
@@ -150,9 +169,9 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
             /* if: comprueba !bigint_init(&monto, monto_txt) antes de ejecutar esta rama. */
             if (!bigint_init(&monto, monto_txt))
             {
-                const char *row[] = {"", "", monto_txt, "ERROR", "monto invalido"};
+                const char *row[] = {"", "", monto_txt, "ERROR", batch_note_invalid_amount()};
                 csv_write_row(out, row, 5);
-                logger_error("Linea %zu: monto invalido: %s", lineno, monto_txt);
+                logger_error("Line %zu: invalid amount: %s", lineno, monto_txt);
                 bigint_free(&monto);
                 continue;
             }
@@ -160,9 +179,9 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
             /* if: comprueba !cargar_denominaciones_moneda(moneda, &denom) antes de ejecutar esta rama. */
             if (!cargar_denominaciones_moneda(moneda, &denom))
             {
-                const char *row[] = {"", "", monto_txt, "ERROR", "moneda no encontrada"};
+                const char *row[] = {"", "", monto_txt, "ERROR", batch_note_currency_not_found()};
                 csv_write_row(out, row, 5);
-                logger_error("Linea %zu: moneda no encontrada: %s", lineno, moneda);
+                logger_error("Line %zu: currency not found: %s", lineno, moneda);
                 bigint_free(&monto);
                 continue;
             }
@@ -174,9 +193,9 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
                 /* if: comprueba !cargar_stock_moneda(moneda, &stock) antes de ejecutar esta rama. */
                 if (!cargar_stock_moneda(moneda, &stock))
                 {
-                    const char *row[] = {"", "", monto_txt, "ERROR", "stock no encontrado"};
+                    const char *row[] = {"", "", monto_txt, "ERROR", batch_note_stock_not_found()};
                     csv_write_row(out, row, 5);
-                    logger_error("Linea %zu: stock no encontrado: %s", lineno, moneda);
+                    logger_error("Line %zu: stock not found: %s", lineno, moneda);
                     bigint_free(&monto);
                     bigint_array_free(&denom);
                     continue;
@@ -224,7 +243,7 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
             }
             else
             {
-                const char *row[] = {"", moneda, monto_txt, "NO", "sin solucion"};
+                const char *row[] = {"", moneda, monto_txt, "NO", batch_note_no_solution()};
                 csv_write_row(out, row, 5);
                 logger_info("Linea %zu: no solution %s %s", lineno, moneda, monto_txt);
             }
@@ -256,8 +275,7 @@ int batch_process_stream(const char *rutaLog)
         logger_init(rutaLog);
 
     /* Cabecera CSV de salida */
-    const char *hdr[] = {"modo", "moneda", "monto", "resultado", "nota"};
-    csv_write_row(stdout, hdr, 5);
+    write_csv_header(stdout);
 
     char linea[4096];
     size_t lineno = 0;
@@ -320,14 +338,7 @@ int batch_process_stream(const char *rutaLog)
                 continue;
         }
 
-        /* for: itera segun char *q = moneda; q && *q; ++q para recorrer el bloque. */
-        for (char *q = moneda; q && *q; ++q)
-            *q = (char)tolower((unsigned char)*q);
-        /* for: itera segun char *q = moneda; q && *q; ++q para recorrer el bloque. */
-        for (char *q = moneda; q && *q; ++q)
-            /* if: comprueba *q == ' ' antes de ejecutar esta rama. */
-            if (*q == ' ')
-                *q = '_';
+        moneda = (char *)progvoraz_map_currency_key(moneda);
 
         BigIntArray denom = {0};
         BigIntArray stock = {0};
@@ -337,9 +348,9 @@ int batch_process_stream(const char *rutaLog)
         /* if: comprueba !bigint_init(&monto, monto_txt) antes de ejecutar esta rama. */
         if (!bigint_init(&monto, monto_txt))
         {
-            const char *row[] = {"", "", monto_txt, "ERROR", "monto invalido"};
+            const char *row[] = {"", "", monto_txt, "ERROR", batch_note_invalid_amount()};
             csv_write_row(stdout, row, 5);
-            logger_error("Linea %zu: monto invalido: %s", lineno, monto_txt);
+            logger_error("Line %zu: invalid amount: %s", lineno, monto_txt);
             bigint_free(&monto);
             continue;
         }
@@ -347,9 +358,9 @@ int batch_process_stream(const char *rutaLog)
         /* if: comprueba !cargar_denominaciones_moneda(moneda, &denom) antes de ejecutar esta rama. */
         if (!cargar_denominaciones_moneda(moneda, &denom))
         {
-            const char *row[] = {"", "", monto_txt, "ERROR", "moneda no encontrada"};
+            const char *row[] = {"", "", monto_txt, "ERROR", batch_note_currency_not_found()};
             csv_write_row(stdout, row, 5);
-            logger_error("Linea %zu: moneda no encontrada: %s", lineno, moneda);
+            logger_error("Line %zu: currency not found: %s", lineno, moneda);
             bigint_free(&monto);
             continue;
         }
@@ -361,9 +372,9 @@ int batch_process_stream(const char *rutaLog)
             /* if: comprueba !cargar_stock_moneda(moneda, &stock) antes de ejecutar esta rama. */
             if (!cargar_stock_moneda(moneda, &stock))
             {
-                const char *row[] = {"", "", monto_txt, "ERROR", "stock no encontrado"};
+                const char *row[] = {"", "", monto_txt, "ERROR", batch_note_stock_not_found()};
                 csv_write_row(stdout, row, 5);
-                logger_error("Linea %zu: stock no encontrado: %s", lineno, moneda);
+                logger_error("Line %zu: stock not found: %s", lineno, moneda);
                 bigint_free(&monto);
                 bigint_array_free(&denom);
                 continue;
@@ -411,7 +422,7 @@ int batch_process_stream(const char *rutaLog)
         }
         else
         {
-            const char *row[] = {"", moneda, monto_txt, "NO", "sin solucion"};
+            const char *row[] = {"", moneda, monto_txt, "NO", batch_note_no_solution()};
             csv_write_row(stdout, row, 5);
             logger_info("Linea %zu: no solution %s %s", lineno, moneda, monto_txt);
         }
