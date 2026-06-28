@@ -13,3 +13,5 @@ dist
 progvoraz
 progvoraz_gui
 progvoraz_*
+!progvoraz_locale.c
+!progvoraz_locale.h
