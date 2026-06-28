@@ -185,6 +185,12 @@ int run_http_server(const char *port)
                 need -= (size_t)r;
                 off += (size_t)r;
             }
+            if (need > 0)
+            {
+                free(body);
+                close(client);
+                continue;
+            }
             body[content_length] = '\0';
         }
 
@@ -232,8 +238,18 @@ int run_http_server(const char *port)
             fseek(f, 0, SEEK_END);
             long flen = ftell(f);
             fseek(f, 0, SEEK_SET);
-            char *buf = malloc((size_t)flen + 1);
-            fread(buf, 1, (size_t)flen, f);
+            char *buf = NULL;
+            if (flen < 0 || (buf = malloc((size_t)flen + 1)) == NULL || fread(buf, 1, (size_t)flen, f) != (size_t)flen)
+            {
+                const char *resp = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n";
+                free(buf);
+                fclose(f);
+                write_all(client, resp, strlen(resp));
+                close(client);
+                if (body)
+                    free(body);
+                continue;
+            }
             buf[flen] = '\0';
             fclose(f);
 
@@ -315,8 +331,20 @@ int run_http_server(const char *port)
             fseek(fout, 0, SEEK_END);
             long flen = ftell(fout);
             fseek(fout, 0, SEEK_SET);
-            char *buf = malloc((size_t)flen + 1);
-            fread(buf, 1, (size_t)flen, fout);
+            char *buf = NULL;
+            if (flen < 0 || (buf = malloc((size_t)flen + 1)) == NULL || fread(buf, 1, (size_t)flen, fout) != (size_t)flen)
+            {
+                const char *resp = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n";
+                free(buf);
+                fclose(fout);
+                remove(in_template);
+                remove(out_template);
+                write_all(client, resp, strlen(resp));
+                close(client);
+                if (body)
+                    free(body);
+                continue;
+            }
             buf[flen] = '\0';
             fclose(fout);
 
