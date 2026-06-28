@@ -4,6 +4,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 /* funcion file_exists_gui: contiene la logica principal de esta operacion. */
 static int file_exists_gui(const char *path)
 {
@@ -27,19 +31,35 @@ static int file_exists_gui(const char *path)
 /* funcion launch_exec_nonblocking: contiene la logica principal de esta operacion. */
 static int launch_exec_nonblocking(const char *exec_path)
 {
-    char cmd[1024];
-
     /* if: comprueba exec_path == NULL || exec_path[0] == '\0' antes de ejecutar esta rama. */
     if (exec_path == NULL || exec_path[0] == '\0')
         return 0;
 
 #ifdef _WIN32
-    snprintf(cmd, sizeof(cmd), "start \"\" \"%s\"", exec_path);
-#else
-    snprintf(cmd, sizeof(cmd), "setsid \"%s\" >/dev/null 2>&1 &", exec_path);
-#endif
+    STARTUPINFOA startup_info;
+    PROCESS_INFORMATION process_info;
+    char cmdline[1024];
 
+    memset(&startup_info, 0, sizeof(startup_info));
+    memset(&process_info, 0, sizeof(process_info));
+    startup_info.cb = sizeof(startup_info);
+
+    snprintf(cmdline, sizeof(cmdline), "\"%s\"", exec_path);
+    /* if: comprueba !CreateProcessA(NULL, cmdline, NULL, NULL, FALSE, DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP, NULL, NULL, &startup_info, &process_info) antes de ejecutar esta rama. */
+    if (!CreateProcessA(NULL, cmdline, NULL, NULL, FALSE,
+                        DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP,
+                        NULL, NULL, &startup_info, &process_info))
+        return 0;
+
+    CloseHandle(process_info.hThread);
+    CloseHandle(process_info.hProcess);
+    return 1;
+#else
+    char cmd[1024];
+
+    snprintf(cmd, sizeof(cmd), "setsid \"%s\" >/dev/null 2>&1 &", exec_path);
     return system(cmd) == 0;
+#endif
 }
 
 /* funcion progvoraz_launch_gui_nonblocking: contiene la logica principal de esta operacion. */
