@@ -1,0 +1,9 @@
+FROM ubuntu:24.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential make ca-certificates libcurl4-openssl-dev valgrind strace lsof curl procps time \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY . .
+RUN chmod +x scripts/*.sh docker/*.sh 2>/dev/null || true
+CMD ["scripts/memory_safety_suite.sh"]
