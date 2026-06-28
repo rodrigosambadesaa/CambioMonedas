@@ -168,6 +168,49 @@ typedef enum
 static void a_minusculas(char *texto);
 #define TR(es, en) progvoraz_tr((es), (en))
 
+static char *leer_linea_dinamica(void)
+{
+    size_t capacidad = 4096;
+    size_t len = 0;
+    char *buffer = (char *)malloc(capacidad);
+    int ch;
+
+    if (buffer == NULL)
+        return NULL;
+
+    while ((ch = fgetc(stdin)) != EOF)
+    {
+        if (ch == '\r')
+            continue;
+        if (ch == '\n')
+            break;
+
+        if (len + 1 >= capacidad)
+        {
+            size_t nueva_capacidad = capacidad * 2;
+            char *nuevo = (char *)realloc(buffer, nueva_capacidad);
+            if (nuevo == NULL)
+            {
+                free(buffer);
+                return NULL;
+            }
+            buffer = nuevo;
+            capacidad = nueva_capacidad;
+        }
+
+        buffer[len++] = (char)ch;
+    }
+
+    if (ch == EOF && len == 0)
+    {
+        free(buffer);
+        return NULL;
+    }
+
+    buffer[len] = '\0';
+    return buffer;
+}
+
 /* leer_linea: Funcion auxiliar. Ejecuta su logica, valida parametros de entrada y retorna un estado. */
 /* funcion leer_linea: contiene la logica principal de esta operacion. */
 static int leer_linea(char *buffer, size_t tam)
@@ -541,7 +584,7 @@ static int pedir_indice(size_t max, size_t *indice)
 /* funcion pedir_cantidad: contiene la logica principal de esta operacion. */
 static int pedir_cantidad(BigInt *delta)
 {
-    char buffer[2048];
+    char *buffer = NULL;
     BigInt tmp = {0};
 
     /* if: comprueba delta == NULL antes de ejecutar esta rama. */
@@ -550,15 +593,19 @@ static int pedir_cantidad(BigInt *delta)
 
     printf("Cantidad (entero no negativo): ");
     /* if: comprueba !leer_linea(buffer, sizeof(buffer)) antes de ejecutar esta rama. */
-    if (!leer_linea(buffer, sizeof(buffer)))
+    buffer = leer_linea_dinamica();
+    if (buffer == NULL)
         return -1;
 
-    /* if: comprueba !bigint_init(&tmp, buffer) antes de ejecutar esta rama. */
     if (!bigint_init(&tmp, buffer))
+    {
+        free(buffer);
         return 0;
+    }
 
     bigint_free(delta);
     *delta = tmp;
+    free(buffer);
     return 1;
 }
 
@@ -566,7 +613,7 @@ static int pedir_cantidad(BigInt *delta)
 /* funcion pedir_monto: contiene la logica principal de esta operacion. */
 static int pedir_monto(BigInt *monto)
 {
-    char buffer[2048];
+    char *buffer = NULL;
     BigInt tmp = {0};
 
     /* if: comprueba monto == NULL antes de ejecutar esta rama. */
@@ -575,15 +622,19 @@ static int pedir_monto(BigInt *monto)
 
     printf("Monto (entero no negativo en centimos): ");
     /* if: comprueba !leer_linea(buffer, sizeof(buffer)) antes de ejecutar esta rama. */
-    if (!leer_linea(buffer, sizeof(buffer)))
+    buffer = leer_linea_dinamica();
+    if (buffer == NULL)
         return -1;
 
-    /* if: comprueba !bigint_init(&tmp, buffer) antes de ejecutar esta rama. */
     if (!bigint_init(&tmp, buffer))
+    {
+        free(buffer);
         return 0;
+    }
 
     bigint_free(monto);
     *monto = tmp;
+    free(buffer);
     return 1;
 }
 
@@ -634,22 +685,23 @@ static int pedir_cantidades_por_denominacion(const BigIntArray *denom, const cha
         /* while: repite el bloque mientras se cumpla 1. */
         while (1)
         {
-            char buffer[2048];
+            char *buffer = NULL;
             BigInt tmp = {0};
 
             printf("Cantidad para %s c: ", denom->items[i].digits);
 
             /* if: comprueba !leer_linea(buffer, sizeof(buffer)) antes de ejecutar esta rama. */
-            if (!leer_linea(buffer, sizeof(buffer)))
+            buffer = leer_linea_dinamica();
+            if (buffer == NULL)
             {
                 bigint_array_free(cantidades);
                 return 0;
             }
 
-            /* if: comprueba !bigint_init(&tmp, buffer) antes de ejecutar esta rama. */
             if (!bigint_init(&tmp, buffer))
             {
                 printf("Cantidad invalida. Usa entero no negativo.\n");
+                free(buffer);
                 continue;
             }
 
@@ -657,11 +709,13 @@ static int pedir_cantidades_por_denominacion(const BigIntArray *denom, const cha
             if (!bigint_array_set(cantidades, i, &tmp))
             {
                 bigint_free(&tmp);
+                free(buffer);
                 bigint_array_free(cantidades);
                 return 0;
             }
 
             bigint_free(&tmp);
+            free(buffer);
             break;
         }
     }

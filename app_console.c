@@ -194,6 +194,50 @@ static void dibujar_titulo(void)
     dibujar_linea();
 }
 
+/* leer_linea_dinamica: Lee una linea completa de stdin sin truncarla. */
+static char *leer_linea_dinamica(void)
+{
+    size_t capacidad = 4096;
+    size_t len = 0;
+    char *buffer = (char *)malloc(capacidad);
+    int ch;
+
+    if (buffer == NULL)
+        return NULL;
+
+    while ((ch = fgetc(stdin)) != EOF)
+    {
+        if (ch == '\r')
+            continue;
+        if (ch == '\n')
+            break;
+
+        if (len + 1 >= capacidad)
+        {
+            size_t nueva_capacidad = capacidad * 2;
+            char *nuevo = (char *)realloc(buffer, nueva_capacidad);
+            if (nuevo == NULL)
+            {
+                free(buffer);
+                return NULL;
+            }
+            buffer = nuevo;
+            capacidad = nueva_capacidad;
+        }
+
+        buffer[len++] = (char)ch;
+    }
+
+    if (ch == EOF && len == 0)
+    {
+        free(buffer);
+        return NULL;
+    }
+
+    buffer[len] = '\0';
+    return buffer;
+}
+
 /* leer_linea: Lee una linea desde teclado limitando la cantidad de caracteres y limpiando saltos. */
 /* funcion leer_linea: contiene la logica principal de esta operacion. */
 static int leer_linea(char *buffer, size_t tam)
@@ -756,19 +800,23 @@ static int pedir_opcion(void)
 /* funcion pedir_cantidad: contiene la logica principal de esta operacion. */
 static int pedir_cantidad(BigInt *cantidad)
 {
-    char buffer[2048];
-    char comando[2048];
+    char comando[64];
+    char *buffer = NULL;
     BigInt tmp = {0};
 
     printf("%s", TR("Cantidad en centimos (0, volver, gui o salir): ",
                    "Amount in cents (0, back, gui or exit): "));
     /* if: comprueba !leer_linea(buffer, sizeof(buffer)) antes de ejecutar esta rama. */
-    if (!leer_linea(buffer, sizeof(buffer)))
+    buffer = leer_linea_dinamica();
+    if (buffer == NULL)
         return -1;
 
     /* if: comprueba buffer[0] == '\0' antes de ejecutar esta rama. */
     if (buffer[0] == '\0')
+    {
+        free(buffer);
         return 0;
+    }
 
     strncpy(comando, buffer, sizeof(comando) - 1);
     comando[sizeof(comando) - 1] = '\0';
@@ -776,18 +824,28 @@ static int pedir_cantidad(BigInt *cantidad)
 
     /* if: comprueba strcmp(comando, "salir") == 0 antes de ejecutar esta rama. */
     if (progvoraz_cmd_is_exit(comando))
+    {
+        free(buffer);
         return 3;
+    }
 
     /* if: comprueba strcmp(comando, "volver") == 0 || strcmp(comando, "0") == 0 antes de ejecutar esta rama. */
     if (progvoraz_cmd_is_back(comando) || strcmp(comando, "0") == 0)
+    {
+        free(buffer);
         return 2;
+    }
 
     /* if: comprueba !bigint_init(&tmp, buffer) antes de ejecutar esta rama. */
     if (!bigint_init(&tmp, buffer))
+    {
+        free(buffer);
         return 0;
+    }
 
     bigint_free(cantidad);
     *cantidad = tmp;
+    free(buffer);
     return 1;
 }
 
@@ -804,19 +862,23 @@ static int pedir_cantidad(BigInt *cantidad)
 /* funcion pedir_cantidad_admin: contiene la logica principal de esta operacion. */
 static int pedir_cantidad_admin(BigInt *cantidad)
 {
-    char buffer[2048];
-    char comando[2048];
+    char comando[64];
+    char *buffer = NULL;
     BigInt tmp = {0};
 
     printf("%s", TR("Cantidad (volver, modo, gui o salir): ",
                    "Amount (back, mode, gui or exit): "));
     /* if: comprueba !leer_linea(buffer, sizeof(buffer)) antes de ejecutar esta rama. */
-    if (!leer_linea(buffer, sizeof(buffer)))
+    buffer = leer_linea_dinamica();
+    if (buffer == NULL)
         return -1;
 
     /* if: comprueba buffer[0] == '\0' antes de ejecutar esta rama. */
     if (buffer[0] == '\0')
+    {
+        free(buffer);
         return 0;
+    }
 
     strncpy(comando, buffer, sizeof(comando) - 1);
     comando[sizeof(comando) - 1] = '\0';
@@ -824,20 +886,33 @@ static int pedir_cantidad_admin(BigInt *cantidad)
 
     /* if: comprueba strcmp(comando, "salir") == 0 antes de ejecutar esta rama. */
     if (progvoraz_cmd_is_exit(comando))
+    {
+        free(buffer);
         return 4;
+    }
     /* if: comprueba strcmp(comando, "modo") == 0 antes de ejecutar esta rama. */
     if (progvoraz_cmd_is_mode(comando))
+    {
+        free(buffer);
         return 3;
+    }
     /* if: comprueba strcmp(comando, "volver") == 0 antes de ejecutar esta rama. */
     if (progvoraz_cmd_is_back(comando))
+    {
+        free(buffer);
         return 2;
+    }
 
     /* if: comprueba !bigint_init(&tmp, buffer) antes de ejecutar esta rama. */
     if (!bigint_init(&tmp, buffer))
+    {
+        free(buffer);
         return 0;
+    }
 
     bigint_free(cantidad);
     *cantidad = tmp;
+    free(buffer);
     return 1;
 }
 
@@ -1478,8 +1553,8 @@ static int pedir_cantidades_por_denominacion(const BigIntArray *monedas, const c
         /* while: repite el bloque mientras se cumpla 1. */
         while (1)
         {
-            char buffer[2048];
-            char comando[2048];
+            char comando[64];
+            char *buffer = NULL;
             BigInt cantidad = {0};
 
             printf("%s%s%s\n", "", "", "");
@@ -1489,7 +1564,8 @@ static int pedir_cantidades_por_denominacion(const BigIntArray *monedas, const c
                    TR(" c (volver/modo/gui/salir): ", " c (back/mode/gui/exit): "));
             /* Atrapa la lectura bloqueando con I/O fgets. */
             /* if: comprueba !leer_linea(buffer, sizeof(buffer)) antes de ejecutar esta rama. */
-            if (!leer_linea(buffer, sizeof(buffer)))
+            buffer = leer_linea_dinamica();
+            if (buffer == NULL)
             {
                 limpiar_arreglo(cantidades);
                 return -1;
@@ -1500,6 +1576,7 @@ static int pedir_cantidades_por_denominacion(const BigIntArray *monedas, const c
             if (buffer[0] == '\0')
             {
                 printf("%s\n", TR("Entrada vacia. Intente de nuevo.", "Empty input. Try again."));
+                free(buffer);
                 continue;
             }
 
@@ -1511,6 +1588,7 @@ static int pedir_cantidades_por_denominacion(const BigIntArray *monedas, const c
             /* if: comprueba strcmp(comando, "salir") == 0 antes de ejecutar esta rama. */
             if (progvoraz_cmd_is_exit(comando))
             {
+                free(buffer);
                 limpiar_arreglo(cantidades);
                 return 4;
             }
@@ -1518,6 +1596,7 @@ static int pedir_cantidades_por_denominacion(const BigIntArray *monedas, const c
             /* if: comprueba strcmp(comando, "modo") == 0 antes de ejecutar esta rama. */
             if (progvoraz_cmd_is_mode(comando))
             {
+                free(buffer);
                 limpiar_arreglo(cantidades);
                 return 3;
             }
@@ -1525,6 +1604,7 @@ static int pedir_cantidades_por_denominacion(const BigIntArray *monedas, const c
             /* if: comprueba strcmp(comando, "volver") == 0 antes de ejecutar esta rama. */
             if (progvoraz_cmd_is_back(comando))
             {
+                free(buffer);
                 limpiar_arreglo(cantidades);
                 return 2;
             }
@@ -1535,6 +1615,7 @@ static int pedir_cantidades_por_denominacion(const BigIntArray *monedas, const c
             {
                 printf("%s\n", TR("Cantidad invalida. Debe ser entero no negativo.",
                                   "Invalid quantity. It must be a non-negative integer."));
+                free(buffer);
                 continue;
             }
 
@@ -1543,11 +1624,13 @@ static int pedir_cantidades_por_denominacion(const BigIntArray *monedas, const c
             if (!bigint_array_set(cantidades, i, &cantidad))
             {
                 bigint_free(&cantidad);
+                free(buffer);
                 limpiar_arreglo(cantidades);
                 return 0;
             }
 
             bigint_free(&cantidad);
+            free(buffer);
             break;
         }
     }

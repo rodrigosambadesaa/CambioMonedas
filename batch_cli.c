@@ -53,6 +53,76 @@ static const char *batch_note_no_solution(void)
     return progvoraz_tr("sin solucion", "no solution");
 }
 
+static char *batch_read_line(FILE *fp)
+{
+    size_t capacidad = 4096;
+    size_t len = 0;
+    char *buffer = (char *)malloc(capacidad);
+    int ch;
+
+    if (buffer == NULL || fp == NULL)
+    {
+        free(buffer);
+        return NULL;
+    }
+
+    while ((ch = fgetc(fp)) != EOF)
+    {
+        if (ch == '\r')
+            continue;
+        if (ch == '\n')
+            break;
+
+        if (len + 1 >= capacidad)
+        {
+            size_t nueva_capacidad = capacidad * 2;
+            char *nuevo = (char *)realloc(buffer, nueva_capacidad);
+            if (nuevo == NULL)
+            {
+                free(buffer);
+                return NULL;
+            }
+            buffer = nuevo;
+            capacidad = nueva_capacidad;
+        }
+
+        buffer[len++] = (char)ch;
+    }
+
+    if (ch == EOF && len == 0)
+    {
+        free(buffer);
+        return NULL;
+    }
+
+    buffer[len] = '\0';
+    return buffer;
+}
+
+static void batch_build_result_summary(const BigIntArray *sol, char *resultado_buf, size_t resultado_buf_len)
+{
+    BigInt total = {0};
+
+    if (resultado_buf == NULL || resultado_buf_len == 0)
+        return;
+
+    resultado_buf[0] = '\0';
+    if (!bigint_init(&total, "0"))
+        return;
+
+    for (size_t i = 0; i < sol->len; i++)
+    {
+        BigInt nuevo_total = {0};
+        if (!bigint_add(&total, &sol->items[i], &nuevo_total))
+            break;
+        bigint_free(&total);
+        total = nuevo_total;
+    }
+
+    snprintf(resultado_buf, resultado_buf_len, "OK total=%s", total.digits != NULL ? total.digits : "0");
+    bigint_free(&total);
+}
+
 /* funcion batch_process_file: contiene la logica principal de esta operacion. */
 int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const char *rutaLog)
 {
@@ -95,10 +165,9 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
         /* Cabecera CSV de salida */
         write_csv_header(out);
 
-        char linea[4096];
         size_t lineno = 0;
-        /* while: repite el bloque mientras se cumpla fgets(linea, sizeof(linea), in). */
-        while (fgets(linea, sizeof(linea), in))
+        char *linea = NULL;
+        while ((linea = batch_read_line(in)) != NULL)
         {
             lineno++;
             char *p = linea;
@@ -173,6 +242,7 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
                 csv_write_row(out, row, 5);
                 logger_error("Line %zu: invalid amount: %s", lineno, monto_txt);
                 bigint_free(&monto);
+                free(linea);
                 continue;
             }
 
@@ -183,6 +253,7 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
                 csv_write_row(out, row, 5);
                 logger_error("Line %zu: currency not found: %s", lineno, moneda);
                 bigint_free(&monto);
+                free(linea);
                 continue;
             }
 
@@ -198,6 +269,7 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
                     logger_error("Line %zu: stock not found: %s", lineno, moneda);
                     bigint_free(&monto);
                     bigint_array_free(&denom);
+                    free(linea);
                     continue;
                 }
             }
@@ -224,11 +296,7 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
             if (found)
             {
                 /* serializar solucion simple: contar monedas totales y lista */
-                size_t total = 0;
-                /* for: itera segun size_t i = 0; i < sol.len; i++ para recorrer el bloque. */
-                for (size_t i = 0; i < sol.len; i++)
-                    total += (size_t)strtoul(sol.items[i].digits, NULL, 10);
-                snprintf(resultado_buf, sizeof(resultado_buf), "OK total=%zu", total);
+                batch_build_result_summary(&sol, resultado_buf, sizeof(resultado_buf));
                 char note[512] = "";
                 /* for: itera segun size_t i = 0; i < sol.len && i < 8; i++ para recorrer el bloque. */
                 for (size_t i = 0; i < sol.len && i < 8; i++)
@@ -252,6 +320,7 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
             bigint_array_free(&denom);
             bigint_array_free(&stock);
             bigint_array_free(&sol);
+            free(linea);
         }
     }
 
@@ -277,10 +346,9 @@ int batch_process_stream(const char *rutaLog)
     /* Cabecera CSV de salida */
     write_csv_header(stdout);
 
-    char linea[4096];
     size_t lineno = 0;
-    /* while: repite el bloque mientras se cumpla fgets(linea, sizeof(linea), stdin). */
-    while (fgets(linea, sizeof(linea), stdin))
+    char *linea = NULL;
+    while ((linea = batch_read_line(stdin)) != NULL)
     {
         lineno++;
         char *p = linea;
@@ -352,6 +420,7 @@ int batch_process_stream(const char *rutaLog)
             csv_write_row(stdout, row, 5);
             logger_error("Line %zu: invalid amount: %s", lineno, monto_txt);
             bigint_free(&monto);
+            free(linea);
             continue;
         }
 
@@ -362,6 +431,7 @@ int batch_process_stream(const char *rutaLog)
             csv_write_row(stdout, row, 5);
             logger_error("Line %zu: currency not found: %s", lineno, moneda);
             bigint_free(&monto);
+            free(linea);
             continue;
         }
 
@@ -377,6 +447,7 @@ int batch_process_stream(const char *rutaLog)
                 logger_error("Line %zu: stock not found: %s", lineno, moneda);
                 bigint_free(&monto);
                 bigint_array_free(&denom);
+                free(linea);
                 continue;
             }
         }
@@ -402,12 +473,8 @@ int batch_process_stream(const char *rutaLog)
         /* if: comprueba found antes de ejecutar esta rama. */
         if (found)
         {
-            size_t total = 0;
-            /* for: itera segun size_t i = 0; i < sol.len; i++ para recorrer el bloque. */
-            for (size_t i = 0; i < sol.len; i++)
-                total += (size_t)strtoul(sol.items[i].digits, NULL, 10);
             char resultado_buf[256];
-            snprintf(resultado_buf, sizeof(resultado_buf), "OK total=%zu", total);
+            batch_build_result_summary(&sol, resultado_buf, sizeof(resultado_buf));
             char note[512] = "";
             /* for: itera segun size_t i = 0; i < sol.len && i < 8; i++ para recorrer el bloque. */
             for (size_t i = 0; i < sol.len && i < 8; i++)
@@ -431,6 +498,7 @@ int batch_process_stream(const char *rutaLog)
         bigint_array_free(&denom);
         bigint_array_free(&stock);
         bigint_array_free(&sol);
+        free(linea);
     }
 
     /* if: comprueba rutaLog antes de ejecutar esta rama. */

@@ -82,6 +82,36 @@ run_case_updates_stock() {
   echo "[OK] $name"
 }
 
+run_case_contains_and_not_contains() {
+  local name="$1"
+  local exe="$2"
+  local expected="$3"
+  local forbidden="$4"
+  local input="$5"
+  local output
+
+  cp "$stock_backup" stock.txt
+  output="$(printf "%b" "$input" | sh -lc "$exe" 2>&1 || true)"
+
+  if ! grep -Fq -- "$expected" <<<"$output"; then
+    echo "[FALLO] $name"
+    echo "Esperado: $expected"
+    echo "Salida:"
+    echo "$output"
+    exit 1
+  fi
+
+  if grep -Fq -- "$forbidden" <<<"$output"; then
+    echo "[FALLO] $name"
+    echo "Se encontro texto no permitido: $forbidden"
+    echo "Salida:"
+    echo "$output"
+    exit 1
+  fi
+
+  echo "[OK] $name"
+}
+
 run_case "Consola modo a (tradicional)" \
   ./progvoraz \
   "Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4, volver, modo, gui o salir):" \
@@ -171,6 +201,17 @@ run_case "Consola modo ingles" \
   "PROGVORAZ_LANG=en ./progvoraz" \
   "Change option (traditional|1 / specific|2 / history|3 / summary|4, back, mode, gui or exit):" \
   "a\ndollar\ntraditional\n30\nexit\n"
+
+big_digits="$(python3 - <<'PY'
+print("9" * 10000, end="")
+PY
+)"
+
+run_case_contains_and_not_contains "Consola admite bigint largo sin contaminar stdin" \
+  ./progvoraz \
+  "Gracias por utilizar este programa." \
+  "Subopcion invalida." \
+  "a\n${currency}\ntradicional\n${big_digits}\nsalir\n"
 
 run_case "GUI portable modo ingles" \
   "PROGVORAZ_LANG=en ./progvoraz_gui" \
