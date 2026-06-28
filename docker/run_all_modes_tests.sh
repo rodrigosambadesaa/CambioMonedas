@@ -202,10 +202,7 @@ run_case "Consola modo ingles" \
   "Change option (traditional|1 / specific|2 / history|3 / summary|4, back, mode, gui or exit):" \
   "a\ndollar\ntraditional\n30\nexit\n"
 
-big_digits="$(python3 - <<'PY'
-print("9" * 10000, end="")
-PY
-)"
+big_digits="$(awk 'BEGIN { for (i = 0; i < 10000; ++i) printf "9" }')"
 
 run_case_contains_and_not_contains "Consola admite bigint largo sin contaminar stdin" \
   ./progvoraz \
