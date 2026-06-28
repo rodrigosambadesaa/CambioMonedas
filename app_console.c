@@ -18,6 +18,7 @@
 #include "moneda_gestion.h"
 #include "algoritmo_cambio.h"
 #include "exchange_api.h"
+#include "gui_launcher.h"
 #include "json_io.h"
 
 #include <time.h>
@@ -46,6 +47,7 @@ static void registrar_historial(const char *mensaje)
 /* forward prototypes: used by public wrapper below */
 static void dibujar_linea(void);
 static void imprimir_resultado(const BigIntArray *monedas, const BigIntArray *solucion, const BigIntArray *stock, int usarStock);
+static void a_minusculas(char *texto);
 /* Implementation moved here so wrapper can call it without forward-declaration issues. */
 /* funcion imprimir_resultado: contiene la logica principal de esta operacion. */
 static void imprimir_resultado(const BigIntArray *monedas, const BigIntArray *solucion, const BigIntArray *stock, int usarStock)
@@ -194,12 +196,34 @@ static void dibujar_titulo(void)
 /* funcion leer_linea: contiene la logica principal de esta operacion. */
 static int leer_linea(char *buffer, size_t tam)
 {
-    /* if: comprueba fgets(buffer, (int)tam, stdin) == NULL antes de ejecutar esta rama. */
-    if (fgets(buffer, (int)tam, stdin) == NULL)
-        return 0;
+    /* while: repite el bloque mientras se cumpla 1. */
+    while (1)
+    {
+        char comando[64];
 
-    buffer[strcspn(buffer, "\r\n")] = '\0';
-    return 1;
+        /* if: comprueba fgets(buffer, (int)tam, stdin) == NULL antes de ejecutar esta rama. */
+        if (fgets(buffer, (int)tam, stdin) == NULL)
+            return 0;
+
+        buffer[strcspn(buffer, "\r\n")] = '\0';
+
+        strncpy(comando, buffer, sizeof(comando) - 1);
+        comando[sizeof(comando) - 1] = '\0';
+        a_minusculas(comando);
+
+        /* if: comprueba strcmp(comando, "gui") == 0 antes de ejecutar esta rama. */
+        if (strcmp(comando, "gui") == 0)
+        {
+            /* if: comprueba progvoraz_launch_gui_nonblocking() antes de ejecutar esta rama. */
+            if (progvoraz_launch_gui_nonblocking())
+                printf("Interfaz GUI lanzada en segundo plano.\n");
+            else
+                printf("No se encontro ejecutable GUI (progvoraz_gui).\n");
+            continue;
+        }
+
+        return 1;
+    }
 }
 
 /* a_minusculas: Modifica in-place un string para que todo sea lowercase. */
@@ -674,7 +698,7 @@ static int pedir_opcion(void)
     printf("|   j) Exportar stock JSON                          |\n");
     printf("|   x) Conversion entre monedas                     |\n");
     dibujar_linea();
-    printf("Opcion (a/b/c/h/r/s/u/g/j/x o salir): ");
+    printf("Opcion (a/b/c/h/r/s/u/g/j/x, gui o salir): ");
 
     /* if: comprueba !leer_linea(buffer, sizeof(buffer)) antes de ejecutar esta rama. */
     if (!leer_linea(buffer, sizeof(buffer)))
@@ -731,7 +755,7 @@ static int pedir_cantidad(BigInt *cantidad)
     char comando[2048];
     BigInt tmp = {0};
 
-    printf("Cantidad en centimos (0, volver o salir): ");
+    printf("Cantidad en centimos (0, volver, gui o salir): ");
     /* if: comprueba !leer_linea(buffer, sizeof(buffer)) antes de ejecutar esta rama. */
     if (!leer_linea(buffer, sizeof(buffer)))
         return -1;
@@ -778,7 +802,7 @@ static int pedir_cantidad_admin(BigInt *cantidad)
     char comando[2048];
     BigInt tmp = {0};
 
-    printf("Cantidad (volver, modo o salir): ");
+    printf("Cantidad (volver, modo, gui o salir): ");
     /* if: comprueba !leer_linea(buffer, sizeof(buffer)) antes de ejecutar esta rama. */
     if (!leer_linea(buffer, sizeof(buffer)))
         return -1;
@@ -819,7 +843,7 @@ static int pedir_indice_denominacion(size_t maximo, size_t *indice)
     char *fin;
     long v;
 
-    printf("Indice de denominacion (1-%zu, o volver/modo/salir): ", maximo);
+    printf("Indice de denominacion (1-%zu, o volver/modo/gui/salir): ", maximo);
     /* if: comprueba !leer_linea(buffer, sizeof(buffer)) antes de ejecutar esta rama. */
     if (!leer_linea(buffer, sizeof(buffer)))
         return -1;
@@ -1192,9 +1216,9 @@ static int pedir_subopcion_cambio(int permitir_limite)
 
     /* if: comprueba permitir_limite antes de ejecutar esta rama. */
     if (permitir_limite)
-        printf("Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4 / limite|5|l, volver, modo o salir): ");
+        printf("Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4 / limite|5|l, volver, modo, gui o salir): ");
     else
-        printf("Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4, volver, modo o salir): ");
+        printf("Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4, volver, modo, gui o salir): ");
     /* if: comprueba !leer_linea(buffer, sizeof(buffer)) antes de ejecutar esta rama. */
     if (!leer_linea(buffer, sizeof(buffer)))
         return -1;
@@ -1341,7 +1365,7 @@ static int pedir_restriccion_monedas(size_t *min_monedas, size_t *max_monedas)
     char buffer[128];
     char comando[128];
 
-    printf("Restriccion de monedas (N, =N, N-M, volver, modo o salir): ");
+    printf("Restriccion de monedas (N, =N, N-M, volver, modo, gui o salir): ");
     /* if: comprueba !leer_linea(buffer, sizeof(buffer)) antes de ejecutar esta rama. */
     if (!leer_linea(buffer, sizeof(buffer)))
         return -1;
@@ -1423,7 +1447,7 @@ static int pedir_cantidades_por_denominacion(const BigIntArray *monedas, const c
             char comando[2048];
             BigInt cantidad = {0};
 
-            printf("Cantidad para %s c (volver/modo/salir): ", monedas->items[i].digits);
+            printf("Cantidad para %s c (volver/modo/gui/salir): ", monedas->items[i].digits);
             /* Atrapa la lectura bloqueando con I/O fgets. */
             /* if: comprueba !leer_linea(buffer, sizeof(buffer)) antes de ejecutar esta rama. */
             if (!leer_linea(buffer, sizeof(buffer)))
@@ -1912,7 +1936,7 @@ int app_console_run(void)
             limpiar_arreglo(&monedas);
 
             mostrar_monedas_disponibles(opcion);
-            printf("Nombre de la moneda ('modo', 'volver' o 'salir'): ");
+            printf("Nombre de la moneda ('modo', 'volver', 'gui' o 'salir'): ");
 
             /* Espera I/O bloqueante. */
             /* if: comprueba !leer_linea(moneda, sizeof(moneda)) antes de ejecutar esta rama. */
@@ -1992,7 +2016,7 @@ int app_console_run(void)
                     int estadoDelta;
 
                     imprimir_stock_administrador(&monedas, &stock);
-                    printf("Accion admin (anadir/quitar/historial/resumen, volver, modo, salir): ");
+                    printf("Accion admin (anadir/quitar/historial/resumen, volver, modo, gui, salir): ");
 
                     /* Bloqueo en consola. */
                     /* if: comprueba !leer_linea(accion, sizeof(accion)) antes de ejecutar esta rama. */

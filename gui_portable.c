@@ -9,6 +9,7 @@
 #include "moneda_gestion.h"
 #include "algoritmo_cambio.h"
 #include "exchange_api.h"
+#include "gui_launcher.h"
 #include "json_io.h"
 
 #include <time.h>
@@ -163,6 +164,8 @@ typedef enum
     MODO_ILIMITADO = 1
 } ModoGUI;
 
+static void a_minusculas(char *texto);
+
 /* leer_linea: Funcion auxiliar. Ejecuta su logica, valida parametros de entrada y retorna un estado. */
 /* funcion leer_linea: contiene la logica principal de esta operacion. */
 static int leer_linea(char *buffer, size_t tam)
@@ -171,12 +174,34 @@ static int leer_linea(char *buffer, size_t tam)
     if (buffer == NULL || tam == 0)
         return 0;
 
-    /* if: comprueba fgets(buffer, (int)tam, stdin) == NULL antes de ejecutar esta rama. */
-    if (fgets(buffer, (int)tam, stdin) == NULL)
-        return 0;
+    /* while: repite el bloque mientras se cumpla 1. */
+    while (1)
+    {
+        char comando[64];
 
-    buffer[strcspn(buffer, "\r\n")] = '\0';
-    return 1;
+        /* if: comprueba fgets(buffer, (int)tam, stdin) == NULL antes de ejecutar esta rama. */
+        if (fgets(buffer, (int)tam, stdin) == NULL)
+            return 0;
+
+        buffer[strcspn(buffer, "\r\n")] = '\0';
+
+        strncpy(comando, buffer, sizeof(comando) - 1);
+        comando[sizeof(comando) - 1] = '\0';
+        a_minusculas(comando);
+
+        /* if: comprueba strcmp(comando, "gui") == 0 antes de ejecutar esta rama. */
+        if (strcmp(comando, "gui") == 0)
+        {
+            /* if: comprueba progvoraz_launch_gui_nonblocking() antes de ejecutar esta rama. */
+            if (progvoraz_launch_gui_nonblocking())
+                printf("Interfaz GUI lanzada en segundo plano.\n");
+            else
+                printf("No se encontro ejecutable GUI (progvoraz_gui).\n");
+            continue;
+        }
+
+        return 1;
+    }
 }
 
 /* funcion parse_size_t_positivo_gui: contiene la logica principal de esta operacion. */
@@ -1377,7 +1402,7 @@ static int pedir_modo(ModoGUI *modo)
 {
     char entrada[32];
 
-    printf("Modo (limitado/ilimitado/convertir/historial/snapshot/restaurar/reporte/json o salir): ");
+    printf("Modo (limitado/ilimitado/convertir/historial/snapshot/restaurar/reporte/json/gui o salir): ");
     /* if: comprueba !leer_linea(entrada, sizeof(entrada)) antes de ejecutar esta rama. */
     if (!leer_linea(entrada, sizeof(entrada)))
         return 0;
@@ -1522,7 +1547,7 @@ int main(void)
         for (int i = 0; i < nMonedas; i++)
             printf("  [%d] %s\n", i + 1, monedas[i]);
 
-        printf("Selecciona moneda por indice o nombre (o salir): ");
+        printf("Selecciona moneda por indice o nombre (o gui/salir): ");
         /* if: comprueba !leer_linea(entrada, sizeof(entrada)) antes de ejecutar esta rama. */
         if (!leer_linea(entrada, sizeof(entrada)))
             break;
@@ -1589,9 +1614,9 @@ int main(void)
             imprimir_panel(monedas[idxMoneda], &denom, &stock);
             /* if: comprueba requiereAdmin antes de ejecutar esta rama. */
             if (requiereAdmin)
-                printf("Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/json/anadir/quitar/modo/volver/salir): ");
+                printf("Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/json/anadir/quitar/modo/volver/gui/salir): ");
             else
-                printf("Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/json/modo/volver/salir): ");
+                printf("Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/json/modo/volver/gui/salir): ");
 
             /* if: comprueba !leer_linea(accion, sizeof(accion)) antes de ejecutar esta rama. */
             if (!leer_linea(accion, sizeof(accion)))
