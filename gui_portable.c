@@ -1582,12 +1582,12 @@ int main(void)
         /* if: comprueba idxMoneda < 0 antes de ejecutar esta rama. */
         if (idxMoneda < 0)
         {
+            const char *monedaMapeada = progvoraz_map_currency_key(entrada);
             /* for: itera segun int i = 0; i < nMonedas; i++ para recorrer el bloque. */
             for (int i = 0; i < nMonedas; i++)
             {
-
                 /* if: comprueba strcmp(monedas[i], entrada) == 0 antes de ejecutar esta rama. */
-                if (strcmp(monedas[i], entrada) == 0)
+                if (strcmp(monedas[i], entrada) == 0 || strcmp(monedas[i], monedaMapeada) == 0)
                 {
                     idxMoneda = i;
                     break;
