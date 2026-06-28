@@ -65,6 +65,11 @@ jobs:
         run: |
           printf "a\neuro\ntradicional\n30\nsalir\n" | ./progvoraz
 
+      - name: Smoke test comando gui (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          printf "gui\nsalir\n" | ./progvoraz | grep -F "Interfaz GUI lanzada en segundo plano."
+
       - name: Smoke test limite (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -84,6 +89,11 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           printf "a\neuro\ntradicional\n30\nsalir\n" | ./progvoraz
+
+      - name: Smoke test comando gui (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          printf "gui\nsalir\n" | ./progvoraz | grep -F "Interfaz GUI lanzada en segundo plano."
 
       - name: Smoke test limite (macOS)
         if: runner.os == 'macOS'
@@ -117,13 +127,13 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          gcc -std=c2x -Wall -Wextra -Wpedantic -O2 main.c app_console.c server_http.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c csv_io.c logger.c json_io.c batch_cli.c exchange_api.c -o progvoraz.exe
+          gcc -std=c2x -Wall -Wextra -Wpedantic -O2 main.c app_console.c server_http.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c csv_io.c logger.c json_io.c batch_cli.c exchange_api.c gui_launcher.c -o progvoraz.exe
 
       - name: Build GUI (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          gcc -std=c2x -Wall -Wextra -Wpedantic -O2 gui_window.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c csv_io.c logger.c json_io.c exchange_api.c -o progvoraz_gui.exe -mwindows
+          gcc -std=c2x -Wall -Wextra -Wpedantic -O2 gui_window.c vector_dinamico.c moneda_gestion.c bigint.c algoritmo_cambio.c csv_io.c logger.c json_io.c exchange_api.c gui_launcher.c -o progvoraz_gui.exe -mwindows
 
       - name: Unit tests (Windows)
         if: runner.os == 'Windows'
@@ -167,6 +177,16 @@ jobs:
 
           salir
           "@ | .\progvoraz.exe | Out-String
+
+      - name: Smoke test comando gui (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Set-Content -Path gui_input.txt -Value "gui`r`nsalir`r`n"
+          $output = cmd /c "progvoraz.exe < gui_input.txt"
+          if ($output -notmatch "Interfaz GUI lanzada en segundo plano\.") {
+            throw "No se detecto el lanzamiento de GUI desde consola."
+          }
 
       - name: Test user flow (Windows, modo a)
         if: runner.os == 'Windows'

@@ -84,8 +84,13 @@ run_case_updates_stock() {
 
 run_case "Consola modo a (tradicional)" \
   ./progvoraz \
-  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4, volver, modo o salir):" \
+  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4, volver, modo, gui o salir):" \
   "a\n${currency}\ntradicional\n30\nsalir\n"
+
+run_case "Consola lanza GUI desde comando global" \
+  ./progvoraz \
+  "Interfaz GUI lanzada en segundo plano." \
+  "gui\nsalir\n"
 
 run_case "Entrypoint console mantiene menu interactivo sin TTY" \
   "./docker/entrypoint.sh console" \
@@ -94,17 +99,17 @@ run_case "Entrypoint console mantiene menu interactivo sin TTY" \
 
 run_case "Consola modo b (tradicional)" \
   ./progvoraz \
-  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4 / limite|5|l, volver, modo o salir):" \
+  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4 / limite|5|l, volver, modo, gui o salir):" \
   "b\n${currency}\ntradicional\n30\nsalir\n"
 
 run_case_updates_stock "Consola modo b actualiza stock.txt" \
   ./progvoraz \
-  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4 / limite|5|l, volver, modo o salir):" \
+  "Subopcion cambio (tradicional|1 / especifico|2 / historial|3 / resumen|4 / limite|5|l, volver, modo, gui o salir):" \
   "b\n${currency}\ntradicional\n30\nsalir\n"
 
 run_case "Consola modo b (restriccion por limite)" \
   ./progvoraz \
-  "Restriccion de monedas (N, =N, N-M, volver, modo o salir):" \
+  "Restriccion de monedas (N, =N, N-M, volver, modo, gui o salir):" \
   "b\n${currency}\n5\n30\n=2\nvolver\nmodo\nsalir\n"
 
 run_case "Consola operacion global snapshot" \
@@ -119,17 +124,17 @@ run_case "Consola operacion global reporte" \
 
 run_case "Consola modo c (admin)" \
   ./progvoraz \
-  "Accion admin (anadir/quitar/historial/resumen, volver, modo, salir):" \
+  "Accion admin (anadir/quitar/historial/resumen, volver, modo, gui, salir):" \
   "c\n${currency}\nanadir\n1\n0\nsalir\n"
 
 run_case "GUI portable modo limitado" \
   ./progvoraz_gui \
-  "Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/json/anadir/quitar/modo/volver/salir):" \
+  "Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/json/anadir/quitar/modo/volver/gui/salir):" \
   "limitado\n${currency}\ncalcular\n30\nsalir\n"
 
 run_case "GUI portable modo ilimitado" \
   ./progvoraz_gui \
-  "Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/json/modo/volver/salir):" \
+  "Accion (calcular/caja/limite/especifico/historial/resumen/snapshot/restaurar/reporte/json/modo/volver/gui/salir):" \
   "ilimitado\n${currency}\ncalcular\n30\nsalir\n"
 
 run_case "GUI portable historial desde modo" \

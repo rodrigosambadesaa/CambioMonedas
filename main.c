@@ -10,6 +10,7 @@
 #include "server_http.h"
 #include "exchange_api.h"
 #include "algoritmo_cambio.h"
+#include "gui_launcher.h"
 
 // Explicación del propósito de cada variable de este archivo, función por función:
 // Función 1: map_currency_key
@@ -131,36 +132,6 @@ static void print_version(void)
     }
 }
 
-/* funcion file_exists: contiene la logica principal de esta operacion. */
-static int file_exists(const char *path)
-{
-    /* if: comprueba !path antes de ejecutar esta rama. */
-    if (!path)
-        return 0;
-    FILE *f = fopen(path, "r");
-    /* if: comprueba f antes de ejecutar esta rama. */
-    if (f)
-    {
-        fclose(f);
-        return 1;
-    }
-    return 0;
-}
-
-/* funcion launch_gui_nonblocking: contiene la logica principal de esta operacion. */
-static int launch_gui_nonblocking(const char *exec)
-{
-#ifdef _WIN32
-    char cmd[1024];
-    snprintf(cmd, sizeof(cmd), "start \"\" \"%s\"", exec);
-    return system(cmd) == 0;
-#else
-    char cmd[1024];
-    snprintf(cmd, sizeof(cmd), "setsid %s >/dev/null 2>&1 &", exec);
-    return system(cmd) == 0;
-#endif
-}
-
 /* funcion main: contiene la logica principal de esta operacion. */
 int main(int argc, char **argv)
 {
@@ -199,7 +170,7 @@ int main(int argc, char **argv)
         else if (strcmp(argv[i], "--config") == 0 && i + 1 < argc)
             configpath = argv[++i];
         /* if: comprueba strcmp(argv[i], "--gui") == 0 antes de continuar con esta alternativa. */
-        else if (strcmp(argv[i], "--gui") == 0)
+        else if (strcmp(argv[i], "--gui") == 0 || strcmp(argv[i], "gui") == 0)
             gui_flag = 1;
         /* if: comprueba strcmp(argv[i], "--docker") == 0 antes de continuar con esta alternativa. */
         else if (strcmp(argv[i], "--docker") == 0 || strcmp(argv[i], "--stream") == 0)
@@ -387,25 +358,7 @@ int main(int argc, char **argv)
     /* if: comprueba gui_flag antes de ejecutar esta rama. */
     if (gui_flag)
     {
-#ifdef _WIN32
-        const char *gui_execs[] = {"progvoraz_gui.exe", "./progvoraz_gui.exe"};
-#else
-        const char *gui_execs[] = {"./progvoraz_gui", "progvoraz_gui"};
-#endif
-        int launched = 0;
-        /* for: itera segun size_t i = 0; i < sizeof(gui_execs) / sizeof(gui_execs[0]); i++ para recorrer el bloque. */
-        for (size_t i = 0; i < sizeof(gui_execs) / sizeof(gui_execs[0]); i++)
-        {
-            /* if: comprueba file_exists(gui_execs[i]) antes de ejecutar esta rama. */
-            if (file_exists(gui_execs[i]))
-            {
-                /* if: comprueba !launch_gui_nonblocking(gui_execs[i]) antes de ejecutar esta rama. */
-                if (!launch_gui_nonblocking(gui_execs[i]))
-                    fprintf(stderr, "Advertencia: fallo al lanzar GUI (no bloqueante): %s\n", gui_execs[i]);
-                launched = 1;
-                break;
-            }
-        }
+        int launched = progvoraz_launch_gui_nonblocking();
 
         /* if: comprueba !launched antes de ejecutar esta rama. */
         if (!launched)
