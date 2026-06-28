@@ -67,6 +67,8 @@ int progvoraz_launch_gui_nonblocking(void)
 {
 #ifdef _WIN32
     const char *gui_execs[] = {"progvoraz_gui.exe", ".\\progvoraz_gui.exe"};
+#elif defined(__APPLE__)
+    const char *gui_execs[] = {"./progvoraz_gui", "progvoraz_gui", "./progvoraz_gui_swift", "progvoraz_gui_swift", "./progvoraz_gui_portable", "progvoraz_gui_portable"};
 #else
     const char *gui_execs[] = {"./progvoraz_gui", "progvoraz_gui"};
 #endif

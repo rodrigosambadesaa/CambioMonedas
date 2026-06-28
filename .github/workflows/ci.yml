@@ -183,9 +183,10 @@ jobs:
         shell: pwsh
         timeout-minutes: 2
         run: |
-          Set-Content -Path gui_input.txt -Value "gui`r`nsalir`r`n"
-          $output = cmd /c "progvoraz.exe < gui_input.txt"
-          Remove-Item -LiteralPath gui_input.txt -ErrorAction SilentlyContinue
+          $output = @"
+          gui
+          salir
+          "@ | .\progvoraz.exe | Out-String
           if ($output -notmatch "Interfaz GUI lanzada en segundo plano\.") {
             throw "No se detecto el lanzamiento de GUI desde consola."
           }
