@@ -12,15 +12,22 @@ static char *duplicar(const char *s)
     char *copia;
 
     /* if: comprueba s == NULL antes de ejecutar esta rama. */
+    // El objetivo de este if es evitar que se intente duplicar un puntero nulo, lo cual podría causar un comportamiento indefinido o un fallo en tiempo de ejecución.
+    // Al retornar NULL en este caso, se indica que no se pudo realizar la duplicación debido a un argumento inválido.
+    // Explicación lógica detallada del funcionamiento: Si el puntero 's' es nulo, significa que no hay una cadena válida para duplicar. Por lo tanto, la función retorna NULL para indicar que no se puede crear una copia de una cadena inexistente.
     if (s == NULL)
         return NULL;
 
     len = strlen(s) + 1;
     copia = (char *)malloc(len);
     /* if: comprueba copia == NULL antes de ejecutar esta rama. */
+    // El objetivo de este if es verificar si la asignación de memoria para la copia de la cadena fue exitosa. Si malloc devuelve NULL, significa que no se pudo asignar memoria suficiente, lo cual podría ocurrir por falta de recursos del sistema.
+    // Al retornar NULL en este caso, se indica que la duplicación de la cadena no pudo completarse debido a un error de asignación de memoria.
+    // Explicación lógica detallada del funcionamiento: La función malloc intenta reservar un bloque de memoria del tamaño especificado (len). Si la reserva falla, malloc devuelve NULL. Por lo tanto, se verifica si 'copia' es NULL para manejar adecuadamente el error y evitar desreferenciar un puntero nulo más adelante en el código.
     if (copia == NULL)
         return NULL;
 
+    // La siguiente instrucción copia el contenido de la cadena original 's' a la nueva ubicación de memoria 'copia', incluyendo el carácter nulo de terminación.
     memcpy(copia, s, len);
     return copia;
 }
@@ -32,13 +39,18 @@ static int texto_valido_entero_no_negativo(const char *text)
     size_t i;
 
     /* if: comprueba text == NULL || *text == '\0' antes de ejecutar esta rama. */
+    // El objetivo de este if es verificar si el puntero 'text' es nulo o si apunta a una cadena vacía. En ambos casos, no se puede considerar que el texto represente un entero no negativo válido.
+    // Al retornar 0 en este caso, se indica que el texto no es válido como entero no negativo.
     if (text == NULL || *text == '\0')
         return 0;
 
     /* for: itera segun i = 0; text[i] != '\0'; i++ para recorrer el bloque. */
+    // El objetivo de este bucle for es recorrer cada carácter de la cadena 'text' hasta llegar al carácter nulo de terminación. Se utiliza para verificar que todos los caracteres sean dígitos numéricos.
     for (i = 0; text[i] != '\0'; i++)
     {
         /* if: comprueba !isdigit((unsigned char)text[i]) antes de ejecutar esta rama. */
+        // El objetivo de este if es verificar si el carácter actual no es un dígito numérico. La función isdigit() devuelve un valor distinto de cero si el carácter es un dígito, y cero en caso contrario.
+        // Se utiliza (unsigned char) para evitar problemas con caracteres con signo en sistemas donde char es signed por defecto. Si se encuentra un carácter que no es un dígito, se retorna 0, indicando que el texto no es un entero no negativo válido.
         if (!isdigit((unsigned char)text[i]))
             return 0;
     }
@@ -53,10 +65,14 @@ static char *normalizar(const char *text)
     size_t i = 0;
 
     /* if: comprueba text == NULL || *text == '\0' antes de ejecutar esta rama. */
+    // El objetivo de este if es verificar si el puntero 'text' es nulo o si apunta a una cadena vacía. En ambos casos, no se puede considerar que el texto represente un entero no negativo válido.
+    // Al retornar NULL en este caso, se indica que la normalización no se puede realizar debido a un texto inválido.
     if (text == NULL || *text == '\0')
         return NULL;
 
     /* while: repite el bloque mientras se cumpla text[i] == '0' && text[i + 1] != '\0'. */
+    // El objetivo de este bucle while es avanzar el índice 'i' mientras se encuentren ceros a la izquierda en la cadena 'text', pero asegurándose de no eliminar el último cero si toda la cadena es "0".
+    // Explicación lógica detallada del funcionamiento: El bucle continúa incrementando 'i' mientras el carácter actual sea '0' y el siguiente carácter no sea el final de la cadena. Esto permite eliminar los ceros a la izquierda, dejando al menos un dígito en la cadena resultante.
     while (text[i] == '0' && text[i + 1] != '\0')
         i++;
 
@@ -70,14 +86,22 @@ int bigint_init(BigInt *n, const char *text)
     char *normalizado;
 
     /* if: comprueba n == NULL || !texto_valido_entero_no_negativo(text) antes de ejecutar esta rama. */
+    // El objetivo de este if es verificar si el puntero 'n' es nulo o si el texto no representa un entero no negativo válido. En ambos casos, no se puede inicializar el BigInt.
+    // Al retornar 0 en este caso, se indica que la inicialización no se pudo realizar debido a parámetros inválidos.
+    // Explicación lógica detallada del funcionamiento: Si 'n' es NULL, significa que no hay una estructura BigInt válida para inicializar. Si el texto no es un entero no negativo válido, no se puede representar correctamente en la estructura BigInt. Por lo tanto, se retorna 0 para indicar el fallo en la inicialización.
     if (n == NULL || !texto_valido_entero_no_negativo(text))
         return 0;
 
     normalizado = normalizar(text);
     /* if: comprueba normalizado == NULL antes de ejecutar esta rama. */
+    // El objetivo de este if es verificar si la normalización del texto falló, lo que podría ocurrir si hubo un error de memoria al duplicar la cadena. En este caso, no se puede inicializar el BigInt correctamente.
+    // Al retornar 0 en este caso, se indica que la inicialización no se pudo realizar debido a un error en la normalización del texto.
+    // Explicación lógica detallada del funcionamiento: Si la función normalizar devuelve NULL, significa que no se pudo crear una copia válida del texto normalizado, posiblemente debido a un fallo de memoria. Por lo tanto, se retorna 0 para indicar que la inicialización del BigInt no se pudo completar correctamente.
     if (normalizado == NULL)
         return 0;
 
+    // La siguiente instrucción asigna la cadena normalizada al campo 'digits' de la estructura BigInt, completando así la inicialización del número grande.
+    // Explicación lógica detallada del funcionamiento: Se asigna la cadena normalizada a 'n->digits', lo que permite que la estructura BigInt represente correctamente el número grande sin ceros a la izquierda. La función retorna 1 para indicar que la inicialización fue exitosa.
     n->digits = normalizado;
     return 1;
 }
@@ -89,11 +113,17 @@ int bigint_set(BigInt *dest, const BigInt *src)
     char *copia;
 
     /* if: comprueba dest == NULL || src == NULL || src->digits == NULL antes de ejecutar esta rama. */
+    // El objetivo de este if es verificar si los punteros 'dest' o 'src' son nulos, o si 'src->digits' es nulo. En cualquiera de estos casos, no se puede realizar la operación de copia.
+    // Al retornar 0 en este caso, se indica que la operación de copia no se pudo realizar debido a parámetros inválidos.
+    // Explicación lógica detallada del funcionamiento: Si 'dest' es NULL, significa que no hay una estructura BigInt válida para recibir la copia. Si 'src' es NULL o 'src->digits' es NULL, significa que no hay un número grande válido para copiar. Por lo tanto, se retorna 0 para indicar que la operación de copia no se pudo completar correctamente.
     if (dest == NULL || src == NULL || src->digits == NULL)
         return 0;
 
     copia = duplicar(src->digits);
     /* if: comprueba copia == NULL antes de ejecutar esta rama. */
+    // El objetivo de este if es verificar si la duplicación de la cadena 'src->digits' falló, lo que podría ocurrir si hubo un error de memoria al duplicar la cadena. En este caso, no se puede realizar la operación de copia correctamente.
+    // Al retornar 0 en este caso, se indica que la operación de copia no se pudo realizar debido a un error en la duplicación de la cadena.
+    // Explicación lógica detallada del funcionamiento: Si la función duplicar devuelve NULL, significa que no se pudo crear una copia válida de la cadena 'src->digits', posiblemente debido a un fallo de memoria. Por lo tanto, se retorna 0 para indicar que la operación de copia no se pudo completar correctamente.
     if (copia == NULL)
         return 0;
 
@@ -107,6 +137,9 @@ int bigint_set(BigInt *dest, const BigInt *src)
 void bigint_free(BigInt *n)
 {
     /* if: comprueba n == NULL antes de ejecutar esta rama. */
+    // El objetivo de este if es verificar si el puntero 'n' es nulo. Si es nulo, no hay una estructura BigInt válida para liberar, y por lo tanto, no se debe intentar acceder a ella.
+    // Al retornar en este caso, se evita un posible fallo en tiempo de ejecución al intentar liberar memoria de un puntero nulo.
+    // Explicación lógica detallada del funcionamiento: Si 'n' es NULL, significa que no hay una estructura BigInt válida para liberar. Intentar acceder a un puntero nulo podría causar un comportamiento indefinido o un fallo en tiempo de ejecución. Por lo tanto, se retorna inmediatamente para evitar cualquier operación sobre un puntero nulo.
     if (n == NULL)
         return;
 

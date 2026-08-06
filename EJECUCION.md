@@ -67,10 +67,17 @@ Si cambiaste codigo y quieres forzar recompilacion de la imagen:
 docker compose run --rm --build progvoraz-console
 ```
 
-Ejecuta pruebas automatizadas de modos `a`, `b`, `c`, GUI limitado y GUI ilimitado:
+Ejecuta la suite Docker consolidada de modos, exportaciones y memoria/recursos:
 
 ```bash
 docker compose run --rm progvoraz-test
+```
+
+Tambien puedes ejecutar subconjuntos desde el mismo contenedor:
+
+```bash
+docker compose run --rm progvoraz-test smoke
+docker compose run --rm progvoraz-test memory
 ```
 
 Prueba en host Windows (PowerShell):
@@ -322,4 +329,3 @@ Este proyecto se distribuye bajo licencia MIT.
 El uso es libre (incluyendo uso comercial, modificacion y redistribucion), siempre que se mantenga la atribucion al codigo original mediante el aviso de copyright y licencia.
 
 Consulta el archivo `LICENSE` para el texto completo.
-

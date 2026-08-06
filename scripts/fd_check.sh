@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+make clean
 make debug
 baseline=$(find /proc/$$/fd -maxdepth 1 -type l | wc -l)
 for i in $(seq 1 100); do

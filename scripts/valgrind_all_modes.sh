@@ -3,9 +3,11 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 if ! command -v valgrind >/dev/null 2>&1; then
-  echo "valgrind no está instalado; omitiendo comprobación local (docker/Dockerfile.debug sí lo instala)." >&2
+  echo "valgrind no está instalado; omitiendo comprobación local (la imagen Docker quality sí lo instala)." >&2
   exit 0
 fi
+make clean
+make test
 make debug
 VG=(valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --errors-for-leak-kinds=definite,possible --error-exitcode=1)
 "${VG[@]}" ./.dist/test_progvoraz

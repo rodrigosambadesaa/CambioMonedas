@@ -1,8 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="/app"
+if [[ ! -d "$APP_DIR" ]]; then
+  APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+fi
 cd "$APP_DIR"
+
+if [[ ! -x ./progvoraz || ! -x ./progvoraz_gui ]]; then
+  make clean
+  make release
+  make gui
+fi
 
 currency="$(awk '/^[0-9-]+$/ { next } { print; exit }' monedas.txt)"
 if [[ -z "$currency" ]]; then
@@ -21,10 +31,15 @@ else
 fi
 
 cleanup() {
+  if [[ -n "${server_pid:-}" ]]; then
+    kill "$server_pid" 2>/dev/null || true
+    wait "$server_pid" 2>/dev/null || true
+  fi
   cp "$stock_backup" stock.txt || true
   cp "$report_backup" reporte_global.txt || true
   rm -f "$stock_backup"
   rm -f "$report_backup" stock_snapshot.txt stock_out.json
+  rm -f /tmp/progvoraz_batch_test.csv /tmp/progvoraz_batch_test.log /tmp/progvoraz_export_stock.json /tmp/progvoraz_export_report.txt
 }
 trap cleanup EXIT
 
@@ -34,9 +49,17 @@ run_case() {
   local expected="$3"
   local input="$4"
   local output
+  local status=0
 
   cp "$stock_backup" stock.txt
-  output="$(printf "%b" "$input" | sh -lc "$exe" 2>&1 || true)"
+  output="$(printf "%b" "$input" | sh -lc "$exe" 2>&1)" || status=$?
+
+  if ((status != 0)); then
+    echo "[FALLO] $name (codigo de salida $status)"
+    echo "Salida:"
+    echo "$output"
+    exit 1
+  fi
 
   if ! grep -Fq -- "$expected" <<<"$output"; then
     echo "[FALLO] $name"
@@ -57,11 +80,19 @@ run_case_updates_stock() {
   local output
   local before
   local after
+  local status=0
 
   cp "$stock_backup" stock.txt
   before="$(cat stock.txt)"
-  output="$(printf "%b" "$input" | sh -lc "$exe" 2>&1 || true)"
+  output="$(printf "%b" "$input" | sh -lc "$exe" 2>&1)" || status=$?
   after="$(cat stock.txt)"
+
+  if ((status != 0)); then
+    echo "[FALLO] $name (codigo de salida $status)"
+    echo "Salida:"
+    echo "$output"
+    exit 1
+  fi
 
   if ! grep -Fq -- "$expected" <<<"$output"; then
     echo "[FALLO] $name"
@@ -89,9 +120,17 @@ run_case_contains_and_not_contains() {
   local forbidden="$4"
   local input="$5"
   local output
+  local status=0
 
   cp "$stock_backup" stock.txt
-  output="$(printf "%b" "$input" | sh -lc "$exe" 2>&1 || true)"
+  output="$(printf "%b" "$input" | sh -lc "$exe" 2>&1)" || status=$?
+
+  if ((status != 0)); then
+    echo "[FALLO] $name (codigo de salida $status)"
+    echo "Salida:"
+    echo "$output"
+    exit 1
+  fi
 
   if ! grep -Fq -- "$expected" <<<"$output"; then
     echo "[FALLO] $name"
@@ -110,6 +149,63 @@ run_case_contains_and_not_contains() {
   fi
 
   echo "[OK] $name"
+}
+
+run_file_case() {
+  local name="$1"
+  local exe="$2"
+  local file_path="$3"
+  local expected_file_text="$4"
+
+  cp "$stock_backup" stock.txt
+  if ! sh -lc "$exe" >/tmp/progvoraz_file_case.out 2>&1; then
+    echo "[FALLO] $name"
+    cat /tmp/progvoraz_file_case.out
+    exit 1
+  fi
+
+  if [[ ! -f "$file_path" ]]; then
+    echo "[FALLO] $name"
+    echo "No se genero el archivo esperado: $file_path"
+    cat /tmp/progvoraz_file_case.out
+    exit 1
+  fi
+
+  if ! grep -Fq -- "$expected_file_text" "$file_path"; then
+    echo "[FALLO] $name"
+    echo "No se encontro el texto esperado en $file_path: $expected_file_text"
+    echo "Contenido:"
+    cat "$file_path"
+    exit 1
+  fi
+
+  echo "[OK] $name"
+}
+
+run_server_case() {
+  local port=18080
+  local response=""
+
+  ./docker/entrypoint.sh server --port "$port" >/tmp/progvoraz_server.out 2>&1 &
+  server_pid=$!
+
+  for _ in $(seq 1 30); do
+    if response="$(curl --fail --silent --show-error "http://127.0.0.1:${port}/health" 2>/dev/null)"; then
+      break
+    fi
+    sleep 0.1
+  done
+
+  if [[ "$response" != "OK" ]]; then
+    echo "[FALLO] Entrypoint server responde en /health"
+    cat /tmp/progvoraz_server.out
+    exit 1
+  fi
+
+  kill "$server_pid"
+  wait "$server_pid" 2>/dev/null || true
+  server_pid=""
+  echo "[OK] Entrypoint server responde en /health"
 }
 
 run_case "Consola modo a (tradicional)" \
@@ -196,6 +292,48 @@ run_case "Entrypoint stream sigue usando CSV Docker" \
   "./docker/entrypoint.sh stream" \
   "modo,moneda,monto,resultado,nota" \
   "mode,moneda,monto,range\na,euro,250,\n"
+
+run_case "Entrypoint convert" \
+  "PROGVORAZ_EXCHANGE_SOURCE=stub ./docker/entrypoint.sh convert euro dolar 250" \
+  "Convert CLI euro->dolar | Origen=250 c | Destino=273 c | Tasa=1.090000" \
+  ""
+
+run_case "Entrypoint convert-stock usa stock real" \
+  "PROGVORAZ_EXCHANGE_SOURCE=stub ./docker/entrypoint.sh convert-stock euro dolar 250" \
+  "cantidad 1 | stock" \
+  ""
+
+run_case "Entrypoint bash reenvia argumentos" \
+  "./docker/entrypoint.sh bash -lc 'printf PROGVORAZ_BASH_OK'" \
+  "PROGVORAZ_BASH_OK" \
+  ""
+
+run_case "Entrypoint console conserva metadatos de version" \
+  "./docker/entrypoint.sh console --version" \
+  "# Versiones y tags historicos" \
+  ""
+
+run_server_case
+
+run_file_case "CLI batch genera CSV esperado" \
+  "./progvoraz --input tests/sample_batch.csv --output /tmp/progvoraz_batch_test.csv --log /tmp/progvoraz_batch_test.log" \
+  "/tmp/progvoraz_batch_test.csv" \
+  "OK total=2"
+
+run_file_case "CLI batch genera log esperado" \
+  "./progvoraz --input tests/sample_batch.csv --output /tmp/progvoraz_batch_test.csv --log /tmp/progvoraz_batch_test.log" \
+  "/tmp/progvoraz_batch_test.log" \
+  "no solution"
+
+run_file_case "CLI exporta stock JSON" \
+  "./progvoraz --export-stock-json /tmp/progvoraz_export_stock.json" \
+  "/tmp/progvoraz_export_stock.json" \
+  "\"monedas\""
+
+run_file_case "CLI exporta reporte global" \
+  "./progvoraz --export-report /tmp/progvoraz_export_report.txt" \
+  "/tmp/progvoraz_export_report.txt" \
+  "Reporte global"
 
 run_case "Consola modo ingles" \
   "PROGVORAZ_LANG=en ./progvoraz" \

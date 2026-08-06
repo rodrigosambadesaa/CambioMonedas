@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: runtime
     image: progvoraz:latest
     pull_policy: build
     volumes:
@@ -18,6 +19,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: runtime
     image: progvoraz:latest
     pull_policy: build
     volumes:
@@ -33,7 +35,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: progvoraz:latest
+      target: quality
+    image: progvoraz-quality:latest
     pull_policy: build
     volumes:
       - ./monedas.txt:/app/monedas.txt:ro

@@ -38,7 +38,7 @@ RUN_TARGET := ./$(TARGET)
 RUN_TEST_TARGET := ./$(TEST_TARGET)
 endif
 
-.PHONY: all debug release debug-sanitize run gui run-gui test test-sanitize valgrind fd-check stress-test memory-safety docker-debug docker-sanitize docker-valgrind docker-stress docker-fd-check clean help
+.PHONY: all debug release debug-sanitize run gui run-gui test test-sanitize valgrind fd-check stress-test memory-safety quality-suite docker-debug docker-quality docker-sanitize docker-valgrind docker-stress docker-fd-check clean help
 
 all: debug
 
@@ -88,20 +88,26 @@ stress-test:
 memory-safety:
 	scripts/memory_safety_suite.sh
 
+quality-suite:
+	scripts/quality_suite.sh
+
 docker-debug:
-	docker build -f docker/Dockerfile.debug -t progvoraz-debug .
+	docker build --target quality -t progvoraz-quality .
+
+docker-quality: docker-debug
+	docker run --rm --memory=256m progvoraz-quality test
 
 docker-sanitize: docker-debug
-	docker run --rm --memory=256m progvoraz-debug make test-sanitize
+	docker run --rm --memory=256m progvoraz-quality make test-sanitize
 
 docker-valgrind: docker-debug
-	docker run --rm --memory=256m progvoraz-debug make valgrind
+	docker run --rm --memory=256m progvoraz-quality make valgrind
 
 docker-stress: docker-debug
-	docker run --rm --memory=256m progvoraz-debug make stress-test
+	docker run --rm --memory=256m progvoraz-quality make stress-test
 
 docker-fd-check: docker-debug
-	docker run --rm --memory=256m progvoraz-debug make fd-check
+	docker run --rm --memory=256m progvoraz-quality make fd-check
 
 ifeq ($(OS),Windows_NT)
 GUI_TARGET := $(GUI_APP).exe
@@ -154,4 +160,5 @@ help:
 	@echo "  make fd-check       -> comprueba crecimiento de file descriptors"
 	@echo "  make stress-test    -> ejecuta estrés repetido"
 	@echo "  make memory-safety  -> batería completa reproducible"
+	@echo "  make quality-suite  -> integra smoke + memoria/recursos"
 	@echo "  make clean    -> elimina artefactos"

@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+make clean
 make debug
 rss_max=0
 for i in $(seq 1 200); do

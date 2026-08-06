@@ -13,12 +13,10 @@ Equivale a ejecutar sanitizers, Valgrind, comprobación de file descriptors y es
 ## Docker
 
 ```bash
-docker build -f docker/Dockerfile.debug -t progvoraz-debug .
-docker run --rm --memory=256m progvoraz-debug
-docker run --rm --memory=256m progvoraz-debug make test-sanitize
-docker run --rm --memory=256m progvoraz-debug make valgrind
-docker run --rm --memory=256m progvoraz-debug make fd-check
-docker run --rm --memory=256m progvoraz-debug make stress-test
+docker build --target quality -t progvoraz-quality .
+docker run --rm --memory=256m progvoraz-quality test
+docker run --rm --memory=256m progvoraz-quality memory
+docker run --rm --memory=256m progvoraz-quality smoke
 ```
 
 ## Targets disponibles
@@ -30,7 +28,8 @@ docker run --rm --memory=256m progvoraz-debug make stress-test
 | `make valgrind` | Ejecuta Valgrind con `--leak-check=full --show-leak-kinds=all --track-origins=yes --errors-for-leak-kinds=definite,possible --error-exitcode=1`. |
 | `make fd-check` | Repite ejecuciones y comprueba que `/proc/<pid>/fd` no crece; usa `strace` si está instalado. |
 | `make stress-test` | Ejecuta 200 entradas variadas y registra RSS pico con `/usr/bin/time`. |
-| `make memory-safety` | Batería completa. |
+| `make memory-safety` | Batería completa de memoria/recursos. |
+| `make quality-suite` | Smoke Docker + memoria/recursos en una sola ejecución. |
 
 ## Matriz de modos probados
 
@@ -51,6 +50,14 @@ docker run --rm --memory=256m progvoraz-debug make stress-test
 - Se corrigió un acceso inválido potencial en el recorte de cadenas vacías: ya no se calcula `s + strlen(s) - 1` cuando la cadena recortada queda vacía.
 - Se endureció el servidor HTTP ante cuerpos incompletos y lecturas de archivos temporales fallidas: libera el cuerpo, cierra sockets/archivos y valida `malloc`/`fread`.
 
+## Suite consolidada
+
+El servicio `progvoraz-test` de `docker compose` usa el mismo `Dockerfile` principal con target `quality` y ejecuta una suite única que integra:
+
+- Pruebas de modos CLI/GUI portable (`smoke`).
+- Sanitizers, Valgrind, file descriptors y estrés (`memory`).
+- Exportaciones batch, JSON y reporte por CLI.
+
 ## Pendientes
 
-No se automatiza la GUI interactiva porque requiere entorno gráfico. La auditoría cubre el binario principal, batch, stream, exportaciones y rutas HTTP internas que compilan en el binario; para pruebas funcionales de servidor con tráfico real se recomienda ejecutar el contenedor debug y añadir peticiones `curl` específicas del despliegue.
+No se automatiza la GUI interactiva porque requiere entorno gráfico. La auditoría cubre el binario principal, batch, stream, exportaciones y rutas HTTP internas que compilan en el binario; para pruebas funcionales de servidor con tráfico real se recomienda ejecutar el contenedor `quality` y añadir peticiones `curl` específicas del despliegue.

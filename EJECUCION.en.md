@@ -73,4 +73,6 @@ Run automated tests:
 
 ```bash
 docker compose run --rm progvoraz-test
+docker compose run --rm progvoraz-test smoke
+docker compose run --rm progvoraz-test memory
 ```

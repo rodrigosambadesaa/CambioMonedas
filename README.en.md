@@ -62,6 +62,8 @@ docker compose build
 docker compose run --rm progvoraz-console
 docker compose run --rm progvoraz-gui-portable
 docker compose run --rm progvoraz-test
+docker compose run --rm progvoraz-test smoke
+docker compose run --rm progvoraz-test memory
 ```
 
 ## Relevant Files
@@ -78,4 +80,3 @@ docker compose run --rm progvoraz-test
 
 - Spanish usage guide: [EJECUCION.md](/C:/Users/rodri/OneDrive/Documentos/GitHub/ProgVoraz/ProgVoraz/EJECUCION.md)
 - Spanish technical reference: [FUNCIONES_C.md](/C:/Users/rodri/OneDrive/Documentos/GitHub/ProgVoraz/ProgVoraz/FUNCIONES_C.md)
-
