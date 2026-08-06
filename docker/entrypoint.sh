@@ -1,39 +1,51 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_DIR="/app"
+if [[ ! -d "$APP_DIR" ]]; then
+  APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+fi
+
 mode="${1:-console}"
 shift || true
 
 case "$mode" in
   console)
-    exec /app/progvoraz "$@"
+    exec "$APP_DIR/progvoraz" "$@"
     ;;
   convert)
     # Ejecuta conversión no interactiva: args esperados: <from> <to> <amount_cents>
-    exec /app/progvoraz --convert "$@"
+    exec "$APP_DIR/progvoraz" --convert "$@"
     ;;
   convert-stock)
     # Igual que convert pero solicita uso de stock en destino
-    exec /app/progvoraz --convert "$@" --convert-stock
+    exec "$APP_DIR/progvoraz" --convert "$@" --convert-stock
     ;;
   gui)
-    exec /app/progvoraz_gui "$@"
+    exec "$APP_DIR/progvoraz_gui" "$@"
     ;;
   stream)
-    exec /app/progvoraz --docker "$@"
+    exec "$APP_DIR/progvoraz" --docker "$@"
     ;;
   server)
-    exec /app/progvoraz --server "$@"
+    exec "$APP_DIR/progvoraz" --server "$@"
     ;;
   test)
-    exec /app/docker/run_all_modes_tests.sh "$@"
+    exec "$APP_DIR/scripts/quality_suite.sh" "$@"
+    ;;
+  smoke)
+    exec "$APP_DIR/docker/run_all_modes_tests.sh" "$@"
+    ;;
+  memory)
+    exec "$APP_DIR/scripts/memory_safety_suite.sh" "$@"
     ;;
   bash)
     exec /bin/bash "$@"
     ;;
   *)
     echo "Modo invalido: $mode"
-    echo "Usa: console | gui | test | bash"
+    echo "Usa: console | convert | convert-stock | gui | stream | server | test | smoke | memory | bash"
     exit 2
     ;;
 esac

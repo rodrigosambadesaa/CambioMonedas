@@ -93,10 +93,17 @@ Persistencia de datos con Docker Compose:
 - Cualquier actualizacion de stock hecha desde consola o GUI portable se guarda en tu `stock.txt` local.
 - Cualquier transaccion registrada desde consola o GUI se refleja en tu `historial.txt` local.
 
-Ejecutar pruebas automáticas de todos los modos soportados en Docker:
+Ejecutar la suite Docker consolidada de calidad (smoke + memoria/recursos):
 
 ```bash
 docker compose run --rm progvoraz-test
+```
+
+Si quieres aislar sólo una parte dentro de la imagen de test:
+
+```bash
+docker compose run --rm progvoraz-test smoke
+docker compose run --rm progvoraz-test memory
 ```
 
 En Windows PowerShell (host):

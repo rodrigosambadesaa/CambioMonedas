@@ -243,6 +243,113 @@ static void test_cambio_cercano_con_rango_stock(void)
     bigint_array_free(&solucion);
 }
 
+/* funcion test_cambio_exacto_con_rango_ilimitado: contiene la logica principal de esta operacion. */
+static void test_cambio_exacto_con_rango_ilimitado(void)
+{
+    const char *denom_txt[] = {"10", "6", "1"};
+    const char *esperado[] = {"0", "2", "0"};
+    BigInt monto = {0};
+    BigIntArray denom = {0};
+    BigIntArray solucion = {0};
+
+    check_int(bigint_init(&monto, "12"), "inicializa monto exacto con rango");
+    check_int(crear_arreglo(&denom, denom_txt, 3), "crea denominaciones exacto con rango");
+    check_int(calcular_cambio_optimo_con_rango(&monto, &denom, 2, 2, &solucion),
+              "calcula cambio exacto con dos monedas");
+    check_arreglo_texto(&solucion, esperado, 3, "combinacion exacta con rango esperada");
+
+    bigint_free(&monto);
+    bigint_array_free(&denom);
+    bigint_array_free(&solucion);
+}
+
+/* funcion test_cambio_exacto_con_rango_stock: contiene la logica principal de esta operacion. */
+static void test_cambio_exacto_con_rango_stock(void)
+{
+    const char *denom_txt[] = {"10", "6", "1"};
+    const char *stock_txt[] = {"1", "2", "10"};
+    const char *esperado[] = {"0", "2", "0"};
+    BigInt monto = {0};
+    BigIntArray denom = {0};
+    BigIntArray stock = {0};
+    BigIntArray solucion = {0};
+
+    check_int(bigint_init(&monto, "12"), "inicializa monto exacto con stock y rango");
+    check_int(crear_arreglo(&denom, denom_txt, 3), "crea denominaciones exacto con stock y rango");
+    check_int(crear_arreglo(&stock, stock_txt, 3), "crea stock exacto con rango");
+    check_int(calcular_cambio_optimo_stock_con_rango(&monto, &denom, &stock, 2, 2, &solucion),
+              "calcula cambio exacto con stock y rango");
+    check_arreglo_texto(&solucion, esperado, 3, "combinacion exacta con stock y rango esperada");
+
+    bigint_free(&monto);
+    bigint_array_free(&denom);
+    bigint_array_free(&stock);
+    bigint_array_free(&solucion);
+}
+
+/* funcion test_limite_monedas_ilimitado: contiene la logica principal de esta operacion. */
+static void test_limite_monedas_ilimitado(void)
+{
+    const char *denom_txt[] = {"9", "6", "3"};
+    const char *esperado[] = {"1", "0", "1"};
+    BigInt monto = {0};
+    BigIntArray denom = {0};
+    BigIntArray solucion = {0};
+
+    check_int(bigint_init(&monto, "12"), "inicializa monto con limite ilimitado");
+    check_int(crear_arreglo(&denom, denom_txt, 3), "crea denominaciones con limite ilimitado");
+    check_int(calcular_cambio_optimo_con_limite(&monto, &denom, 2, &solucion),
+              "calcula cambio exacto dentro del limite");
+    check_arreglo_texto(&solucion, esperado, 3, "respeta limite de monedas en modo ilimitado");
+
+    bigint_free(&monto);
+    bigint_array_free(&denom);
+    bigint_array_free(&solucion);
+}
+
+/* funcion test_limite_monedas_stock_sin_solucion: contiene la logica principal de esta operacion. */
+static void test_limite_monedas_stock_sin_solucion(void)
+{
+    const char *denom_txt[] = {"10", "6", "1"};
+    const char *stock_txt[] = {"1", "1", "10"};
+    BigInt monto = {0};
+    BigIntArray denom = {0};
+    BigIntArray stock = {0};
+    BigIntArray solucion = {0};
+
+    check_int(bigint_init(&monto, "12"), "inicializa monto sin solucion por limite y stock");
+    check_int(crear_arreglo(&denom, denom_txt, 3), "crea denominaciones sin solucion por limite y stock");
+    check_int(crear_arreglo(&stock, stock_txt, 3), "crea stock sin solucion por limite y stock");
+    check_int(!calcular_cambio_optimo_stock_con_limite(&monto, &denom, &stock, 2, &solucion),
+              "detecta ausencia de solucion por limite y stock");
+    check_int(solucion.items == NULL && solucion.len == 0, "no deja solucion parcial tras fallo por limite y stock");
+
+    bigint_free(&monto);
+    bigint_array_free(&denom);
+    bigint_array_free(&stock);
+    bigint_array_free(&solucion);
+}
+
+/* funcion test_cambio_cero_con_rango: contiene la logica principal de esta operacion. */
+static void test_cambio_cero_con_rango(void)
+{
+    const char *denom_txt[] = {"10", "5", "1"};
+    const char *esperado[] = {"0", "0", "0"};
+    BigInt monto = {0};
+    BigIntArray denom = {0};
+    BigIntArray solucion = {0};
+
+    check_int(bigint_init(&monto, "0"), "inicializa monto cero");
+    check_int(crear_arreglo(&denom, denom_txt, 3), "crea denominaciones para monto cero");
+    check_int(calcular_cambio_optimo_con_rango(&monto, &denom, 0, 3, &solucion),
+              "resuelve monto cero cuando el minimo permitido es cero");
+    check_arreglo_texto(&solucion, esperado, 3, "devuelve vector nulo para monto cero");
+
+    bigint_free(&monto);
+    bigint_array_free(&denom);
+    bigint_array_free(&solucion);
+}
+
 /* funcion main: contiene la logica principal de esta operacion. */
 int main(void)
 {
@@ -252,6 +359,11 @@ int main(void)
     test_sin_solucion_con_stock();
     test_cambio_cercano_con_rango_ilimitado();
     test_cambio_cercano_con_rango_stock();
+    test_cambio_exacto_con_rango_ilimitado();
+    test_cambio_exacto_con_rango_stock();
+    test_limite_monedas_ilimitado();
+    test_limite_monedas_stock_sin_solucion();
+    test_cambio_cero_con_rango();
 
     /* if: comprueba fallos != 0 antes de ejecutar esta rama. */
     if (fallos != 0)

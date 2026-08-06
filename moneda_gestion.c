@@ -345,6 +345,11 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
     /* if: comprueba ok antes de ejecutar esta rama. */
     if (ok)
     {
+// Dependiendo del sistema operativo, se renombra el archivo temporal al original.
+// El método usado en Windows requiere eliminar el archivo original antes de renombrar el temporal, ya que Windows no permite renombrar sobre un archivo existente.
+// El método usado en Linux/Unix (POSIX) es más seguro y evita la pérdida de datos si el proceso se interrumpe, ya que el archivo original permanece intacto hasta que el renombrado se completa con éxito.
+// El método usado en macOS es similar al de Linux/Unix, pero con algunas diferencias en la implementación del sistema de archivos. En general, se recomienda usar el método POSIX para mayor compatibilidad y seguridad.
+// Para futuros sistemas operativos, se recomienda seguir el enfoque POSIX, ya que es más seguro y ampliamente soportado. Sin embargo, siempre es importante verificar la documentación del sistema operativo específico para asegurarse de que el comportamiento sea el esperado.
 #ifdef _WIN32
         /* Este bloque de codigo es para Windows: elimina el archivo original antes de renombrar el temporal, ya que Windows no permite renombrar sobre un archivo existente. */
         /* if: comprueba remove(rutaStock) != 0 antes de ejecutar esta rama. */

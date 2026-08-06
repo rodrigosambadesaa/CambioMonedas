@@ -8,3 +8,4 @@ make test-sanitize
 make valgrind
 make fd-check
 make stress-test
+echo "Memory safety suite completada correctamente."
