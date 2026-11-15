@@ -7,6 +7,12 @@ if [[ ! -d "$APP_DIR" ]]; then
   APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 fi
 
+# Runtime services mount the repository directory at /app/workspace so that
+# stock.txt can be replaced atomically. Quality images keep their /app sandbox.
+if [[ -f "$APP_DIR/workspace/monedas.txt" && -f "$APP_DIR/workspace/stock.txt" ]]; then
+  cd "$APP_DIR/workspace"
+fi
+
 mode="${1:-console}"
 shift || true
 
