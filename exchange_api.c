@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <math.h>
 
 /* funcion normalize_currency_token: contiene la logica principal de esta operacion. */
 static void normalize_currency_token(const char *input, char *output, size_t output_size)
@@ -153,7 +154,8 @@ static int fetch_exchange_rate_from_stub(const char *from, const char *to, doubl
         !currency_to_iso_code(to, to_code, sizeof(to_code)))
         return 0;
 
-    snprintf(key, sizeof(key), "%s_%s", from_code, to_code);
+    if (strcmp(from_code, to_code) == 0) { *rate_out = 1.0; return 1; }
+    snprintf(key, sizeof(key), "\"%s_%s\"", from_code, to_code);
 
     f = fopen("rates_stub.json", "r");
     /* if: comprueba !f antes de ejecutar esta rama. */
@@ -174,9 +176,10 @@ static int fetch_exchange_rate_from_stub(const char *from, const char *to, doubl
     if (!p)
         return 0;
 
-    rate = atof(p + 1);
-    /* if: comprueba rate <= 0.0 antes de ejecutar esta rama. */
-    if (rate <= 0.0)
+    char *end = NULL;
+    rate = strtod(p + 1, &end);
+    while (end && isspace((unsigned char)*end)) ++end;
+    if (!end || !isfinite(rate) || rate <= 0.0 || (*end != ',' && *end != '}'))
         return 0;
 
     *rate_out = rate;
@@ -208,6 +211,8 @@ static size_t write_cb(void *ptr, size_t size, size_t nmemb, void *userdata)
 {
     size_t realsize = size * nmemb;
     struct memchunk *m = (struct memchunk *)userdata;
+    if (size && realsize / size != nmemb) return 0;
+    if (realsize > 16384 || m->size > 16384 - realsize) return 0;
     char *tmp = realloc(m->data, m->size + realsize + 1);
     /* if: comprueba !tmp antes de ejecutar esta rama. */
     if (!tmp)
@@ -217,6 +222,41 @@ static size_t write_cb(void *ptr, size_t size, size_t nmemb, void *userdata)
     m->size += realsize;
     m->data[m->size] = '\0';
     return realsize;
+}
+
+/* Parse only the flat JSON object returned by Frankfurter v2.
+ * Reject mismatched currency identifiers and nonfinite rates.
+ */
+static int json_string_equals(const char *json, const char *field, const char *wanted)
+{
+    char key[32];
+    snprintf(key, sizeof(key), "\"%s\"", field);
+    const char *p = strstr(json, key);
+    if (!p) return 0;
+    p += strlen(key);
+    while (isspace((unsigned char)*p)) ++p;
+    if (*p++ != ':') return 0;
+    while (isspace((unsigned char)*p)) ++p;
+    if (*p++ != '"') return 0;
+    size_t n = strlen(wanted);
+    return strncmp(p, wanted, n) == 0 && p[n] == '"';
+}
+
+static int json_numeric_rate(const char *json, double *rate_out)
+{
+    const char *p = strstr(json, "\"rate\"");
+    if (!p) return 0;
+    p += strlen("\"rate\"");
+    while (isspace((unsigned char)*p)) ++p;
+    if (*p++ != ':') return 0;
+    while (isspace((unsigned char)*p)) ++p;
+    char *end = NULL;
+    double value = strtod(p, &end);
+    if (end == p || !isfinite(value) || value <= 0.0) return 0;
+    while (isspace((unsigned char)*end)) ++end;
+    if (*end != ',' && *end != '}') return 0;
+    *rate_out = value;
+    return 1;
 }
 
 /* funcion fetch_exchange_rate: contiene la logica principal de esta operacion. */
@@ -235,6 +275,7 @@ int fetch_exchange_rate(const char *from, const char *to, double *rate_out)
         !currency_to_iso_code(to, to_code, sizeof(to_code)))
         return 0;
 
+    if (strcmp(from_code, to_code) == 0) { *rate_out = 1.0; return 1; }
     source_mode = getenv("PROGVORAZ_EXCHANGE_SOURCE");
     /* if: comprueba source_mode != NULL && strcmp(source_mode, "stub") == 0 antes de ejecutar esta rama. */
     if (source_mode != NULL && strcmp(source_mode, "stub") == 0)
@@ -246,8 +287,8 @@ int fetch_exchange_rate(const char *from, const char *to, double *rate_out)
         return fetch_exchange_rate_from_stub(from_code, to_code, rate_out);
 
     char url[256];
-    /* Using exchangerate.host free API as default (no key required). */
-    snprintf(url, sizeof(url), "https://api.exchangerate.host/convert?from=%s&to=%s&amount=1", from_code, to_code);
+    /* Frankfurter v2 serves reference rates without API credentials. */
+    snprintf(url, sizeof(url), "https://api.frankfurter.dev/v2/rate/%s/%s", from_code, to_code);
 
     struct memchunk chunk = {0};
     CURLcode res;
@@ -256,33 +297,28 @@ int fetch_exchange_rate(const char *from, const char *to, double *rate_out)
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "ProgVoraz/1.0");
 
     res = curl_easy_perform(curl);
-    /* if: comprueba res != CURLE_OK antes de ejecutar esta rama. */
-    if (res != CURLE_OK)
+    long status = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
+    if (res != CURLE_OK || status != 200 || !chunk.data)
     {
         curl_easy_cleanup(curl);
         free(chunk.data);
         return fetch_exchange_rate_from_stub(from_code, to_code, rate_out);
     }
 
-    /* Try to find "result":<number> in the JSON */
     double rate = 0.0;
-    char *p = strstr(chunk.data, "\"result\"");
-    /* if: comprueba p antes de ejecutar esta rama. */
-    if (p)
-    {
-        p = strchr(p, ':');
-        /* if: comprueba p antes de ejecutar esta rama. */
-        if (p)
-            rate = atof(p + 1);
-    }
+    int verified = json_string_equals(chunk.data, "base", from_code) &&
+        json_string_equals(chunk.data, "quote", to_code) &&
+        json_numeric_rate(chunk.data, &rate);
 
     curl_easy_cleanup(curl);
     free(chunk.data);
 
-    /* if: comprueba rate <= 0.0 antes de ejecutar esta rama. */
-    if (rate <= 0.0)
+    if (!verified)
         return fetch_exchange_rate_from_stub(from_code, to_code, rate_out);
 
     *rate_out = rate;
