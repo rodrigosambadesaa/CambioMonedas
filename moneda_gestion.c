@@ -247,7 +247,7 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
     char buffer[MAX_LINEA_STOCK];
     char comparable[MAX_LINEA_STOCK];
     const char *rutaStock = "stock.txt";
-    const char *rutaTemporal = "stock.txt.tmp";
+    char rutaTemporal[1024] = {0};
     size_t i;
     size_t totalLineas = 0;
     int ok = 1;
@@ -394,9 +394,22 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
     fclose(archivoLectura);
     archivoLectura = NULL;
 
-    archivoTemporal = fopen(rutaTemporal, "w");
-    /* if: comprueba archivoTemporal == NULL antes de ejecutar esta rama. */
-    if (archivoTemporal == NULL)
+#ifdef _WIN32
+    /* Same-directory unique staging prevents collisions and symlink clobbering. */
+    if (GetTempFileNameA(".", "stk", 0, rutaTemporal) == 0)
+        ok = 0;
+    if (ok)
+        archivoTemporal = fopen(rutaTemporal, "w");
+#else
+    snprintf(rutaTemporal, sizeof(rutaTemporal), "stock.txt.tmp.XXXXXX");
+    int stage_fd = mkstemp(rutaTemporal);
+    if (stage_fd >= 0)
+    {
+        archivoTemporal = fdopen(stage_fd, "w");
+        if (!archivoTemporal) close(stage_fd);
+    }
+#endif
+    if (!archivoTemporal)
         ok = 0;
 
     /* for: itera segun i = 0; ok && i < totalLineas; i++ para recorrer el bloque. */
@@ -450,7 +463,7 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
     }
 
     /* if: comprueba !ok antes de ejecutar esta rama. */
-    if (!ok)
+    if (!ok && rutaTemporal[0])
         remove(rutaTemporal);
 
     /* for: itera segun i = 0; i < totalLineas; i++ para recorrer el bloque. */
