@@ -155,6 +155,19 @@ static int cargar_datos_moneda(const char *archivo, const char *nombreMoneda, in
         return 0;
 
     fp = fopen(archivo, "r");
+#ifdef _WIN32
+    /* An atomic replacement may briefly deny readers without SHARE_DELETE.
+     * Retry the complete open; never retry a completed inventory transaction.
+     */
+    if (!fp && convertirMenosUnoACero && strcmp(archivo, "stock.txt") == 0)
+    {
+        for (int attempt = 0; attempt < 200 && !fp; ++attempt)
+        {
+            Sleep(10);
+            fp = fopen(archivo, "r");
+        }
+    }
+#endif
     /* if: comprueba fp == NULL antes de ejecutar esta rama. */
     if (fp == NULL)
         return 0;
