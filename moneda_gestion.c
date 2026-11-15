@@ -10,9 +10,13 @@
 #include <time.h>
 #ifdef _WIN32
 #include <io.h>
+#include <windows.h>
 #else
 #include <sys/types.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/file.h>
+#include <errno.h>
 #endif
 #include "moneda_gestion.h"
 
@@ -20,6 +24,64 @@
 #define MAX_DENOMINACIONES 64
 #define MAX_LINEA_STOCK 256
 #define MAX_LINEAS_STOCK 512
+
+/* Cooperating C/C++/C# writers lock the same sidecar file, never stock.txt:
+ * an atomic rename replaces stock.txt's inode but leaves this lock stable.
+ */
+typedef struct StockWriteLock
+{
+#ifdef _WIN32
+    HANDLE handle;
+#else
+    int fd;
+#endif
+} StockWriteLock;
+
+static int acquire_stock_write_lock(StockWriteLock *lock)
+{
+#ifdef _WIN32
+    lock->handle = INVALID_HANDLE_VALUE;
+    for (int attempt = 0; attempt < 200; ++attempt)
+    {
+        lock->handle = CreateFileA("stock.txt.lock", GENERIC_READ | GENERIC_WRITE, 0,
+                                   NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (lock->handle != INVALID_HANDLE_VALUE) return 1;
+        Sleep(10);
+    }
+#else
+    lock->fd = open("stock.txt.lock", O_CREAT | O_RDWR, 0600);
+    if (lock->fd < 0) return 0;
+    for (int attempt = 0; attempt < 200; ++attempt)
+    {
+        if (flock(lock->fd, LOCK_EX | LOCK_NB) == 0) return 1;
+        if (errno != EWOULDBLOCK && errno != EAGAIN) break;
+        struct timespec pause_time = { 0, 10000000L };
+        nanosleep(&pause_time, NULL);
+    }
+    close(lock->fd);
+    lock->fd = -1;
+#endif
+    return 0;
+}
+
+static void release_stock_write_lock(StockWriteLock *lock)
+{
+#ifdef _WIN32
+    if (lock->handle != INVALID_HANDLE_VALUE)
+    {
+        CloseHandle(lock->handle);
+        lock->handle = INVALID_HANDLE_VALUE;
+    }
+#else
+    if (lock->fd >= 0)
+    {
+        flock(lock->fd, LOCK_UN);
+        close(lock->fd);
+        lock->fd = -1;
+    }
+#endif
+}
+
 
 /* es_texto_bigint_valido: Funcion auxiliar que verifica si un string es un numero grande valido. */
 /* funcion es_texto_bigint_valido: contiene la logica principal de esta operacion. */
@@ -177,6 +239,8 @@ Explicación del algoritmo: Se lee todo el archivo stock.txt en memoria, se busc
 /* funcion actualizar_stock_moneda: contiene la logica principal de esta operacion. */
 int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
 {
+    StockWriteLock lock;
+    BigIntArray denominaciones = {0};
     FILE *archivoLectura;
     FILE *archivoTemporal = NULL;
     char *lineas[MAX_LINEAS_STOCK];
@@ -194,10 +258,19 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
         stock == NULL || stock->items == NULL || stock->len == 0)
         return 0;
 
-    archivoLectura = fopen(rutaStock, "r");
-    /* if: comprueba archivoLectura == NULL antes de ejecutar esta rama. */
-    if (archivoLectura == NULL)
+    if (!cargar_denominaciones_moneda(nombreMoneda, &denominaciones))
         return 0;
+    int expected = denominaciones.len == stock->len;
+    bigint_array_free(&denominaciones);
+    if (!expected || !acquire_stock_write_lock(&lock))
+        return 0;
+
+    archivoLectura = fopen(rutaStock, "r");
+    if (archivoLectura == NULL)
+    {
+        release_stock_write_lock(&lock);
+        return 0;
+    }
 
     /* for: itera segun i = 0; i < MAX_LINEAS_STOCK; i++ para recorrer el bloque. */
     for (i = 0; i < MAX_LINEAS_STOCK; i++)
@@ -275,6 +348,14 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
                 size_t objetivo = linea + 1 + i;
                 char nuevaLinea[MAX_LINEA_STOCK];
 
+                /* Reject truncation of arbitrary-precision stock values. */
+                if (!stock->items[i].digits ||
+                    strlen(stock->items[i].digits) + 2 >= sizeof(nuevaLinea))
+                {
+                    ok = 0;
+                    break;
+                }
+
                 /* if: comprueba bigint_is_zero(&stock->items[i]) antes de ejecutar esta rama. */
                 if (bigint_is_zero(&stock->items[i]))
                     snprintf(nuevaLinea, sizeof(nuevaLinea), "-1\n");
@@ -306,6 +387,7 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
         for (i = 0; i < totalLineas; i++)
             free(lineas[i]);
         fclose(archivoLectura);
+        release_stock_write_lock(&lock);
         return 0;
     }
 
@@ -342,54 +424,29 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
         ok = 0;
     archivoTemporal = NULL;
 
-    /* if: comprueba ok antes de ejecutar esta rama. */
     if (ok)
     {
-// Dependiendo del sistema operativo, se renombra el archivo temporal al original.
-// El método usado en Windows requiere eliminar el archivo original antes de renombrar el temporal, ya que Windows no permite renombrar sobre un archivo existente.
-// El método usado en Linux/Unix (POSIX) es más seguro y evita la pérdida de datos si el proceso se interrumpe, ya que el archivo original permanece intacto hasta que el renombrado se completa con éxito.
-// El método usado en macOS es similar al de Linux/Unix, pero con algunas diferencias en la implementación del sistema de archivos. En general, se recomienda usar el método POSIX para mayor compatibilidad y seguridad.
-// Para futuros sistemas operativos, se recomienda seguir el enfoque POSIX, ya que es más seguro y ampliamente soportado. Sin embargo, siempre es importante verificar la documentación del sistema operativo específico para asegurarse de que el comportamiento sea el esperado.
 #ifdef _WIN32
-        /* Este bloque de codigo es para Windows: elimina el archivo original antes de renombrar el temporal, ya que Windows no permite renombrar sobre un archivo existente. */
-        /* if: comprueba remove(rutaStock) != 0 antes de ejecutar esta rama. */
-        if (remove(rutaStock) != 0)
-            ok = 0;
-#endif
-        /* Este bloque de codigo es para sistemas POSIX: renombra el archivo temporal al nombre del stock, reemplazando el original. */
-        /* if: comprueba ok && rename(rutaTemporal, rutaStock) != 0 antes de ejecutar esta rama. */
-        if (ok && rename(rutaTemporal, rutaStock) != 0)
+        /* Never remove the destination first. Retain it on any failed swap. */
+        int swapped = 0;
+        for (int attempt = 0; attempt < 200; ++attempt)
         {
-            FILE *archivoDestino = fopen(rutaStock, "w");
-            /* if: comprueba archivoDestino == NULL antes de ejecutar esta rama. */
-            if (archivoDestino == NULL)
+            if (MoveFileExA(rutaTemporal, rutaStock,
+                            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
             {
-                ok = 0;
+                swapped = 1;
+                break;
             }
-            else
-            /* Explicación del for: Reescribe todas las lineas en el archivo destino. Si alguna falla, marca error y sale del bucle. */
-            {
-                /* for: itera segun i = 0; i < totalLineas; i++ para recorrer el bloque. */
-                for (i = 0; i < totalLineas; i++)
-                {
-                    // Este if verifica si fputs devolvio EOF, lo que indica un error de escritura. Si ocurre, se marca ok como 0 y se rompe el bucle.
-                    /* if: comprueba fputs(lineas[i], archivoDestino) == EOF antes de ejecutar esta rama. */
-                    if (fputs(lineas[i], archivoDestino) == EOF)
-                    {
-                        ok = 0;
-                        break;
-                    }
-                }
-                // Este if verifica si fflush devolvio un valor distinto de 0, lo que indica un error al vaciar el buffer. Si ocurre, se marca ok como 0.
-                /* if: comprueba ok && fflush(archivoDestino) != 0 antes de ejecutar esta rama. */
-                if (ok && fflush(archivoDestino) != 0)
-                    ok = 0;
-                // Este if verifica si fclose devolvio un valor distinto de 0, lo que indica un error al cerrar el archivo. Si ocurre, se marca ok como 0.
-                /* if: comprueba fclose(archivoDestino) != 0 antes de ejecutar esta rama. */
-                if (fclose(archivoDestino) != 0)
-                    ok = 0;
-            }
+            DWORD error = GetLastError();
+            if (error != ERROR_SHARING_VIOLATION && error != ERROR_ACCESS_DENIED &&
+                error != ERROR_LOCK_VIOLATION) break;
+            Sleep(10);
         }
+        if (!swapped) ok = 0;
+#else
+        /* POSIX rename atomically replaces the stock under the sidecar lock. */
+        if (rename(rutaTemporal, rutaStock) != 0) ok = 0;
+#endif
     }
 
     /* if: comprueba !ok antes de ejecutar esta rama. */
@@ -407,6 +464,7 @@ int actualizar_stock_moneda(const char *nombreMoneda, const BigIntArray *stock)
     if (archivoTemporal != NULL)
         fclose(archivoTemporal);
 
+    release_stock_write_lock(&lock);
     return (ok && actualizado) ? 1 : 0;
 }
 
