@@ -75,6 +75,7 @@ int export_stock_json(const char *rutaJson)
     }
 
     /* for: itera segun size_t i = 0; i < nmon; i++ para recorrer el bloque. */
+    size_t emitted = 0;
     for (size_t i = 0; i < nmon; i++)
     {
         BigIntArray denom = {0};
@@ -87,14 +88,21 @@ int export_stock_json(const char *rutaJson)
             continue;
         }
 
-        fprintf(fp, "    {\"nombre\": \"%s\", \"denominaciones\": [", claves[i]);
+        /* Filtrar entradas inconsistentes antes de escribir un objeto JSON. */
+        if (denom.len == 0 || denom.len != stock.len ||
+            strspn(claves[i], "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_") != strlen(claves[i]))
+        {
+            bigint_array_free(&denom);
+            bigint_array_free(&stock);
+            continue;
+        }
+
+        fprintf(fp, "%s    {\"nombre\": \"%s\", \"denominaciones\": [",
+                emitted ? ",\n" : "", claves[i]);
         /* for: itera segun size_t j = 0; j < denom.len; j++ para recorrer el bloque. */
         for (size_t j = 0; j < denom.len; j++)
         {
-            fprintf(fp, "%s\"%s\"", j ? ", \"" : "\"", denom.items[j].digits);
-            /* if: comprueba j + 1 < denom.len antes de ejecutar esta rama. */
-            if (j + 1 < denom.len)
-                fprintf(fp, ", ");
+            fprintf(fp, "%s\"%s\"", j ? ", " : "", denom.items[j].digits);
         }
         fprintf(fp, "], \"stock\": [");
         /* for: itera segun size_t j = 0; j < stock.len; j++ para recorrer el bloque. */
@@ -102,13 +110,18 @@ int export_stock_json(const char *rutaJson)
         {
             fprintf(fp, "%s%s", stock.items[j].digits, j + 1 < stock.len ? ", " : "");
         }
-        fprintf(fp, "]}%s\n", i + 1 < nmon ? "," : "");
+        fprintf(fp, "]}");
+        emitted++;
 
         bigint_array_free(&denom);
         bigint_array_free(&stock);
     }
 
-    fprintf(fp, "  ]\n}\n");
-    fclose(fp);
+    fprintf(fp, "\n  ]\n}\n");
+    if (ferror(fp) || fclose(fp) != 0)
+    {
+        remove(ruta);
+        return 0;
+    }
     return 1;
 }
