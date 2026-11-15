@@ -70,7 +70,7 @@ int progvoraz_launch_gui_nonblocking(void)
 #elif defined(__APPLE__)
     const char *gui_execs[] = {"./progvoraz_gui", "progvoraz_gui", "./progvoraz_gui_swift", "progvoraz_gui_swift", "./progvoraz_gui_portable", "progvoraz_gui_portable"};
 #else
-    const char *gui_execs[] = {"./progvoraz_gui", "progvoraz_gui"};
+    const char *gui_execs[] = {"./progvoraz_gui", "progvoraz_gui", "/app/progvoraz_gui"};
 #endif
 
     /* for: itera segun size_t i = 0; i < sizeof(gui_execs) / sizeof(gui_execs[0]); i++ para recorrer el bloque. */

@@ -1,0 +1,33 @@
+name: C atomic inventory interoperability
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  atomic-stock:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build isolated C transaction test helper (Unix)
+        if: runner.os != 'Windows'
+        run: gcc -std=c2x -Wall -Wextra -Wpedantic -O2 -I. tests/stock_writer.c moneda_gestion.c bigint.c vector_dinamico.c -o stock_writer
+      - name: Build isolated C transaction test helper (Windows)
+        if: runner.os == 'Windows'
+        run: gcc -std=c2x -Wall -Wextra -Wpedantic -O2 -I. tests/stock_writer.c moneda_gestion.c bigint.c vector_dinamico.c -o stock_writer.exe
+      - name: Test C lock, atomic replace, 24 concurrent writers (Unix)
+        if: runner.os != 'Windows'
+        run: python tests/test_c_stock_transactions.py ./stock_writer
+      - name: Test C lock, atomic replace, 24 concurrent writers (Windows)
+        if: runner.os == 'Windows'
+        run: python tests/test_c_stock_transactions.py .\stock_writer.exe

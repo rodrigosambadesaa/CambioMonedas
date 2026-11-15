@@ -7,10 +7,9 @@ services:
     image: progvoraz:latest
     pull_policy: build
     volumes:
-      - ./monedas.txt:/app/monedas.txt:ro
-      - ./stock.txt:/app/stock.txt
-      - ./historial.txt:/app/historial.txt
-      - ./reporte_global.txt:/app/reporte_global.txt
+      # Mount a DIRECTORY, not individual stock.txt: atomic rename on a
+      # file bind mount fails with EBUSY and cannot be made safe by fallback.
+      - ./:/app/workspace
     stdin_open: true
     tty: true
     command: [ "console" ]
@@ -23,10 +22,9 @@ services:
     image: progvoraz:latest
     pull_policy: build
     volumes:
-      - ./monedas.txt:/app/monedas.txt:ro
-      - ./stock.txt:/app/stock.txt
-      - ./historial.txt:/app/historial.txt
-      - ./reporte_global.txt:/app/reporte_global.txt
+      # Mount a DIRECTORY, not individual stock.txt: atomic rename on a
+      # file bind mount fails with EBUSY and cannot be made safe by fallback.
+      - ./:/app/workspace
     stdin_open: true
     tty: true
     command: [ "gui" ]
@@ -38,9 +36,5 @@ services:
       target: quality
     image: progvoraz-quality:latest
     pull_policy: build
-    volumes:
-      - ./monedas.txt:/app/monedas.txt:ro
-      - ./stock.txt:/app/stock.txt
-      - ./historial.txt:/app/historial.txt
-      - ./reporte_global.txt:/app/reporte_global.txt
+    # Isolated disposable test data; never change the host's stock.txt.
     command: [ "test" ]
