@@ -295,7 +295,7 @@ run_case "Entrypoint stream sigue usando CSV Docker" \
 
 run_case "Entrypoint convert" \
   "PROGVORAZ_EXCHANGE_SOURCE=stub ./docker/entrypoint.sh convert euro dolar 250" \
-  "Convert CLI euro->dolar | Origen=250 c | Destino=273 c | Tasa=1.090000" \
+  "Convert CLI euro->dolar | Origen=250 c | Destino=273 c | Tasa=1.09" \
   ""
 
 run_case "Entrypoint convert-stock usa stock real" \
