@@ -339,3 +339,144 @@ int fetch_exchange_rate(const char *from, const char *to, double *rate_out)
 }
 
 #endif
+
+
+/* The test-rate path preserves decimal digits instead of traversing a double. */
+static int stub_decimal_text(const char *from, const char *to,
+                             char *output, size_t capacity)
+{
+    char key[32], content[4096];
+    FILE *input = fopen("rates_stub.json", "rb");
+    if (!input) return 0;
+    size_t bytes = fread(content, 1, sizeof(content) - 1, input);
+    int too_large = !feof(input), read_error = ferror(input);
+    fclose(input);
+    if (too_large || read_error) return 0;
+    content[bytes] = '\0';
+    if (snprintf(key, sizeof(key), "\"%s_%s\"", from, to) >= (int)sizeof(key))
+        return 0;
+    const char *start = strstr(content, key);
+    if (!start || strstr(start + strlen(key), key)) return 0;
+    const char *p = start + strlen(key);
+    while (isspace((unsigned char)*p)) ++p;
+    if (*p++ != ':') return 0;
+    while (isspace((unsigned char)*p)) ++p;
+    const char *begin = p;
+    int digits = 0, period = 0;
+    while (*p) {
+        if (isdigit((unsigned char)*p)) {
+            ++digits;
+        } else if (*p == '.' && !period) {
+            period = 1;
+        } else {
+            break;
+        }
+        ++p;
+    }
+    if (digits == 0 || p == begin || p[-1] == '.' || *begin == '.') return 0;
+    size_t length = (size_t)(p - begin);
+    while (isspace((unsigned char)*p)) ++p;
+    if (*p != ',' && *p != '}') return 0;
+    if (length >= capacity || length > 120) return 0;
+    memcpy(output, begin, length);
+    output[length] = '\0';
+    return 1;
+}
+
+int fetch_exchange_rate_decimal(const char *from, const char *to,
+                                char *text_out, size_t output_size)
+{
+    char source[8], destination[8];
+    if (!text_out || output_size == 0 ||
+        !currency_to_iso_code(from, source, sizeof(source)) ||
+        !currency_to_iso_code(to, destination, sizeof(destination)))
+        return 0;
+    if (strcmp(source, destination) == 0) {
+        if (output_size < 2) return 0;
+        memcpy(text_out, "1", 2);
+        return 1;
+    }
+    const char *mode = getenv("PROGVORAZ_EXCHANGE_SOURCE");
+    if (mode && strcmp(mode, "stub") == 0)
+        return stub_decimal_text(source, destination, text_out, output_size);
+    double rate = 0.0;
+    if (!fetch_exchange_rate(source, destination, &rate) || !isfinite(rate) || rate <= 0.0)
+        return 0;
+    /* Historical double-valued HTTP API: format a bounded decimal.
+       The deterministic stub case above never loses literal digits. */
+    int bytes = snprintf(text_out, output_size, "%.15g", rate);
+    return bytes > 0 && (size_t)bytes < output_size;
+}
+
+int convert_cents_decimal(const char *amount_cents, const char *decimal_rate,
+                          BigInt *out)
+{
+    char numerator_text[384], denominator_text[384];
+    size_t length = 0;
+    long fractional = 0, exponent = 0;
+    int dot = 0, have_digit = 0, ok = 0;
+    const char *p = decimal_rate;
+    BigInt amount = {0}, numerator = {0}, denominator = {0};
+    BigInt product = {0}, quotient = {0}, remainder = {0};
+    BigInt twice = {0}, two = {0}, one = {0}, rounded = {0};
+
+    if (!amount_cents || !*amount_cents || !out || !decimal_rate || !*decimal_rate ||
+        strspn(amount_cents, "0123456789") != strlen(amount_cents))
+        return 0;
+
+    /* Decimal numerator / power-of-ten denominator; round half up exactly. */
+    while (*p && *p != 'e' && *p != 'E') {
+        if (*p == '.' && !dot) { dot = 1; ++p; continue; }
+        if (!isdigit((unsigned char)*p) || length >= 120) return 0;
+        numerator_text[length++] = *p++;
+        if (dot) ++fractional;
+        have_digit = 1;
+    }
+    if (!have_digit) return 0;
+    if (*p) {
+        char *end = NULL;
+        exponent = strtol(p + 1, &end, 10);
+        if (end == p + 1 || *end || exponent < -200 || exponent > 200) return 0;
+    }
+    long scale = fractional - exponent;
+    if (scale < -200 || scale > 200) return 0;
+    if (scale < 0) {
+        for (long i = 0; i < -scale; ++i)
+            numerator_text[length++] = '0';
+        scale = 0;
+    }
+    numerator_text[length] = '\0';
+    denominator_text[0] = '1';
+    for (long i = 0; i < scale; ++i)
+        denominator_text[i + 1] = '0';
+    denominator_text[scale + 1] = '\0';
+
+    if (!bigint_init(&amount, amount_cents) ||
+        !bigint_init(&numerator, numerator_text) ||
+        !bigint_init(&denominator, denominator_text) ||
+        bigint_is_zero(&numerator) ||
+        !bigint_init(&two, "2") || !bigint_init(&one, "1") ||
+        !bigint_multiply(&amount, &numerator, &product) ||
+        !bigint_divmod(&product, &denominator, &quotient, &remainder) ||
+        !bigint_multiply(&remainder, &two, &twice))
+        goto cleanup;
+    if (bigint_compare(&twice, &denominator) >= 0) {
+        if (!bigint_add(&quotient, &one, &rounded)) goto cleanup;
+        ok = bigint_set(out, &rounded);
+    } else {
+        ok = bigint_set(out, &quotient);
+    }
+
+cleanup:
+    bigint_free(&amount);
+    bigint_free(&numerator);
+    bigint_free(&denominator);
+    bigint_free(&product);
+    bigint_free(&quotient);
+    bigint_free(&remainder);
+    bigint_free(&twice);
+    bigint_free(&two);
+    bigint_free(&one);
+    bigint_free(&rounded);
+    return ok;
+}

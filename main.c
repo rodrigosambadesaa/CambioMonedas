@@ -153,6 +153,11 @@ int main(int argc, char **argv)
             convert_to = argv[++i];
             convert_amount = argv[++i];
         }
+        else if (strcmp(argv[i], "--convert") == 0)
+        {
+            fprintf(stderr, "--convert requiere moneda origen, destino e importe.\n");
+            return 2;
+        }
         /* if: comprueba strcmp(argv[i], "--convert-stock") == 0 antes de continuar con esta alternativa. */
         else if (strcmp(argv[i], "--convert-stock") == 0)
         {
@@ -240,27 +245,23 @@ int main(int argc, char **argv)
     /* if: comprueba convert_flag antes de ejecutar esta rama. */
     if (convert_flag)
     {
-        double tasa = 0.0;
-        // Este if es para evitar que se intente obtener la tasa si la moneda de origen y destino son iguales.
-        /* if: comprueba !fetch_exchange_rate(convert_from, convert_to, &tasa) antes de ejecutar esta rama. */
-        if (!fetch_exchange_rate(convert_from, convert_to, &tasa))
+        char tasa[128] = {0};
+        BigInt montoDestino = {0};
+        if (!convert_amount || !*convert_amount ||
+            strspn(convert_amount, "0123456789") != strlen(convert_amount))
         {
-            fprintf(stderr, progvoraz_tr("No se pudo obtener la tasa para %s->%s\n", "Could not obtain the rate for %s->%s\n"), convert_from, convert_to);
+            fprintf(stderr, "Importe en centimos no valido.\n");
             return 2;
         }
-
-        /* Calcular monto destino en centimos: destino_cents = round(src_cents * tasa) */
-        double src_cents = atof(convert_amount);
-        double dst_cents = src_cents * tasa;
-        long long rounded = (long long)(dst_cents + 0.5);
-        char dst_str[64];
-        snprintf(dst_str, sizeof(dst_str), "%lld", rounded);
-
-        BigInt montoDestino = {0};
-        /* if: comprueba !bigint_init(&montoDestino, dst_str) antes de ejecutar esta rama. */
-        if (!bigint_init(&montoDestino, dst_str))
+        if (!fetch_exchange_rate_decimal(convert_from, convert_to, tasa, sizeof(tasa)))
         {
-            fprintf(stderr, "%s\n", progvoraz_tr("Error interno al crear BigInt destino.", "Internal error while creating destination BigInt."));
+            fprintf(stderr, "No se pudo obtener una tasa decimal valida para %s->%s\n",
+                    convert_from, convert_to);
+            return 2;
+        }
+        if (!convert_cents_decimal(convert_amount, tasa, &montoDestino))
+        {
+            fprintf(stderr, "No se pudo convertir el importe decimal usando BigInt.\n");
             return 2;
         }
 
@@ -300,9 +301,9 @@ int main(int argc, char **argv)
         if (rc)
         {
             app_console_imprimir_resultado(&monedas, &solucion, convert_use_stock ? &stock : NULL, convert_use_stock ? 1 : 0);
-            printf(progvoraz_tr("Convert CLI %s->%s | Origen=%s c | Destino=%s c | Tasa=%f\n",
-                                "Convert CLI %s->%s | Source=%s c | Target=%s c | Rate=%f\n"),
-                   convert_from, convert_to, convert_amount, dst_str, tasa);
+            printf(progvoraz_tr("Convert CLI %s->%s | Origen=%s c | Destino=%s c | Tasa=%s\n",
+                                "Convert CLI %s->%s | Source=%s c | Target=%s c | Rate=%s\n"),
+                   convert_from, convert_to, convert_amount, montoDestino.digits, tasa);
         }
         else
         {
