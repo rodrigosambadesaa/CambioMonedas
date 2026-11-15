@@ -55,11 +55,12 @@ docker compose run --rm progvoraz-gui-portable
 
 Persistencia de archivos en Docker Compose:
 
-- `monedas.txt` se monta en solo lectura desde la raiz del proyecto.
-- `stock.txt` se monta en modo lectura/escritura desde la raiz del proyecto.
-- `historial.txt` se monta en modo lectura/escritura desde la raiz del proyecto.
-- Los cambios de stock realizados dentro del contenedor se reflejan en el `stock.txt` local.
-- Las transacciones registradas dentro del contenedor se reflejan en el `historial.txt` local.
+- Los servicios de consola y GUI montan **el directorio del proyecto** en `/app/workspace` y trabajan con los datos de esa ruta. Los ejecutables proceden de la imagen, en `/app`.
+- `stock.txt`, `historial.txt` y `reporte_global.txt` persisten en el proyecto local.
+- No se monta `stock.txt` como fichero independiente: un montaje de fichero impide el reemplazo atomico con `rename` (error `EBUSY`).
+- El servicio `progvoraz-test` utiliza datos aislados de la imagen; no altera el inventario del anfitrion.
+- Las escrituras C usan `stock.txt.lock` compatible con los backends C++ y C# en sistemas de archivos locales, y reemplazo atomico con archivo temporal unico. El antiguo camino Windows que borraba el original antes de renombrar ya no se usa.
+- El contrato heredado `actualizar_stock_moneda` reemplaza valores **absolutos**. Dos interfaces C con el mismo inventario obsoleto aun podrian realizar una actualizacion perdida en la misma divisa; para una transaccion concurrente completa de lectura-modificacion-escritura utilice los backends transaccionales C++/C#.
 
 Si cambiaste codigo y quieres forzar recompilacion de la imagen:
 
@@ -308,7 +309,7 @@ Mismo orden de bloques que `monedas.txt`:
 - Se corrigio la lectura de archivos para evitar errores por uso de `feof`.
 - Se corrigieron validaciones de limites en el vector dinamico.
 - Se agrego validacion de entrada para opcion y cantidad.
-- La actualizacion de stock reescribe `stock.txt` en el mismo archivo abierto (`r+`) sin temporales.
+- La actualizacion de stock usa un bloqueo entre procesos sobre `stock.txt.lock`, un temporal unico y reemplazo atomico (sin borrar el archivo original).
 - La consola fue modularizada: `main.c` ahora delega en `app_console.c`.
 - Se modernizo el flujo para GitHub con `Makefile`, `.gitignore` y CI en `.github/workflows/ci.yml`.
 
