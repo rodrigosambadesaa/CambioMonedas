@@ -14,6 +14,7 @@ int main(void)
     assert(tamano(&v) == 0);
     crear(&v, 0);
     assert(v != NULL && capacidad_vector(v) == 0);
+    { vectorP old = v; crear(&v, 5); assert(v == old && tamano(&v) == 0); }
     assert(redimensionar(v, 3));
     assert(recuperar(v, 2) == 0);
     asignar(v, 1, 42);
