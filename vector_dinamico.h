@@ -9,7 +9,8 @@ typedef struct STVECTOR *vectorP;
 /* Los vectores son propietarios SOLO del bloque de bytes, no de posibles
  * punteros/recursos dentro de los elementos. Para BigInt usar la API
  * bigint_array_resize, que gestiona los recursos de cada elemento.
- * crear/crear_bytes deben recibir un puntero de salida sin un vector vivo.
+ * crear/crear_bytes exigen un puntero de salida inicializado a NULL;
+ * rechazan sobrescribir un vector vivo para evitar fugas.
  */
 void crear_bytes(vectorP *v1, unsigned long tam1, size_t tam_elemento);
 void *datos(vectorP v1);

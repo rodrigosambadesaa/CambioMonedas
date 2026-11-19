@@ -15,9 +15,10 @@ struct STVECTOR
 void crear_bytes(vectorP *v1, unsigned long tam1, size_t tam_elemento)
 {
     vectorP nuevo;
-    if (v1 == NULL)
+    /* El puntero de salida debe inicializarse a NULL. Evitar fugas al
+     * intentar crear encima de un vector que todavia esta vivo. */
+    if (v1 == NULL || *v1 != NULL)
         return;
-    *v1 = NULL;
     if (tam_elemento == 0 || (uintmax_t)tam1 > SIZE_MAX / tam_elemento)
         return;
     nuevo = (vectorP)calloc(1, sizeof(*nuevo));
