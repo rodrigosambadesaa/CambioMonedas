@@ -3,57 +3,36 @@
 
 #include <stddef.h>
 
-/* Tipo base almacenado por el vector dinamico. */
 typedef int TELEMENTO;
-
-/* Puntero opaco a la estructura interna del vector. */
 typedef struct STVECTOR *vectorP;
 
-/*
- * Reserva memoria para un vector generico de 'tam1' elementos,
- * cada uno de tamano 'tam_elemento' bytes.
+/* Los vectores son propietarios SOLO del bloque de bytes, no de posibles
+ * punteros/recursos dentro de los elementos. Para BigInt usar la API
+ * bigint_array_resize, que gestiona los recursos de cada elemento.
+ * crear/crear_bytes deben recibir un puntero de salida sin un vector vivo.
  */
 void crear_bytes(vectorP *v1, unsigned long tam1, size_t tam_elemento);
-
-/*
- * Retorna el puntero a la memoria contigua del vector generico.
- * Devuelve NULL si el vector no existe.
- */
 void *datos(vectorP v1);
-
-/*
- * Retorna el tamano en bytes de cada elemento del vector generico.
- * Devuelve 0 si el vector no existe.
- */
 size_t tam_elemento_vector(vectorP v1);
-
-/*
- * Reserva memoria para un vector de tam1 elementos.
- * Inicializa cada posicion a 0.
- */
 void crear(vectorP *v1, unsigned long tam1);
-
-/*
- * Asigna un valor en una posicion concreta.
- * Si v1 es nulo o posicion esta fuera de rango, no hace nada.
- */
 void asignar(vectorP v1, unsigned long posicion, TELEMENTO valor);
-
-/*
- * Recupera el valor de una posicion.
- * Devuelve 0 si v1 es nulo o la posicion es invalida.
- */
 TELEMENTO recuperar(vectorP v1, unsigned long posicion);
-
-/*
- * Libera la memoria del vector y deja el puntero a NULL.
- */
 void liberar(vectorP *v1);
-
-/*
- * Devuelve la cantidad de elementos reservados en el vector.
- * Si no existe, devuelve 0.
- */
 unsigned long tamano(vectorP *v1);
+
+/* Capacidad y longitud son distintas. Reserva y redimensionamiento devuelven
+ * 1 si tuvieron exito, 0 si fallaron sin perder los datos existentes.
+ * Las posiciones nuevas se inicializan a cero; la reduccion descarta bytes
+ * pero NO destruye los recursos de cada elemento.
+ * IMPORTANTE: realloc puede mover el bloque; llamar a datos() otra vez
+ * tras cada operacion de reserva/cambio de tamano.
+ */
+unsigned long capacidad_vector(vectorP v1);
+int reservar_bytes(vectorP v1, unsigned long capacidad);
+int redimensionar_bytes(vectorP v1, unsigned long nuevo_tam);
+int agregar_bytes(vectorP v1, const void *elemento);
+int reservar(vectorP v1, unsigned long capacidad);
+int redimensionar(vectorP v1, unsigned long nuevo_tam);
+int agregar(vectorP v1, TELEMENTO valor);
 
 #endif
