@@ -1,0 +1,31 @@
+name: Dynamic vector memory and regression
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  vector-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test vector + BigInt (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cc -std=c11 -O2 -Wall -Wextra -Wpedantic -I. tests/test_vector_dinamico.c vector_dinamico.c bigint.c -o vector_test
+          ./vector_test
+      - name: Build and test vector + BigInt (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          gcc -std=c11 -O2 -Wall -Wextra -Wpedantic -I. tests/test_vector_dinamico.c vector_dinamico.c bigint.c -o vector_test.exe
+          .\vector_test.exe
+      - name: AddressSanitizer and UndefinedBehaviorSanitizer (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cc -std=c11 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/test_vector_dinamico.c vector_dinamico.c bigint.c -o vector_test_san
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 ./vector_test_san

@@ -1,144 +1,182 @@
-#include <stdio.h>
+#include <limits.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include "vector_dinamico.h"
 
-/*
- * Estructura real del vector dinamico.
- * - datos: memoria contigua de elementos.
- * - tam: cantidad total de posiciones disponibles.
- */
 struct STVECTOR
 {
     void *datos;
     unsigned long tam;
+    unsigned long capacidad;
     size_t tam_elemento;
 };
 
-/* funcion crear_bytes: contiene la logica principal de esta operacion. */
 void crear_bytes(vectorP *v1, unsigned long tam1, size_t tam_elemento)
 {
-    /* if: comprueba v1 == NULL antes de ejecutar esta rama. */
+    vectorP nuevo;
     if (v1 == NULL)
         return;
-
-    /* if: comprueba tam1 == 0 || tam_elemento == 0 antes de ejecutar esta rama. */
-    if (tam1 == 0 || tam_elemento == 0)
+    *v1 = NULL;
+    if (tam_elemento == 0 || (uintmax_t)tam1 > SIZE_MAX / tam_elemento)
+        return;
+    nuevo = (vectorP)calloc(1, sizeof(*nuevo));
+    if (nuevo == NULL)
+        return;
+    nuevo->tam_elemento = tam_elemento;
+    if (tam1 > 0)
     {
-        *v1 = NULL;
-        return;
+        nuevo->datos = calloc((size_t)tam1, tam_elemento);
+        if (nuevo->datos == NULL)
+        {
+            free(nuevo);
+            return;
+        }
     }
-
-    /* if: comprueba (size_t)tam1 > ((size_t)-1) / tam_elemento antes de ejecutar esta rama. */
-    if ((size_t)tam1 > ((size_t)-1) / tam_elemento)
-    {
-        *v1 = NULL;
-        return;
-    }
-
-    *v1 = (vectorP)malloc(sizeof(struct STVECTOR));
-    /* if: comprueba *v1 == NULL antes de ejecutar esta rama. */
-    if (*v1 == NULL)
-        return;
-
-    (*v1)->datos = calloc(tam1, tam_elemento);
-    /* if: comprueba (*v1)->datos == NULL antes de ejecutar esta rama. */
-    if ((*v1)->datos == NULL)
-    {
-        free(*v1);
-        *v1 = NULL;
-        return;
-    }
-
-    (*v1)->tam = tam1;
-    (*v1)->tam_elemento = tam_elemento;
+    nuevo->tam = tam1;
+    nuevo->capacidad = tam1;
+    *v1 = nuevo;
 }
 
-/* funcion datos: contiene la logica principal de esta operacion. */
-void *datos(vectorP v1)
-{
-    /* if: comprueba v1 == NULL antes de ejecutar esta rama. */
-    if (v1 == NULL)
-        return NULL;
-
-    return v1->datos;
-}
-
-/* funcion tam_elemento_vector: contiene la logica principal de esta operacion. */
-size_t tam_elemento_vector(vectorP v1)
-{
-    /* if: comprueba v1 == NULL antes de ejecutar esta rama. */
-    if (v1 == NULL)
-        return 0;
-
-    return v1->tam_elemento;
-}
-
-/*
- * Crea un vector de tam1 posiciones.
- * Flujo:
- * 1) valida parametros
- * 2) reserva cabecera
- * 3) reserva arreglo interno
- * 4) inicializa en cero
- */
-/* funcion crear: contiene la logica principal de esta operacion. */
 void crear(vectorP *v1, unsigned long tam1)
 {
     crear_bytes(v1, tam1, sizeof(TELEMENTO));
 }
 
-/* Asigna un valor en posicion si el vector y el indice son validos. */
-/* funcion asignar: contiene la logica principal de esta operacion. */
+void *datos(vectorP v1)
+{
+    return v1 == NULL ? NULL : v1->datos;
+}
+
+size_t tam_elemento_vector(vectorP v1)
+{
+    return v1 == NULL ? 0 : v1->tam_elemento;
+}
+
+unsigned long capacidad_vector(vectorP v1)
+{
+    return v1 == NULL ? 0 : v1->capacidad;
+}
+
+int reservar_bytes(vectorP v1, unsigned long capacidad)
+{
+    void *nuevo;
+    size_t anterior;
+    if (v1 == NULL || v1->tam_elemento == 0)
+        return 0;
+    if (capacidad <= v1->capacidad)
+        return 1;
+    if ((uintmax_t)capacidad > SIZE_MAX / v1->tam_elemento)
+        return 0;
+    anterior = (size_t)v1->capacidad * v1->tam_elemento;
+    nuevo = realloc(v1->datos, (size_t)capacidad * v1->tam_elemento);
+    if (nuevo == NULL)
+        return 0;
+    memset((unsigned char *)nuevo + anterior, 0,
+           ((size_t)capacidad - (size_t)v1->capacidad) * v1->tam_elemento);
+    v1->datos = nuevo;
+    v1->capacidad = capacidad;
+    return 1;
+}
+
+int redimensionar_bytes(vectorP v1, unsigned long nuevo_tam)
+{
+    unsigned long capacidad;
+    if (v1 == NULL)
+        return 0;
+    if (nuevo_tam > v1->capacidad)
+    {
+        capacidad = v1->capacidad ? v1->capacidad : 1;
+        while (capacidad < nuevo_tam)
+        {
+            if (capacidad > ULONG_MAX / 2)
+            {
+                capacidad = nuevo_tam;
+                break;
+            }
+            capacidad *= 2;
+        }
+        if (!reservar_bytes(v1, capacidad))
+            return 0;
+    }
+    if (nuevo_tam != v1->tam)
+    {
+        unsigned long inicio = nuevo_tam < v1->tam ? nuevo_tam : v1->tam;
+        unsigned long fin = nuevo_tam > v1->tam ? nuevo_tam : v1->tam;
+        memset((unsigned char *)v1->datos + (size_t)inicio * v1->tam_elemento, 0,
+               (size_t)(fin - inicio) * v1->tam_elemento);
+    }
+    v1->tam = nuevo_tam;
+    return 1;
+}
+
+int agregar_bytes(vectorP v1, const void *elemento)
+{
+    void *copia;
+    unsigned long anterior;
+    if (v1 == NULL || elemento == NULL || v1->tam == ULONG_MAX)
+        return 0;
+    /* Copia previa: elemento puede apuntar al buffer movido por realloc. */
+    copia = malloc(v1->tam_elemento);
+    if (copia == NULL)
+        return 0;
+    memcpy(copia, elemento, v1->tam_elemento);
+    anterior = v1->tam;
+    if (!redimensionar_bytes(v1, anterior + 1))
+    {
+        free(copia);
+        return 0;
+    }
+    memcpy((unsigned char *)v1->datos + (size_t)anterior * v1->tam_elemento,
+           copia, v1->tam_elemento);
+    free(copia);
+    return 1;
+}
+
+int reservar(vectorP v1, unsigned long capacidad)
+{
+    return v1 != NULL && v1->tam_elemento == sizeof(TELEMENTO)
+               ? reservar_bytes(v1, capacidad) : 0;
+}
+
+int redimensionar(vectorP v1, unsigned long nuevo_tam)
+{
+    return v1 != NULL && v1->tam_elemento == sizeof(TELEMENTO)
+               ? redimensionar_bytes(v1, nuevo_tam) : 0;
+}
+
+int agregar(vectorP v1, TELEMENTO valor)
+{
+    return v1 != NULL && v1->tam_elemento == sizeof(TELEMENTO)
+               ? agregar_bytes(v1, &valor) : 0;
+}
+
 void asignar(vectorP v1, unsigned long posicion, TELEMENTO valor)
 {
-    TELEMENTO *arr;
-
-    /* if: comprueba v1 == NULL || v1->datos == NULL || posicion >= v1->tam || antes de ejecutar esta rama. */
-    if (v1 == NULL || v1->datos == NULL || posicion >= v1->tam ||
+    if (v1 == NULL || posicion >= v1->tam ||
         v1->tam_elemento != sizeof(TELEMENTO))
         return;
-
-    arr = (TELEMENTO *)v1->datos;
-    arr[posicion] = valor;
+    ((TELEMENTO *)v1->datos)[posicion] = valor;
 }
 
-/* Libera memoria del vector y anula el puntero externo. */
-/* funcion liberar: contiene la logica principal de esta operacion. */
-void liberar(vectorP *v1)
-{
-    /* if: comprueba v1 == NULL || *v1 == NULL antes de ejecutar esta rama. */
-    if (v1 == NULL || *v1 == NULL)
-        return;
-
-    /* Se puede liberar NULL sin error, por eso no hace falta condicional extra. */
-    free((*v1)->datos);
-    free(*v1);
-    (*v1) = NULL;
-}
-
-/* Obtiene valor en posicion; retorna 0 si indice/puntero es invalido. */
-/* funcion recuperar: contiene la logica principal de esta operacion. */
 TELEMENTO recuperar(vectorP v1, unsigned long posicion)
 {
-    TELEMENTO *arr;
-
-    /* if: comprueba v1 == NULL || v1->datos == NULL || posicion >= v1->tam || antes de ejecutar esta rama. */
-    if (v1 == NULL || v1->datos == NULL || posicion >= v1->tam ||
+    if (v1 == NULL || posicion >= v1->tam ||
         v1->tam_elemento != sizeof(TELEMENTO))
         return 0;
-
-    arr = (TELEMENTO *)v1->datos;
-    return arr[posicion];
+    return ((TELEMENTO *)v1->datos)[posicion];
 }
 
-/* Devuelve tamano reservado del vector. */
-/* funcion tamano: contiene la logica principal de esta operacion. */
+void liberar(vectorP *v1)
+{
+    if (v1 == NULL || *v1 == NULL)
+        return;
+    free((*v1)->datos);
+    free(*v1);
+    *v1 = NULL;
+}
+
 unsigned long tamano(vectorP *v1)
 {
-    /* if: comprueba v1 == NULL || *v1 == NULL antes de ejecutar esta rama. */
-    if (v1 == NULL || *v1 == NULL)
-        return 0;
-
-    return (*v1)->tam;
+    return (v1 == NULL || *v1 == NULL) ? 0 : (*v1)->tam;
 }

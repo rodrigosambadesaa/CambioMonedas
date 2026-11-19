@@ -30,6 +30,8 @@ int bigint_divmod(const BigInt *a, const BigInt *b, BigInt *quotient, BigInt *re
 
 int bigint_array_create(BigIntArray *arr, size_t len);
 int bigint_array_set(BigIntArray *arr, size_t idx, const BigInt *value);
+/* Redimensiona y conserva los BigInt existentes, liberando los descartados. */
+int bigint_array_resize(BigIntArray *arr, size_t new_len);
 void bigint_array_free(BigIntArray *arr);
 
 #endif
