@@ -555,6 +555,40 @@ int bigint_array_set(BigIntArray *arr, size_t idx, const BigInt *value)
 
 /* bigint_array_free: Funcion de precision arbitraria para operar con numeros grandes. */
 /* funcion bigint_array_free: contiene la logica principal de esta operacion. */
+
+/* Conserva elementos existentes y la validez del alias arr->items tras realloc. */
+int bigint_array_resize(BigIntArray *arr, size_t new_len)
+{
+    size_t previous, i;
+    if (arr == NULL || arr->storage == NULL || new_len > (size_t)ULONG_MAX)
+        return 0;
+    previous = arr->len;
+    if (new_len < previous)
+        for (i = new_len; i < previous; ++i)
+            bigint_free(&arr->items[i]);
+    if (!redimensionar_bytes(arr->storage, (unsigned long)new_len))
+        return 0;
+    arr->items = (BigInt *)datos(arr->storage);
+    arr->len = new_len;
+    if (new_len > previous)
+    {
+        for (i = previous; i < new_len; ++i)
+        {
+            if (!bigint_init(&arr->items[i], "0"))
+            {
+                size_t j;
+                for (j = previous; j < i; ++j)
+                    bigint_free(&arr->items[j]);
+                (void)redimensionar_bytes(arr->storage, (unsigned long)previous);
+                arr->items = (BigInt *)datos(arr->storage);
+                arr->len = previous;
+                return 0;
+            }
+        }
+    }
+    return 1;
+}
+
 void bigint_array_free(BigIntArray *arr)
 {
     /* if: comprueba arr == NULL antes de ejecutar esta rama. */
