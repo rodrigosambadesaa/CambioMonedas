@@ -1,0 +1,67 @@
+name: Extreme BigInt and memory audit
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bigint-cross-platform:
+    name: BigInt arithmetic oracle (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile independent C BigInt harness
+        shell: bash
+        run: |
+          gcc -std=c2x -O2 -g -Wall -Wextra -Wpedantic -I. tests/bigint_oracle_cli.c bigint.c vector_dinamico.c -o bigint_oracle
+      - name: Check exact arithmetic against Python big integers
+        shell: bash
+        run: |
+          python tests/test_bigint_property.py ./bigint_oracle --quick
+
+  memory-linux:
+    name: End-to-end memory and 10k-digit audit (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install memory instrumentation
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y valgrind libcurl4-openssl-dev
+      - name: Build release binaries and the BigInt oracle
+        run: |
+          make clean
+          make release USE_LIBCURL=1
+          make gui USE_LIBCURL=1
+          gcc -std=c2x -O1 -g -Wall -Wextra -Wpedantic -I. tests/bigint_oracle_cli.c bigint.c vector_dinamico.c -o bigint_oracle
+      - name: Validate huge and random BigInt operations (Python oracle)
+        run: python tests/test_bigint_property.py ./bigint_oracle
+      - name: Leak-check BigInt arithmetic and rejection paths (Valgrind)
+        run: python tests/test_bigint_property.py ./bigint_oracle --valgrind
+      - name: Leak-check 27 CLI/GUI paths independently (Valgrind)
+        run: python tests/test_memory_modes.py ./progvoraz ./progvoraz_gui --valgrind
+      - name: Build and execute sanitizer unit and CLI suite
+        run: |
+          make clean
+          make test-sanitize USE_LIBCURL=1
+      - name: Build sanitized portable GUI
+        run: |
+          make gui USE_LIBCURL=1 \
+            CFLAGS='-std=c2x -O1 -g -Wall -Wextra -Wpedantic -fsanitize=address,leak,undefined -fno-omit-frame-pointer -DUSE_LIBCURL' \
+            LDFLAGS='-lcurl -fsanitize=address,leak,undefined'
+      - name: Detect invalid accesses and leaks across CLI/GUI (ASan/LSan/UBSan)
+        run: python tests/test_memory_modes.py ./progvoraz ./progvoraz_gui --asan
