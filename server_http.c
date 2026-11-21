@@ -49,6 +49,29 @@ static int write_all(int fd, const void *buf, size_t len)
     return 0;
 }
 
+/* A client can disconnect before the response is written. On Unix, a raw
+ * write() to a closed socket may terminate the entire server with SIGPIPE.
+ * Keep file writes on write(), but send responses with MSG_NOSIGNAL. */
+static int write_socket_all(int fd, const void *buf, size_t len)
+{
+    const char *p = buf;
+    while (len > 0)
+    {
+#ifdef MSG_NOSIGNAL
+        ssize_t n = send(fd, p, len, MSG_NOSIGNAL);
+#else
+        ssize_t n = send(fd, p, len, 0);
+#endif
+        if (n < 0 && errno == EINTR)
+            continue;
+        if (n <= 0)
+            return -1;
+        p += n;
+        len -= (size_t)n;
+    }
+    return 0;
+}
+
 /* funcion read_until_header_end: contiene la logica principal de esta operacion. */
 static int read_until_header_end(int fd, char *buf, size_t buflen, size_t *out_len)
 {
@@ -73,7 +96,19 @@ static int read_until_header_end(int fd, char *buf, size_t buflen, size_t *out_l
 /* funcion run_http_server: contiene la logica principal de esta operacion. */
 int run_http_server(const char *port)
 {
-    int portnum = port ? atoi(port) : 8080;
+    long parsed = 8080;
+    if (port)
+    {
+        char *end = NULL;
+        errno = 0;
+        parsed = strtol(port, &end, 10);
+        if (errno || end == port || *end || parsed < 1 || parsed > 65535)
+        {
+            fprintf(stderr, "Invalid HTTP port: %s\n", port);
+            return 1;
+        }
+    }
+    int portnum = (int)parsed;
     int listen_fd = -1;
     struct sockaddr_in addr;
 
@@ -140,6 +175,11 @@ int run_http_server(const char *port)
             break;
         }
         ++served;
+#ifdef SO_NOSIGPIPE
+        /* macOS/BSD equivalent of Linux MSG_NOSIGNAL. */
+        int no_sigpipe = 1;
+        (void)setsockopt(client, SOL_SOCKET, SO_NOSIGPIPE, &no_sigpipe, sizeof(no_sigpipe));
+#endif
 
         /* Leer headers */
         char header_buf[8192];
@@ -176,14 +216,14 @@ int run_http_server(const char *port)
                 !end || (*end != '\r' && *end != '\n'))
             {
                 const char *resp = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
-                write_all(client, resp, strlen(resp));
+                write_socket_all(client, resp, strlen(resp));
                 close(client);
                 continue;
             }
             if (parsed > 8ULL * 1024ULL * 1024ULL)
             {
                 const char *resp = "HTTP/1.1 413 Payload Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
-                write_all(client, resp, strlen(resp));
+                write_socket_all(client, resp, strlen(resp));
                 close(client);
                 continue;
             }
@@ -241,7 +281,7 @@ int run_http_server(const char *port)
         if (strcmp(method, "GET") == 0 && strcmp(path, "/health") == 0)
         {
             const char *resp = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nOK";
-            write_all(client, resp, strlen(resp));
+            write_socket_all(client, resp, strlen(resp));
             close(client);
             /* if: comprueba body antes de ejecutar esta rama. */
             if (body)
@@ -259,7 +299,7 @@ int run_http_server(const char *port)
             if (temp_fd < 0)
             {
                 const char *resp = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n";
-                write_all(client, resp, strlen(resp));
+                write_socket_all(client, resp, strlen(resp));
                 close(client);
                 free(body);
                 continue;
@@ -269,7 +309,7 @@ int run_http_server(const char *port)
             {
                 remove(tmpout);
                 const char *resp = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n";
-                write_all(client, resp, strlen(resp));
+                write_socket_all(client, resp, strlen(resp));
                 close(client);
                 /* if: comprueba body antes de ejecutar esta rama. */
                 if (body)
@@ -282,7 +322,7 @@ int run_http_server(const char *port)
             if (!f)
             {
                 const char *resp = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n";
-                write_all(client, resp, strlen(resp));
+                write_socket_all(client, resp, strlen(resp));
                 close(client);
                 /* if: comprueba body antes de ejecutar esta rama. */
                 if (body)
@@ -298,7 +338,7 @@ int run_http_server(const char *port)
                 const char *resp = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n";
                 free(buf);
                 fclose(f);
-                write_all(client, resp, strlen(resp));
+                write_socket_all(client, resp, strlen(resp));
                 close(client);
                 if (body)
                     free(body);
@@ -309,8 +349,8 @@ int run_http_server(const char *port)
 
             char hdr[256];
             int hdrlen = snprintf(hdr, sizeof(hdr), "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %ld\r\n\r\n", flen);
-            write_all(client, hdr, (size_t)hdrlen);
-            write_all(client, buf, (size_t)flen);
+            write_socket_all(client, hdr, (size_t)hdrlen);
+            write_socket_all(client, buf, (size_t)flen);
             free(buf);
             close(client);
             /* if: comprueba body antes de ejecutar esta rama. */
@@ -342,7 +382,7 @@ int run_http_server(const char *port)
                     remove(out_template);
                 }
                 const char *resp = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n";
-                write_all(client, resp, strlen(resp));
+                write_socket_all(client, resp, strlen(resp));
                 close(client);
                 /* if: comprueba body antes de ejecutar esta rama. */
                 if (body)
@@ -359,7 +399,7 @@ int run_http_server(const char *port)
                 remove(in_template);
                 remove(out_template);
                 const char *resp = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n";
-                write_all(client, resp, strlen(resp));
+                write_socket_all(client, resp, strlen(resp));
                 close(client);
                 free(body);
                 continue;
@@ -369,7 +409,7 @@ int run_http_server(const char *port)
             if (!batch_process_file(in_template, out_template, NULL))
             {
                 const char *resp = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n";
-                write_all(client, resp, strlen(resp));
+                write_socket_all(client, resp, strlen(resp));
                 remove(in_template);
                 remove(out_template);
                 close(client);
@@ -384,7 +424,7 @@ int run_http_server(const char *port)
             if (!fout)
             {
                 const char *resp = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n";
-                write_all(client, resp, strlen(resp));
+                write_socket_all(client, resp, strlen(resp));
                 remove(in_template);
                 remove(out_template);
                 close(client);
@@ -404,7 +444,7 @@ int run_http_server(const char *port)
                 fclose(fout);
                 remove(in_template);
                 remove(out_template);
-                write_all(client, resp, strlen(resp));
+                write_socket_all(client, resp, strlen(resp));
                 close(client);
                 if (body)
                     free(body);
@@ -415,8 +455,8 @@ int run_http_server(const char *port)
 
             char hdr[256];
             int hdrlen = snprintf(hdr, sizeof(hdr), "HTTP/1.1 200 OK\r\nContent-Type: text/csv\r\nContent-Length: %ld\r\n\r\n", flen);
-            write_all(client, hdr, (size_t)hdrlen);
-            write_all(client, buf, (size_t)flen);
+            write_socket_all(client, hdr, (size_t)hdrlen);
+            write_socket_all(client, buf, (size_t)flen);
             free(buf);
 
             remove(in_template);
@@ -431,7 +471,7 @@ int run_http_server(const char *port)
         /* Ruta no encontrada */
         {
             const char *resp = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
-            write_all(client, resp, strlen(resp));
+            write_socket_all(client, resp, strlen(resp));
             close(client);
             /* if: comprueba body antes de ejecutar esta rama. */
             if (body)
