@@ -102,6 +102,9 @@ int bigint_init(BigInt *n, const char *text)
 
     // La siguiente instrucción asigna la cadena normalizada al campo 'digits' de la estructura BigInt, completando así la inicialización del número grande.
     // Explicación lógica detallada del funcionamiento: Se asigna la cadena normalizada a 'n->digits', lo que permite que la estructura BigInt represente correctamente el número grande sin ceros a la izquierda. La función retorna 1 para indicar que la inicialización fue exitosa.
+    /* Reinitializing a live BigInt must release the previous owned buffer.
+       Duplicate first so bigint_init(&n, n.digits) also remains valid. */
+    free(n->digits);
     n->digits = normalizado;
     return 1;
 }

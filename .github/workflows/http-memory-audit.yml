@@ -1,0 +1,44 @@
+name: HTTP server resource and memory audit
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  http-resource-audit:
+    name: HTTP real requests (${{ matrix.instrumentation }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        instrumentation: [valgrind, asan]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Valgrind
+        if: matrix.instrumentation == 'valgrind'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y valgrind
+      - name: Compile server with debug symbols for Valgrind
+        if: matrix.instrumentation == 'valgrind'
+        run: |
+          make clean
+          make debug CFLAGS='-std=c2x -g -O1 -Wall -Wextra -Wpedantic'
+      - name: Compile server with ASan/LSan/UBSan
+        if: matrix.instrumentation == 'asan'
+        run: |
+          make clean
+          make debug CFLAGS='-std=c2x -g -O1 -Wall -Wextra -Wpedantic -fsanitize=address,leak,undefined -fno-omit-frame-pointer' LDFLAGS='-fsanitize=address,leak,undefined'
+      - name: Test actual HTTP requests and resource disposal (Valgrind)
+        if: matrix.instrumentation == 'valgrind'
+        run: python tests/test_http_memory.py ./progvoraz --valgrind
+      - name: Test actual HTTP requests and resource disposal (sanitizers)
+        if: matrix.instrumentation == 'asan'
+        run: python tests/test_http_memory.py ./progvoraz
