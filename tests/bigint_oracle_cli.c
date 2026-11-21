@@ -27,6 +27,13 @@ int main(int argc, char **argv)
             goto cleanup;
         ok = bigint_multiply(&a, &b, &out);
     }
+    else if (strcmp(argv[1], "init-reuse") == 0)
+    {
+        /* Reinitialize a live object: any old digits must be freed. */
+        if (!bigint_init(&out, "777"))
+            goto cleanup;
+        ok = bigint_init(&out, argv[2]);
+    }
     else if (strcmp(argv[1], "div") == 0)
         ok = bigint_divmod(&a, &b, &out, &rem);
     else
