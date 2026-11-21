@@ -317,7 +317,16 @@ int bigint_multiply(const BigInt *a, const BigInt *b, BigInt *out)
 
     /* if: comprueba bigint_is_zero(a) || bigint_is_zero(b) antes de ejecutar esta rama. */
     if (bigint_is_zero(a) || bigint_is_zero(b))
-        return bigint_init(out, "0");
+    {
+        /* Do not leak a previously owned destination when the product is zero.
+           Prepare the replacement first to leave out unchanged on OOM. */
+        BigInt zero = {0};
+        if (!bigint_init(&zero, "0"))
+            return 0;
+        bigint_free(out);
+        *out = zero;
+        return 1;
+    }
 
     la = strlen(a->digits);
     lb = strlen(b->digits);
