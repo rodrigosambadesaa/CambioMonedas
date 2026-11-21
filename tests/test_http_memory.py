@@ -127,12 +127,14 @@ with tempfile.TemporaryDirectory(prefix="progvoraz-http-audit-") as t:
             for i in range(32):
                 status, body = request(port, "GET", "/health")
                 assert (status, body) == (200, b"OK"), (i, status, body)
+                if i == 30 and baseline_fds is not None:
+                    # Check while there is still a final request pending:
+                    # the process must still exist at this point.
+                    current_fds = len(list(fd_path.iterdir()))
+                    assert current_fds <= baseline_fds + 2, (
+                        f"Open file descriptors grew from {baseline_fds} to {current_fds}")
+                    print(f"PASS fd stability ({baseline_fds} -> {current_fds})", flush=True)
             print("PASS 32 repeated requests", flush=True)
-            if baseline_fds is not None:
-                current_fds = len(list(fd_path.iterdir()))
-                assert current_fds <= baseline_fds + 2, (
-                    f"Open file descriptors grew from {baseline_fds} to {current_fds}")
-                print(f"PASS fd stability ({baseline_fds} -> {current_fds})", flush=True)
 
             rc = proc.wait(timeout=120)
             logtext = logpath.read_text(errors="replace")
