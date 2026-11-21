@@ -43,7 +43,7 @@ if args.valgrind:
 tested = 0
 for a_text, b_text in pairs:
     a, b = int(a_text), int(b_text)
-    candidates = [("add", str(a + b)), ("mul", str(a * b))]
+    candidates = [("add", str(a + b)), ("mul", str(a * b)), ("init-reuse", str(a))]
     if a >= b:
         candidates.append(("sub", str(a - b)))
     if b:
