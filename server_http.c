@@ -28,6 +28,8 @@ int run_http_server(const char *port)
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <errno.h>
+#include <limits.h>
+#include <ctype.h>
 
 /* funcion write_all: contiene la logica principal de esta operacion. */
 static int write_all(int fd, const void *buf, size_t len)
@@ -109,9 +111,27 @@ int run_http_server(const char *port)
 
     fprintf(stderr, "ProgVoraz HTTP server escuchando en puerto %d\n", portnum);
 
+    /* Optional finite lifetime makes Valgrind leak checks possible after
+       handling actual HTTP requests, with a normal exit (no SIGKILL). */
+    unsigned long max_requests = 0, served = 0;
+    const char *limit = getenv("PROGVORAZ_HTTP_MAX_REQUESTS");
+    if (limit && *limit)
+    {
+        char *end = NULL;
+        errno = 0;
+        max_requests = strtoul(limit, &end, 10);
+        if (errno || !end || *end || end == limit || max_requests == 0)
+        {
+            close(listen_fd);
+            return 1;
+        }
+    }
+
     /* for: itera segun ;; para recorrer el bloque. */
     for (;;)
     {
+        if (max_requests && served >= max_requests)
+            break;
         int client = accept(listen_fd, NULL, NULL);
         /* if: comprueba client < 0 antes de ejecutar esta rama. */
         if (client < 0)
@@ -119,6 +139,7 @@ int run_http_server(const char *port)
             perror("accept");
             break;
         }
+        ++served;
 
         /* Leer headers */
         char header_buf[8192];
@@ -138,14 +159,35 @@ int run_http_server(const char *port)
         /* Obtener Content-Length si existe */
         size_t content_length = 0;
         char *cl = strcasestr(header_buf, "Content-Length:");
-        /* if: comprueba cl antes de ejecutar esta rama. */
+        /* Cap allocation at 8 MiB. Huge or nonnumeric lengths must never
+           cause size_t overflow or unbounded malloc. */
         if (cl)
         {
+            char *end = NULL;
+            unsigned long long parsed;
             cl += strlen("Content-Length:");
-            /* while: repite el bloque mientras se cumpla *cl == ' '. */
-            while (*cl == ' ')
-                cl++;
-            content_length = (size_t)strtoul(cl, NULL, 10);
+            while (*cl == ' ' || *cl == '\t')
+                ++cl;
+            errno = 0;
+            parsed = strtoull(cl, &end, 10);
+            while (end && (*end == ' ' || *end == '\t'))
+                ++end;
+            if (!isdigit((unsigned char)*cl) || errno == ERANGE ||
+                !end || (*end != '\r' && *end != '\n'))
+            {
+                const char *resp = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+                write_all(client, resp, strlen(resp));
+                close(client);
+                continue;
+            }
+            if (parsed > 8ULL * 1024ULL * 1024ULL)
+            {
+                const char *resp = "HTTP/1.1 413 Payload Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+                write_all(client, resp, strlen(resp));
+                close(client);
+                continue;
+            }
+            content_length = (size_t)parsed;
         }
 
         /* Puntero al comienzo del cuerpo (si ya vino parte en el buffer) */
@@ -210,11 +252,22 @@ int run_http_server(const char *port)
         /* if: comprueba strcmp(method, "GET") == 0 && strcmp(path, "/export_stock_json") == 0 antes de ejecutar esta rama. */
         if (strcmp(method, "GET") == 0 && strcmp(path, "/export_stock_json") == 0)
         {
-            /* Exportar stock a un buffer temporal y devolverlo */
-            const char *tmpout = "/tmp/progvoraz_export_stock.json";
-            /* if: comprueba !export_stock_json(tmpout) antes de ejecutar esta rama. */
+            /* A unique, mode-0600 temporary path avoids collisions and
+               must be unlinked on every exit, not left on disk forever. */
+            char tmpout[] = "/tmp/progvoraz_export_stock_XXXXXX";
+            int temp_fd = mkstemp(tmpout);
+            if (temp_fd < 0)
+            {
+                const char *resp = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n";
+                write_all(client, resp, strlen(resp));
+                close(client);
+                free(body);
+                continue;
+            }
+            close(temp_fd);
             if (!export_stock_json(tmpout))
             {
+                remove(tmpout);
                 const char *resp = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n";
                 write_all(client, resp, strlen(resp));
                 close(client);
@@ -224,6 +277,7 @@ int run_http_server(const char *port)
                 continue;
             }
             FILE *f = fopen(tmpout, "rb");
+            remove(tmpout); /* already open: unlink even on later read failures */
             /* if: comprueba !f antes de ejecutar esta rama. */
             if (!f)
             {
@@ -278,10 +332,15 @@ int run_http_server(const char *port)
             {
                 /* if: comprueba in_fd >= 0 antes de ejecutar esta rama. */
                 if (in_fd >= 0)
+                {
                     close(in_fd);
-                /* if: comprueba out_fd >= 0 antes de ejecutar esta rama. */
+                    remove(in_template);
+                }
                 if (out_fd >= 0)
+                {
                     close(out_fd);
+                    remove(out_template);
+                }
                 const char *resp = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n";
                 write_all(client, resp, strlen(resp));
                 close(client);
@@ -292,13 +351,19 @@ int run_http_server(const char *port)
             }
 
             /* if: comprueba content_length > 0 && body antes de ejecutar esta rama. */
-            if (content_length > 0 && body)
-            {
-                ssize_t w = write(in_fd, body, content_length);
-                (void)w;
-            }
+            int write_ok = content_length == 0 || (body && write_all(in_fd, body, content_length) == 0);
             close(in_fd);
             close(out_fd);
+            if (!write_ok)
+            {
+                remove(in_template);
+                remove(out_template);
+                const char *resp = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n";
+                write_all(client, resp, strlen(resp));
+                close(client);
+                free(body);
+                continue;
+            }
 
             /* if: comprueba !batch_process_file(in_template, out_template, NULL) antes de ejecutar esta rama. */
             if (!batch_process_file(in_template, out_template, NULL))
