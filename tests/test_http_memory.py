@@ -49,6 +49,14 @@ with tempfile.TemporaryDirectory(prefix="progvoraz-http-audit-") as t:
     work = Path(t)
     for filename in ("monedas.txt", "stock.txt", "rates_stub.json", "VERSIONES.md"):
         shutil.copy2(root / filename, work / filename)
+    # Invalid ports must fail immediately, not bind port zero or wrap to a
+    # different 16-bit value (atoi and implicit uint16_t cast regression).
+    for invalid_port in ("0", "65536", "-1", "nonsense", "8080garbage"):
+        result = subprocess.run([str(binary), "--server", "--port", invalid_port],
+                                cwd=work, capture_output=True, text=True, timeout=5)
+        assert result.returncode == 2, (invalid_port, result.returncode, result.stderr)
+    print("PASS invalid HTTP port validation", flush=True)
+
     holder = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     holder.bind(("127.0.0.1", 0))
     port = holder.getsockname()[1]
