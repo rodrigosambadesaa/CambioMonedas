@@ -83,6 +83,8 @@ with tempfile.TemporaryDirectory(prefix="progvoraz-http-audit-") as t:
                 raise AssertionError("Server did not accept connections")
             assert status == 200 and body == b"OK", (status, body)
             print("PASS health/readiness", flush=True)
+            fd_path = Path(f"/proc/{proc.pid}/fd")
+            baseline_fds = len(list(fd_path.iterdir())) if fd_path.is_dir() else None
 
             status, body = request(port, "GET", "/export_stock_json")
             assert status == 200 and "monedas" in json.loads(body), (status, body[:100])
@@ -126,6 +128,11 @@ with tempfile.TemporaryDirectory(prefix="progvoraz-http-audit-") as t:
                 status, body = request(port, "GET", "/health")
                 assert (status, body) == (200, b"OK"), (i, status, body)
             print("PASS 32 repeated requests", flush=True)
+            if baseline_fds is not None:
+                current_fds = len(list(fd_path.iterdir()))
+                assert current_fds <= baseline_fds + 2, (
+                    f"Open file descriptors grew from {baseline_fds} to {current_fds}")
+                print(f"PASS fd stability ({baseline_fds} -> {current_fds})", flush=True)
 
             rc = proc.wait(timeout=120)
             logtext = logpath.read_text(errors="replace")
