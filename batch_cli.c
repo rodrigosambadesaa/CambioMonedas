@@ -174,7 +174,15 @@ static void batch_build_result_summary(const BigIntArray *sol, char *resultado_b
 static int batch_is_same_existing_file(const char *input, const char *output)
 {
     if (input == NULL || output == NULL) return 0;
-    if (strcmp(input,output) == 0) return 1;
+    while (input[0] == '.' && (input[1] == '/' || input[1] == '\\'))
+        input += 2;
+    while (output[0] == '.' && (output[1] == '/' || output[1] == '\\'))
+        output += 2;
+#ifdef _WIN32
+    if (_stricmp(input, output) == 0) return 1;
+#else
+    if (strcmp(input, output) == 0) return 1;
+#endif
 #ifdef _WIN32
     HANDLE first=CreateFileA(input,FILE_READ_ATTRIBUTES,
         FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
@@ -209,9 +217,11 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
     /* if: comprueba rutaEntrada == NULL antes de ejecutar esta rama. */
     if (rutaEntrada == NULL)
         return 0;
-    if (batch_is_same_existing_file(rutaEntrada, rutaSalida))
+    if (batch_is_same_existing_file(rutaEntrada, rutaSalida) ||
+        batch_is_same_existing_file(rutaEntrada, rutaLog) ||
+        batch_is_same_existing_file(rutaSalida, rutaLog))
     {
-        fprintf(stderr, "Entrada CSV y salida coinciden: no se sobrescribe la entrada.\n");
+        fprintf(stderr, "Entrada, salida y registro deben usar archivos diferentes.\n");
         return 0;
     }
 
