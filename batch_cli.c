@@ -9,6 +9,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <stdint.h>
 
 /* funcion trim: contiene la logica principal de esta operacion. */
 static char *trim(char *s)
@@ -27,6 +28,42 @@ static char *trim(char *s)
     while (end >= s && (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n'))
         *end-- = '\0';
     return s;
+}
+
+static int parse_range_part(const char **cursor, size_t *value)
+{
+    const unsigned char *p = (const unsigned char *)*cursor;
+    size_t v = 0;
+    while (*p == ' ' || *p == '\t') ++p;
+    if (!isdigit(*p)) return 0;
+    while (isdigit(*p)) {
+        unsigned int digit = (unsigned int)(*p - '0');
+        if (v > (SIZE_MAX - digit) / 10) return 0;
+        v = v * 10 + digit;
+        ++p;
+    }
+    while (*p == ' ' || *p == '\t') ++p;
+    *cursor = (const char *)p;
+    *value = v;
+    return 1;
+}
+
+static int parse_coin_range(const char *input, size_t *min_out, size_t *max_out)
+{
+    const char *p = input;
+    size_t first, last;
+    if (!input || !min_out || !max_out || !parse_range_part(&p, &first)) return 0;
+    if (*p == '-') {
+        ++p;
+        if (!parse_range_part(&p, &last) || first > last) return 0;
+        *min_out = first;
+    } else {
+        *min_out = 0;
+        last = first;
+    }
+    if (*p != '\0' || last == SIZE_MAX) return 0;
+    *max_out = last;
+    return 1;
 }
 
 static void write_csv_header(FILE *out)
@@ -198,22 +235,7 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
             char *moneda = cols[1] ? cols[1] : "";
             char *monto_txt = cols[2] ? cols[2] : "0";
             size_t min_m = 0, max_m = (size_t)-1;
-            /* if: comprueba cols[3] && cols[3][0] antes de ejecutar esta rama. */
-            if (cols[3] && cols[3][0])
-            {
-                char *dash = strchr(cols[3], '-');
-                /* if: comprueba dash antes de ejecutar esta rama. */
-                if (dash)
-                {
-                    *dash = '\0';
-                    min_m = (size_t)strtoul(cols[3], NULL, 10);
-                    max_m = (size_t)strtoul(dash + 1, NULL, 10);
-                }
-                else
-                {
-                    max_m = (size_t)strtoul(cols[3], NULL, 10);
-                }
-            }
+            /* Parse ranges strictly after the optional CSV header. */
 
             /* Saltar cabecera si aparece. */
             /* if: comprueba lineno == 1 antes de ejecutar esta rama. */
@@ -233,6 +255,16 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
                     continue;
                 }
             }
+
+            if (cols[3] && cols[3][0] &&
+                !parse_coin_range(cols[3], &min_m, &max_m)) {
+                const char *row[] = {"", moneda, monto_txt, "ERROR",
+                    progvoraz_tr("rango invalido", "invalid range")};
+                csv_write_row(out, row, 5);
+                free(linea);
+                continue;
+            }
+
 
             /* Normal flow: cargar denominaciones (y stock si modo b/c). */
             moneda = (char *)progvoraz_map_currency_key(moneda);
@@ -382,22 +414,7 @@ int batch_process_stream(const char *rutaLog)
         char *moneda = cols[1] ? cols[1] : "";
         char *monto_txt = cols[2] ? cols[2] : "0";
         size_t min_m = 0, max_m = (size_t)-1;
-        /* if: comprueba cols[3] && cols[3][0] antes de ejecutar esta rama. */
-        if (cols[3] && cols[3][0])
-        {
-            char *dash = strchr(cols[3], '-');
-            /* if: comprueba dash antes de ejecutar esta rama. */
-            if (dash)
-            {
-                *dash = '\0';
-                min_m = (size_t)strtoul(cols[3], NULL, 10);
-                max_m = (size_t)strtoul(dash + 1, NULL, 10);
-            }
-            else
-            {
-                max_m = (size_t)strtoul(cols[3], NULL, 10);
-            }
-        }
+        /* Parse ranges strictly after the optional CSV header. */
 
         /* if: comprueba lineno == 1 antes de ejecutar esta rama. */
         if (lineno == 1)
@@ -416,6 +433,16 @@ int batch_process_stream(const char *rutaLog)
                 continue;
             }
         }
+
+        if (cols[3] && cols[3][0] &&
+            !parse_coin_range(cols[3], &min_m, &max_m)) {
+            const char *row[] = {"", moneda, monto_txt, "ERROR",
+                progvoraz_tr("rango invalido", "invalid range")};
+            csv_write_row(stdout, row, 5);
+            free(linea);
+            continue;
+        }
+
 
         moneda = (char *)progvoraz_map_currency_key(moneda);
 
