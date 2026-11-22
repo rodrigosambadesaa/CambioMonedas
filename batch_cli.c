@@ -231,7 +231,7 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
                 }
             }
 
-            char modo = cols[0] && cols[0][0] ? cols[0][0] : 'a';
+            char modo = cols[0] && cols[0][0] ? (char)tolower((unsigned char)cols[0][0]) : 'a';
             char *moneda = cols[1] ? cols[1] : "";
             char *monto_txt = cols[2] ? cols[2] : "0";
             size_t min_m = 0, max_m = (size_t)-1;
@@ -256,6 +256,16 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
             }
 
             /* Normal flow: cargar denominaciones (y stock si modo b/c). */
+            if (cols[0] && cols[0][0] &&
+                (cols[0][1] != '\0' || (modo != 'a' && modo != 'b' && modo != 'c')))
+            {
+                const char *row[] = {"", "", monto_txt, "ERROR", progvoraz_tr("modo invalido", "invalid mode")};
+                csv_write_row(out, row, 5);
+                logger_error("Line %zu: invalid batch mode", lineno);
+                free(linea);
+                continue;
+            }
+
             if (!parse_coin_range(cols[3], &min_m, &max_m))
             {
                 const char *row[] = {"", "", monto_txt, "ERROR", batch_note_invalid_range()};
@@ -408,7 +418,7 @@ int batch_process_stream(const char *rutaLog)
             }
         }
 
-        char modo = cols[0] && cols[0][0] ? cols[0][0] : 'a';
+        char modo = cols[0] && cols[0][0] ? (char)tolower((unsigned char)cols[0][0]) : 'a';
         char *moneda = cols[1] ? cols[1] : "";
         char *monto_txt = cols[2] ? cols[2] : "0";
         size_t min_m = 0, max_m = (size_t)-1;
@@ -429,6 +439,16 @@ int batch_process_stream(const char *rutaLog)
                 linea = NULL;
                 continue;
             }
+        }
+
+        if (cols[0] && cols[0][0] &&
+            (cols[0][1] != '\0' || (modo != 'a' && modo != 'b' && modo != 'c')))
+        {
+            const char *row[] = {"", "", monto_txt, "ERROR", progvoraz_tr("modo invalido", "invalid mode")};
+            csv_write_row(stdout, row, 5);
+            logger_error("Line %zu: invalid batch mode", lineno);
+            free(linea);
+            continue;
         }
 
         if (!parse_coin_range(cols[3], &min_m, &max_m))
