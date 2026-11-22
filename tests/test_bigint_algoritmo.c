@@ -351,8 +351,47 @@ static void test_cambio_cero_con_rango(void)
 }
 
 /* funcion main: contiene la logica principal de esta operacion. */
+static void test_cercano_bigint_un_tipo(void)
+{
+    const char *denom_text[] = {"50000"};
+    const char *stock_text[] = {"2"};
+    const char *una[] = {"1"};
+    const char *dos[] = {"2"};
+    BigInt monto = {0}, cubierto = {0};
+    BigIntArray denom = {0}, stock = {0}, solucion = {0};
+
+    check_int(bigint_init(&monto, "50001"), "crea importe fuera de DP");
+    check_int(crear_arreglo(&denom, denom_text, 1), "denominacion unica grande");
+    check_int(crear_arreglo(&stock, stock_text, 1), "stock acotado del importe");
+    check_int(calcular_cambio_cercano_con_rango(&monto, &denom, 0, 1,
+               &cubierto, &solucion), "cercano grande exacto con maximo");
+    check_bigint_texto(&cubierto, "50000", "cercano grande cubierto");
+    check_arreglo_texto(&solucion, una, 1, "cercano grande cantidad maxima");
+    bigint_free(&cubierto); bigint_array_free(&solucion);
+
+    check_int(calcular_cambio_cercano_stock_con_rango(&monto, &denom, &stock,
+               1, 1, &cubierto, &solucion), "cercano grande stock y rango");
+    check_bigint_texto(&cubierto, "50000", "cercano grande stock cubierto");
+    check_arreglo_texto(&solucion, una, 1, "cercano grande stock cantidad");
+    bigint_free(&cubierto); bigint_array_free(&solucion);
+    check_int(!calcular_cambio_cercano_stock_con_rango(&monto, &denom, &stock,
+               3, 3, &cubierto, &solucion), "cercano grande minimo imposible");
+    bigint_free(&cubierto); bigint_array_free(&solucion);
+
+    bigint_free(&monto);
+    check_int(bigint_init(&monto, "150000"), "importe grande con dos piezas");
+    check_int(calcular_cambio_cercano_stock_con_rango(&monto, &denom, &stock,
+               0, 3, &cubierto, &solucion), "stock limita cercano alto");
+    check_bigint_texto(&cubierto, "100000", "stock cercano cubierto");
+    check_arreglo_texto(&solucion, dos, 1, "stock cercano usa dos piezas");
+
+    bigint_free(&cubierto); bigint_array_free(&solucion);
+    bigint_free(&monto); bigint_array_free(&denom); bigint_array_free(&stock);
+}
+
 int main(void)
 {
+    test_cercano_bigint_un_tipo();
     test_bigint_basico();
     test_cambio_no_canonico_ilimitado();
     test_cambio_no_canonico_con_stock();
