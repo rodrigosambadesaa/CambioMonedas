@@ -1,0 +1,17 @@
+name: C HTTP request deadline and loopback security
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  slowloris:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Compile debug HTTP server
+        run: make debug
+      - name: Detect all-interface binding and stalled-client starvation
+        run: python3 tests/test_http_slowloris.py
