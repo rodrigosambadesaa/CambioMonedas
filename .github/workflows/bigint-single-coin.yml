@@ -1,0 +1,23 @@
+name: C BigInt one-coin exact and closest regression
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  single-coin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build BigInt one-coin regressions with sanitizers
+        run: |
+          gcc -std=c2x -O1 -g -Wall -Wextra -Wpedantic -I. \
+            -fsanitize=address,undefined,leak -fno-omit-frame-pointer \
+            tests/test_bigint_single_coin.c algoritmo_cambio.c bigint.c \
+            vector_dinamico.c -o /tmp/test-bigint-one-coin
+      - name: Check large exact and closest one-coin restrictions
+        run: |
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1:abort_on_error=1 \
+          UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+          /tmp/test-bigint-one-coin
