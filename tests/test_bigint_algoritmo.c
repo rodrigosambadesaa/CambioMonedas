@@ -389,9 +389,42 @@ static void test_cercano_bigint_un_tipo(void)
     bigint_free(&monto); bigint_array_free(&denom); bigint_array_free(&stock);
 }
 
+static void test_bigint_rango_exacto_un_tipo(void)
+{
+    const char *d[] = {"50001"};
+    const char *stocks[] = {"1"};
+    const char *expected[] = {"1"};
+    BigInt amount = {0};
+    BigIntArray denom = {0}, stock = {0}, result = {0};
+    check_int(bigint_init(&amount, "50001"), "importe unico rango BigInt");
+    check_int(crear_arreglo(&denom, d, 1), "denominacion unica");
+    check_int(crear_arreglo(&stock, stocks, 1), "stock una unidad");
+    check_int(calcular_cambio_optimo_con_rango(&amount, &denom, 1, 1, &result),
+              "acepta minimo positivo por encima del umbral");
+    check_arreglo_texto(&result, expected, 1, "rango exacto con 1 pieza");
+    bigint_array_free(&result);
+    check_int(calcular_cambio_optimo_stock_con_rango(
+                  &amount, &denom, &stock, 1, 1, &result),
+              "stock rango positivo BigInt");
+    check_arreglo_texto(&result, expected, 1, "stock BigInt 1 pieza");
+    bigint_array_free(&result);
+    check_int(!calcular_cambio_optimo_stock_con_rango(
+                   &amount, &denom, &stock, 0, 0, &result),
+              "rechaza maximo cero con importe positivo");
+    bigint_array_free(&result);
+    check_int(!calcular_cambio_optimo_con_rango(
+                   &amount, &denom, 2, 2, &result),
+              "rechaza dos piezas cuando solo existe una");
+    bigint_array_free(&result);
+    bigint_free(&amount);
+    bigint_array_free(&denom);
+    bigint_array_free(&stock);
+}
+
 int main(void)
 {
     test_cercano_bigint_un_tipo();
+    test_bigint_rango_exacto_un_tipo();
     test_bigint_basico();
     test_cambio_no_canonico_ilimitado();
     test_cambio_no_canonico_con_stock();
