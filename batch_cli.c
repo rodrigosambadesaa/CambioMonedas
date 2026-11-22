@@ -29,6 +29,43 @@ static char *trim(char *s)
     return s;
 }
 
+/* Reject signed counts, overflow and trailing junk. The SIZE_MAX value
+ * is reserved by the solver as "unlimited" and is never a valid CSV bound. */
+static int range_decimal(const char *begin, const char *end, size_t *out)
+{
+    size_t value = 0;
+    if (!begin || !end || !out || begin >= end) return 0;
+    for (const char *p = begin; p < end; ++p)
+    {
+        if (*p < '0' || *p > '9') return 0;
+        size_t digit = (size_t)(*p - '0');
+        if (value > (((size_t)-1) - digit) / 10) return 0;
+        value = value * 10 + digit;
+    }
+    if (value == (size_t)-1) return 0;
+    *out = value;
+    return 1;
+}
+
+static int parse_coin_range(const char *text, size_t *minimum, size_t *maximum)
+{
+    if (!minimum || !maximum) return 0;
+    *minimum = 0;
+    *maximum = (size_t)-1;
+    if (!text || !*text) return 1;
+    const char *end = text + strlen(text);
+    const char *dash = strchr(text, '-');
+    if (!dash) return range_decimal(text, end, maximum);
+    return range_decimal(text, dash, minimum) &&
+           range_decimal(dash + 1, end, maximum) &&
+           *minimum <= *maximum;
+}
+
+static const char *batch_note_invalid_range(void)
+{
+    return progvoraz_tr("rango invalido", "invalid range");
+}
+
 static void write_csv_header(FILE *out)
 {
     const char *hdr_es[] = {"modo", "moneda", "monto", "resultado", "nota"};
@@ -198,22 +235,6 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
             char *moneda = cols[1] ? cols[1] : "";
             char *monto_txt = cols[2] ? cols[2] : "0";
             size_t min_m = 0, max_m = (size_t)-1;
-            /* if: comprueba cols[3] && cols[3][0] antes de ejecutar esta rama. */
-            if (cols[3] && cols[3][0])
-            {
-                char *dash = strchr(cols[3], '-');
-                /* if: comprueba dash antes de ejecutar esta rama. */
-                if (dash)
-                {
-                    *dash = '\0';
-                    min_m = (size_t)strtoul(cols[3], NULL, 10);
-                    max_m = (size_t)strtoul(dash + 1, NULL, 10);
-                }
-                else
-                {
-                    max_m = (size_t)strtoul(cols[3], NULL, 10);
-                }
-            }
 
             /* Saltar cabecera si aparece. */
             /* if: comprueba lineno == 1 antes de ejecutar esta rama. */
@@ -235,6 +256,15 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
             }
 
             /* Normal flow: cargar denominaciones (y stock si modo b/c). */
+            if (!parse_coin_range(cols[3], &min_m, &max_m))
+            {
+                const char *row[] = {"", "", monto_txt, "ERROR", batch_note_invalid_range()};
+                csv_write_row(out, row, 5);
+                logger_error("Line %zu: invalid coin range", lineno);
+                free(linea);
+                continue;
+            }
+
             moneda = (char *)progvoraz_map_currency_key(moneda);
             BigIntArray denom = {0};
             BigIntArray stock = {0};
@@ -382,22 +412,6 @@ int batch_process_stream(const char *rutaLog)
         char *moneda = cols[1] ? cols[1] : "";
         char *monto_txt = cols[2] ? cols[2] : "0";
         size_t min_m = 0, max_m = (size_t)-1;
-        /* if: comprueba cols[3] && cols[3][0] antes de ejecutar esta rama. */
-        if (cols[3] && cols[3][0])
-        {
-            char *dash = strchr(cols[3], '-');
-            /* if: comprueba dash antes de ejecutar esta rama. */
-            if (dash)
-            {
-                *dash = '\0';
-                min_m = (size_t)strtoul(cols[3], NULL, 10);
-                max_m = (size_t)strtoul(dash + 1, NULL, 10);
-            }
-            else
-            {
-                max_m = (size_t)strtoul(cols[3], NULL, 10);
-            }
-        }
 
         /* if: comprueba lineno == 1 antes de ejecutar esta rama. */
         if (lineno == 1)
@@ -415,6 +429,15 @@ int batch_process_stream(const char *rutaLog)
                 linea = NULL;
                 continue;
             }
+        }
+
+        if (!parse_coin_range(cols[3], &min_m, &max_m))
+        {
+            const char *row[] = {"", "", monto_txt, "ERROR", batch_note_invalid_range()};
+            csv_write_row(stdout, row, 5);
+            logger_error("Line %zu: invalid coin range", lineno);
+            free(linea);
+            continue;
         }
 
         moneda = (char *)progvoraz_map_currency_key(moneda);
