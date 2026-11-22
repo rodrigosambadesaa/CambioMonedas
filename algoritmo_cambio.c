@@ -1489,6 +1489,114 @@ cleanup:
     return outcome;
 }
 
+/*
+ * Exact nearest change for TWO bounded denominations when the amount and
+ * relevant stock quantities fit size_t. Intended for the large-amount path
+ * above 50,000. For y small coins modulo a/gcd(a,b), coverage increases
+ * until the high-coin stock stops binding, then coverage is constant and the
+ * earliest y gives the fewest coins. Two candidates per residue suffice.
+ */
+typedef struct
+{
+    size_t amount, a, b, high_stock;
+    size_t covered, high_count, low_count, pieces;
+    int found;
+} NearStockTwo;
+
+static void consider_nearest_stock_two(NearStockTwo *state, size_t y)
+{
+    size_t small_value = y * state->b;
+    size_t x = (state->amount - small_value) / state->a;
+    if (x > state->high_stock)
+        x = state->high_stock;
+    size_t paid = x * state->a + small_value;
+    size_t pieces = x + y;
+    if (paid == 0)
+        return;
+    if (!state->found || paid > state->covered ||
+        (paid == state->covered && pieces < state->pieces))
+    {
+        state->found = 1;
+        state->covered = paid;
+        state->high_count = x;
+        state->low_count = y;
+        state->pieces = pieces;
+    }
+}
+
+static int cercano_dos_denominaciones_stock_size(const BigInt *monto,
+        const BigIntArray *denom, const BigIntArray *stock,
+        BigInt *monto_cubierto, BigIntArray *solucion)
+{
+    size_t amount = 0, d[2] = {0}, high = 0, low = 1;
+    size_t high_stock = 0, max_y = 0, gcd, period, saturated;
+    BigInt hi = {0}, lo = {0};
+    int result = 0;
+
+    if (!monto || !denom || !denom->items || denom->len != 2 ||
+        !stock || !stock->items || stock->len != 2 ||
+        !monto_cubierto || !solucion ||
+        !bigint_a_size_limitado(monto, SIZE_MAX, &amount) ||
+        !bigint_a_size_limitado(&denom->items[0],50000,&d[0]) ||
+        !bigint_a_size_limitado(&denom->items[1],50000,&d[1]) ||
+        !d[0] || !d[1] || d[0] == d[1])
+        return -1;
+
+    if (d[1] > d[0]) { high = 1; low = 0; }
+    size_t a = d[high], b = d[low];
+    if (!bigint_a_size_con_tope(&stock->items[high],amount/a,&high_stock) ||
+        !bigint_a_size_con_tope(&stock->items[low],amount/b,&max_y))
+        return 0;
+    gcd = a;
+    { size_t x=b;
+      while(x) { size_t rem=gcd%x; gcd=x; x=rem; }
+    }
+    period = a/gcd;
+    saturated = (amount - high_stock*a)/b;
+    NearStockTwo best = { .amount=amount, .a=a, .b=b,
+                          .high_stock=high_stock };
+
+    for (size_t r=0; r<period && r<=max_y; ++r)
+    {
+        size_t top = saturated < max_y ? saturated : max_y;
+        if (top >= r)
+        {
+            size_t y = r + ((top-r)/period)*period;
+            consider_nearest_stock_two(&best,y);
+        }
+        if (saturated < r)
+        {
+            consider_nearest_stock_two(&best,r);
+        }
+        else if (saturated < max_y)
+        {
+            size_t steps=(saturated-r)/period;
+            /* Bound the addition by max_y to prevent size_t overflow. */
+            if (steps < (max_y-r)/period)
+                consider_nearest_stock_two(&best,r+(steps+1)*period);
+        }
+    }
+
+    if (!best.found)
+        return 0;
+    if (!size_a_bigint(best.high_count,&hi) ||
+        !size_a_bigint(best.low_count,&lo) ||
+        !bigint_array_create(solucion,2))
+        goto cleanup;
+    if (!bigint_array_set(solucion,high,&hi) ||
+        !bigint_array_set(solucion,low,&lo) ||
+        !size_a_bigint(best.covered,monto_cubierto))
+    {
+        bigint_array_free(solucion);
+        goto cleanup;
+    }
+    result = 1;
+cleanup:
+    bigint_free(&hi);
+    bigint_free(&lo);
+    return result;
+}
+
 /* funcion construir_sufijos_stock: contiene la logica principal de esta operacion. */
 static int construir_sufijos_stock(const BigIntArray *denom,
                                    const BigIntArray *stock,
@@ -2159,6 +2267,19 @@ int calcular_cambio_cercano_stock_con_rango(const BigInt *monto,
             return calcular_cercano_una_denominacion_bigint(
                 monto, denominaciones, stock, min_monedas, max_monedas,
                 monto_cubierto, solucion);
+    }
+
+    if (denominaciones->len == 2 && min_monedas == 0 &&
+        max_monedas == SIZE_MAX)
+    {
+        size_t small_amount = 0;
+        if (!bigint_a_size_limitado(monto,DP_MONTO_MAX,&small_amount))
+        {
+            int exact = cercano_dos_denominaciones_stock_size(
+                monto,denominaciones,stock,monto_cubierto,solucion);
+            if (exact >= 0)
+                return exact;
+        }
     }
 
     dp = calcular_dp_stock_cercano_rango(monto, denominaciones, stock, min_monedas, max_monedas, &cubierto_size, solucion);
