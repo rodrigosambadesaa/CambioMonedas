@@ -1,0 +1,21 @@
+name: C strict CSV range parsing
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  range:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile C CLI with sanitizers
+        run: make debug-sanitize
+      - name: Check malformed and valid CSV ranges
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:abort_on_error=1
+        run: python tests/test_batch_invalid_ranges.py ./progvoraz
