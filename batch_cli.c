@@ -57,6 +57,63 @@ static const char *batch_note_no_solution(void)
     return progvoraz_tr("sin solucion", "no solution");
 }
 
+
+/* Parse decimal size_t values with complete input and overflow validation. */
+static int parse_size_span(const char *begin, const char *end, size_t *out)
+{
+    size_t value = 0;
+    if (begin == NULL || end == NULL || out == NULL || begin == end)
+        return 0;
+    for (const char *p = begin; p < end; ++p)
+    {
+        if (*p < '0' || *p > '9')
+            return 0;
+        size_t digit = (size_t)(*p - '0');
+        if (value > (SIZE_MAX - digit) / 10)
+            return 0;
+        value = value * 10 + digit;
+    }
+    *out = value;
+    return 1;
+}
+
+static int parse_coin_range(const char *text, size_t *minimum,
+                            size_t *maximum, int *constrained)
+{
+    if (minimum == NULL || maximum == NULL || constrained == NULL)
+        return 0;
+    *minimum = 0;
+    *maximum = SIZE_MAX;
+    *constrained = 0;
+    if (text == NULL || *text == '\0')
+        return 1;
+    *constrained = 1;
+    const char *end = text + strlen(text);
+    if (*text == '=')
+    {
+        if (!parse_size_span(text + 1, end, minimum))
+            return 0;
+        *maximum = *minimum;
+        return 1;
+    }
+    const char *dash = strchr(text, '-');
+    if (dash != NULL)
+        return parse_size_span(text, dash, minimum) &&
+               parse_size_span(dash + 1, end, maximum) &&
+               *minimum <= *maximum;
+    return parse_size_span(text, end, maximum);
+}
+
+static int valid_batch_mode(const char *text)
+{
+    if (text == NULL || *text == '\0')
+        return 1;
+    if (text[1] != '\0')
+        return 0;
+    char mode = (char)tolower((unsigned char)text[0]);
+    return mode == 'a' || mode == 'b' || mode == 'c';
+}
+
 static char *batch_read_line(FILE *fp)
 {
     size_t capacidad = 4096;
