@@ -75,6 +75,42 @@ static int write_socket_all(int fd, const void *buf, size_t len)
     return 0;
 }
 
+/*
+ * After rejecting a request the TCP receive queue may still contain its
+ * body. close() with unread data can send RST, discarding the HTTP error
+ * response already written. Half-close our write side and drain a small,
+ * time-bounded amount before close. Never allow abusive clients to stall
+ * the single-threaded listener indefinitely.
+ */
+static void finish_rejected_request(int fd)
+{
+    char discard[1024];
+    size_t budget = 8192;
+    struct timespec start;
+    (void)shutdown(fd, SHUT_WR);
+    if (clock_gettime(CLOCK_MONOTONIC, &start) != 0)
+        return;
+    while (budget > 0)
+    {
+        struct timespec now;
+        if (clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+            break;
+        int64_t elapsed = (int64_t)(now.tv_sec - start.tv_sec) * 1000 +
+                          ((int64_t)now.tv_nsec - start.tv_nsec) / 1000000;
+        if (elapsed >= 100)
+            break;
+        struct pollfd pfd = { .fd = fd, .events = POLLIN, .revents = 0 };
+        int ready = poll(&pfd, 1, (int)(100 - elapsed));
+        if (ready <= 0 || (pfd.revents & (POLLERR | POLLNVAL)))
+            break;
+        size_t requested = budget < sizeof(discard) ? budget : sizeof(discard);
+        ssize_t received = read(fd, discard, requested);
+        if (received <= 0)
+            break;
+        budget -= (size_t)received;
+    }
+}
+
 /* funcion read_until_header_end: contiene la logica principal de esta operacion. */
 /*
  * One slow or stalled client must not monopolize the sequential HTTP server.
@@ -152,6 +188,68 @@ static int read_until_header_end(int fd, char *buf, size_t buflen, size_t *out_l
         }
     }
     return -1;
+}
+
+/*
+ * Parse only full HTTP field names, never substring matches in the request
+ * line or X-Content-Length. Reject duplicate Content-Length, unsupported
+ * Transfer-Encoding, and malformed decimal values to prevent ambiguity.
+ * Returns 0: absent, 1: present, 2: too large, -1: invalid.
+ */
+static int parse_http_content_length(const char *headers, size_t *out)
+{
+    const char *cursor;
+    int seen = 0;
+    if (headers == NULL || out == NULL)
+        return -1;
+    cursor = strstr(headers, "\r\n");
+    if (cursor == NULL)
+        return -1;
+    cursor += 2; /* Skip the request line. */
+    for (;;)
+    {
+        const char *end = strstr(cursor, "\r\n");
+        const char *colon;
+        size_t name_len;
+        if (end == NULL)
+            return -1;
+        if (cursor == end)
+            break;
+        colon = memchr(cursor, ':', (size_t)(end - cursor));
+        if (colon == NULL)
+            return -1;
+        name_len = (size_t)(colon - cursor);
+        if (name_len == 17 &&
+            strncasecmp(cursor, "Transfer-Encoding", 17) == 0)
+            return -1; /* Chunked bodies are not implemented. */
+        if (name_len == 14 &&
+            strncasecmp(cursor, "Content-Length", 14) == 0)
+        {
+            const char *number = colon + 1;
+            char *parsed_end = NULL;
+            unsigned long long parsed;
+            if (seen)
+                return -1;
+            while (number < end && (*number == ' ' || *number == '\t'))
+                ++number;
+            if (number == end || !isdigit((unsigned char)*number))
+                return -1;
+            errno = 0;
+            parsed = strtoull(number, &parsed_end, 10);
+            if (errno != 0 || parsed_end == number)
+                return -1;
+            while (parsed_end < end && (*parsed_end == ' ' || *parsed_end == '\t'))
+                ++parsed_end;
+            if (parsed_end != end)
+                return -1;
+            if (parsed > 8ULL * 1024ULL * 1024ULL)
+                return 2;
+            *out = (size_t)parsed;
+            seen = 1;
+        }
+        cursor = end + 2;
+    }
+    return seen;
 }
 
 /* funcion run_http_server: contiene la logica principal de esta operacion. */
@@ -260,38 +358,33 @@ int run_http_server(const char *port)
         char path[512] = {0};
         sscanf(header_buf, "%7s %511s", method, path);
 
-        /* Obtener Content-Length si existe */
+        /* Validate header names and numeric lengths before reading the body. */
         size_t content_length = 0;
-        char *cl = strcasestr(header_buf, "Content-Length:");
-        /* Cap allocation at 8 MiB. Huge or nonnumeric lengths must never
-           cause size_t overflow or unbounded malloc. */
-        if (cl)
+        int length_state = parse_http_content_length(header_buf, &content_length);
+        if (length_state < 0)
         {
-            char *end = NULL;
-            unsigned long long parsed;
-            cl += strlen("Content-Length:");
-            while (*cl == ' ' || *cl == '\t')
-                ++cl;
-            errno = 0;
-            parsed = strtoull(cl, &end, 10);
-            while (end && (*end == ' ' || *end == '\t'))
-                ++end;
-            if (!isdigit((unsigned char)*cl) || errno == ERANGE ||
-                !end || (*end != '\r' && *end != '\n'))
-            {
-                const char *resp = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
-                write_socket_all(client, resp, strlen(resp));
-                close(client);
-                continue;
-            }
-            if (parsed > 8ULL * 1024ULL * 1024ULL)
-            {
-                const char *resp = "HTTP/1.1 413 Payload Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
-                write_socket_all(client, resp, strlen(resp));
-                close(client);
-                continue;
-            }
-            content_length = (size_t)parsed;
+            const char *resp = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+            write_socket_all(client, resp, strlen(resp));
+            finish_rejected_request(client);
+            close(client);
+            continue;
+        }
+        if (length_state == 2)
+        {
+            const char *resp = "HTTP/1.1 413 Payload Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+            write_socket_all(client, resp, strlen(resp));
+            finish_rejected_request(client);
+            close(client);
+            continue;
+        }
+        if (length_state == 0 && strcmp(method, "POST") == 0 &&
+            strcmp(path, "/batch") == 0)
+        {
+            const char *resp = "HTTP/1.1 411 Length Required\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+            write_socket_all(client, resp, strlen(resp));
+            finish_rejected_request(client);
+            close(client);
+            continue;
         }
 
         /* Puntero al comienzo del cuerpo (si ya vino parte en el buffer) */
