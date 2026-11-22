@@ -236,22 +236,7 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
             }
 
             /* Normal flow: cargar denominaciones (y stock si modo b/c). */
-            if (!valid_batch_mode(cols[0]))
-        {
-            const char *row[] = {"", "", monto_txt, "ERROR", progvoraz_tr("modo invalido", "invalid mode")};
-            csv_write_row(stdout, row, 5);
-            free(linea);
-            continue;
-        }
-        if (!parse_coin_range(cols[3], &min_m, &max_m, &has_range))
-        {
-            const char *row[] = {"", "", monto_txt, "ERROR", progvoraz_tr("rango invalido", "invalid range")};
-            csv_write_row(stdout, row, 5);
-            free(linea);
-            continue;
-        }
-
-        moneda = (char *)progvoraz_map_currency_key(moneda);
+            moneda = (char *)progvoraz_map_currency_key(moneda);
             BigIntArray denom = {0};
             BigIntArray stock = {0};
             BigInt monto = {0};
@@ -416,6 +401,21 @@ int batch_process_stream(const char *rutaLog)
                 linea = NULL;
                 continue;
             }
+        }
+
+        if (!valid_batch_mode(cols[0]))
+        {
+            const char *row[] = {"", "", monto_txt, "ERROR", progvoraz_tr("modo invalido", "invalid mode")};
+            csv_write_row(stdout, row, 5);
+            free(linea);
+            continue;
+        }
+        if (!parse_coin_range(cols[3], &min_m, &max_m, &has_range))
+        {
+            const char *row[] = {"", "", monto_txt, "ERROR", progvoraz_tr("rango invalido", "invalid range")};
+            csv_write_row(stdout, row, 5);
+            free(linea);
+            continue;
         }
 
         moneda = (char *)progvoraz_map_currency_key(moneda);
