@@ -9,6 +9,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <stdint.h>
 
 /* funcion trim: contiene la logica principal de esta operacion. */
 static char *trim(char *s)
@@ -194,26 +195,11 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
                 }
             }
 
-            char modo = cols[0] && cols[0][0] ? cols[0][0] : 'a';
+            char modo = cols[0] && cols[0][0] ? (char)tolower((unsigned char)cols[0][0]) : 'a';
             char *moneda = cols[1] ? cols[1] : "";
             char *monto_txt = cols[2] ? cols[2] : "0";
-            size_t min_m = 0, max_m = (size_t)-1;
-            /* if: comprueba cols[3] && cols[3][0] antes de ejecutar esta rama. */
-            if (cols[3] && cols[3][0])
-            {
-                char *dash = strchr(cols[3], '-');
-                /* if: comprueba dash antes de ejecutar esta rama. */
-                if (dash)
-                {
-                    *dash = '\0';
-                    min_m = (size_t)strtoul(cols[3], NULL, 10);
-                    max_m = (size_t)strtoul(dash + 1, NULL, 10);
-                }
-                else
-                {
-                    max_m = (size_t)strtoul(cols[3], NULL, 10);
-                }
-            }
+            size_t min_m = 0, max_m = SIZE_MAX;
+            int has_range = 0;
 
             /* Saltar cabecera si aparece. */
             /* if: comprueba lineno == 1 antes de ejecutar esta rama. */
@@ -234,8 +220,38 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
                 }
             }
 
+            if (!valid_batch_mode(cols[0]))
+            {
+                const char *row[] = {"", "", monto_txt, "ERROR", progvoraz_tr("modo invalido", "invalid mode")};
+                csv_write_row(out, row, 5);
+                free(linea);
+                continue;
+            }
+            if (!parse_coin_range(cols[3], &min_m, &max_m, &has_range))
+            {
+                const char *row[] = {"", "", monto_txt, "ERROR", progvoraz_tr("rango invalido", "invalid range")};
+                csv_write_row(out, row, 5);
+                free(linea);
+                continue;
+            }
+
             /* Normal flow: cargar denominaciones (y stock si modo b/c). */
-            moneda = (char *)progvoraz_map_currency_key(moneda);
+            if (!valid_batch_mode(cols[0]))
+        {
+            const char *row[] = {"", "", monto_txt, "ERROR", progvoraz_tr("modo invalido", "invalid mode")};
+            csv_write_row(stdout, row, 5);
+            free(linea);
+            continue;
+        }
+        if (!parse_coin_range(cols[3], &min_m, &max_m, &has_range))
+        {
+            const char *row[] = {"", "", monto_txt, "ERROR", progvoraz_tr("rango invalido", "invalid range")};
+            csv_write_row(stdout, row, 5);
+            free(linea);
+            continue;
+        }
+
+        moneda = (char *)progvoraz_map_currency_key(moneda);
             BigIntArray denom = {0};
             BigIntArray stock = {0};
             BigInt monto = {0};
@@ -285,7 +301,7 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
             if (modo == 'a')
             {
                 /* if: comprueba max_m == (size_t)-1 antes de ejecutar esta rama. */
-                if (max_m == (size_t)-1)
+                if (!has_range)
                     found = calcular_cambio_optimo(&monto, &denom, &sol);
                 else
                     found = calcular_cambio_optimo_con_rango(&monto, &denom, min_m, max_m, &sol);
@@ -293,7 +309,7 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
             else
             {
                 /* if: comprueba max_m == (size_t)-1 antes de ejecutar esta rama. */
-                if (max_m == (size_t)-1)
+                if (!has_range)
                     found = calcular_cambio_optimo_stock(&monto, &denom, &stock, &sol);
                 else
                     found = calcular_cambio_optimo_stock_con_rango(&monto, &denom, &stock, min_m, max_m, &sol);
@@ -378,26 +394,11 @@ int batch_process_stream(const char *rutaLog)
             }
         }
 
-        char modo = cols[0] && cols[0][0] ? cols[0][0] : 'a';
+        char modo = cols[0] && cols[0][0] ? (char)tolower((unsigned char)cols[0][0]) : 'a';
         char *moneda = cols[1] ? cols[1] : "";
         char *monto_txt = cols[2] ? cols[2] : "0";
-        size_t min_m = 0, max_m = (size_t)-1;
-        /* if: comprueba cols[3] && cols[3][0] antes de ejecutar esta rama. */
-        if (cols[3] && cols[3][0])
-        {
-            char *dash = strchr(cols[3], '-');
-            /* if: comprueba dash antes de ejecutar esta rama. */
-            if (dash)
-            {
-                *dash = '\0';
-                min_m = (size_t)strtoul(cols[3], NULL, 10);
-                max_m = (size_t)strtoul(dash + 1, NULL, 10);
-            }
-            else
-            {
-                max_m = (size_t)strtoul(cols[3], NULL, 10);
-            }
-        }
+        size_t min_m = 0, max_m = SIZE_MAX;
+        int has_range = 0;
 
         /* if: comprueba lineno == 1 antes de ejecutar esta rama. */
         if (lineno == 1)
@@ -467,7 +468,7 @@ int batch_process_stream(const char *rutaLog)
         if (modo == 'a')
         {
             /* if: comprueba max_m == (size_t)-1 antes de ejecutar esta rama. */
-            if (max_m == (size_t)-1)
+            if (!has_range)
                 found = calcular_cambio_optimo(&monto, &denom, &sol);
             else
                 found = calcular_cambio_optimo_con_rango(&monto, &denom, min_m, max_m, &sol);
@@ -475,7 +476,7 @@ int batch_process_stream(const char *rutaLog)
         else
         {
             /* if: comprueba max_m == (size_t)-1 antes de ejecutar esta rama. */
-            if (max_m == (size_t)-1)
+            if (!has_range)
                 found = calcular_cambio_optimo_stock(&monto, &denom, &stock, &sol);
             else
                 found = calcular_cambio_optimo_stock_con_rango(&monto, &denom, &stock, min_m, max_m, &sol);
