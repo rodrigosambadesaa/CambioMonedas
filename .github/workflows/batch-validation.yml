@@ -1,0 +1,26 @@
+name: C exact CSV limits and mode validation
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  csv:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build C CLI with sanitizers
+        run: |
+          gcc -std=c2x -O1 -g -Wall -Wextra -Wpedantic -Werror \
+            -fsanitize=address,undefined -fno-omit-frame-pointer \
+            main.c app_console.c server_http.c vector_dinamico.c moneda_gestion.c \
+            bigint.c algoritmo_cambio.c csv_io.c logger.c json_io.c batch_cli.c \
+            exchange_api.c gui_launcher.c progvoraz_locale.c \
+            -o /tmp/progvoraz-batch
+      - name: Verify 23 CSV cases
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: python3 tests/test_batch_validation.py /tmp/progvoraz-batch
