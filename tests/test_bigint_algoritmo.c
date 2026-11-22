@@ -481,8 +481,53 @@ static void test_cercano_bigint_dos_tipos_stock_mas_512(void)
     bigint_array_free(&denom);bigint_free(&amount);
 }
 
+static void test_gcd1_bigint_cuatro_piezas(void)
+{
+    const char *den[]={"800001","700000","100001","1"};
+    const char *stockv[]={"100","2","100","100"};
+    const char *expect2[]={"0","2","0","0"};
+    const char *expect3[]={"0","3","0","0"};
+    const char *expect4[]={"0","4","0","0"};
+    BigInt amount={0};
+    BigIntArray denom={0},stock={0},out={0};
+    check_int(crear_arreglo(&denom,den,4),"BigInt gcd1 denom");
+    check_int(bigint_init(&amount,"1400000"),"BigInt gcd1 amount");
+    check_int(calcular_cambio_optimo(&amount,&denom,&out),
+              "BigInt gcd1 optimum without stock");
+    check_arreglo_texto(&out,expect2,4,"BigInt gcd1 two coins, not 100000");
+    bigint_array_free(&out);
+    check_int(crear_arreglo(&stock,stockv,4),"BigInt gcd1 stock");
+    check_int(calcular_cambio_optimo_stock(&amount,&denom,&stock,&out),
+              "BigInt gcd1 optimal with stock");
+    check_arreglo_texto(&out,expect2,4,"BigInt gcd1 stock two coins");
+    bigint_array_free(&out);
+    check_int(calcular_cambio_optimo_con_rango(&amount,&denom,2,2,&out),
+              "BigInt gcd1 range 2-2");
+    check_arreglo_texto(&out,expect2,4,"BigInt gcd1 range exact 2");
+    bigint_array_free(&out);
+    check_int(calcular_cambio_optimo_stock_con_rango(
+              &amount,&denom,&stock,2,2,&out),
+              "BigInt gcd1 stock range 2-2");
+    check_arreglo_texto(&out,expect2,4,"BigInt gcd1 stock range exact");
+    bigint_array_free(&out);bigint_array_free(&stock);
+    bigint_free(&amount);
+    check_int(bigint_init(&amount,"2100000"),"BigInt gcd1 amount for 3");
+    check_int(calcular_cambio_optimo_con_rango(&amount,&denom,3,3,&out),
+              "BigInt gcd1 range 3-3");
+    check_arreglo_texto(&out,expect3,4,"BigInt gcd1 three 700000 coins");
+    bigint_array_free(&out);bigint_free(&amount);
+    check_int(bigint_init(&amount,"2800000"),"BigInt gcd1 amount for 4");
+    check_int(calcular_cambio_optimo_con_rango(&amount,&denom,4,4,&out),
+              "BigInt gcd1 range 4-4");
+    check_arreglo_texto(&out,expect4,4,"BigInt gcd1 four 700000 coins");
+    bigint_array_free(&out);bigint_free(&amount);
+    bigint_array_free(&denom);
+}
+
+
 int main(void)
 {
+    test_gcd1_bigint_cuatro_piezas();
     test_cercano_bigint_dos_tipos_stock_mas_512();
     test_cercano_bigint_dos_tipos();
     test_cercano_bigint_un_tipo();

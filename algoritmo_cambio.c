@@ -1864,6 +1864,79 @@ cleanup:
     return ok;
 }
 
+/*
+ * Certifies optimal BigInt change with at most four pieces. Tries counts
+ * 1,2,3,4 (or the requested interval) in ascending order, and enumerates
+ * nondecreasing denomination indices. This never scales memory with amount.
+ * A missing witness is inconclusive, not proof of infeasibility.
+ */
+static int testigo_corto_rec(const BigInt *remaining, const BigIntArray *denom,
+                            const BigIntArray *stock, size_t start, size_t depth,
+                            size_t *counts)
+{
+    size_t i;
+    if (depth == 0) return bigint_is_zero(remaining) ? 1 : 0;
+    if (bigint_is_zero(remaining)) return 0;
+    for (i=start; i<denom->len; ++i)
+    {
+        BigInt next={0};
+        size_t limit=0;
+        int rc;
+        if (!denom->items[i].digits || bigint_is_zero(&denom->items[i]) ||
+            bigint_compare(&denom->items[i],remaining)>0)
+            continue;
+        if (stock)
+        {
+            if (!bigint_a_size_con_tope(&stock->items[i],4,&limit))
+                return -1;
+            if (counts[i]>=limit) continue;
+        }
+        if (!bigint_subtract(remaining,&denom->items[i],&next))
+        {
+            bigint_free(&next);
+            return -1;
+        }
+        counts[i]++;
+        rc=testigo_corto_rec(&next,denom,stock,i,depth-1,counts);
+        /* Keep the successful path for result reconstruction. */
+        if (rc!=1) counts[i]--;
+        bigint_free(&next);
+        if (rc!=0) return rc;
+    }
+    return 0;
+}
+
+static int testigo_corto_bigint(const BigInt *amount,const BigIntArray *denom,
+                               const BigIntArray *stock,size_t min,size_t max,
+                               BigIntArray *out)
+{
+    size_t counts[24]={0},depth,i;
+    int rc=0;
+    if (!amount || !amount->digits || !denom || !denom->items || !out ||
+        !denom->len || denom->len>24 || min>max || min>4 ||
+        (stock && (!stock->items || stock->len!=denom->len)))
+        return 0;
+    if(min<1)min=1;
+    if(max>4)max=4;
+    for(depth=min;depth<=max;++depth)
+    {
+        rc=testigo_corto_rec(amount,denom,stock,0,depth,counts);
+        if(rc!=0)break;
+    }
+    if(rc!=1)return rc;
+    if(!bigint_array_create(out,denom->len))return -1;
+    for(i=0;i<denom->len;++i)
+    {
+        BigInt qty={0};
+        int ok=size_a_bigint(counts[i],&qty) &&
+               bigint_array_set(out,i,&qty);
+        bigint_free(&qty);
+        if(!ok){bigint_array_free(out);return -1;}
+    }
+    return 1;
+}
+
+
 /* funcion calcular_cambio_optimo: contiene la logica principal de esta operacion. */
 int calcular_cambio_optimo(const BigInt *monto, const BigIntArray *denominaciones, BigIntArray *solucion)
 {
@@ -1881,6 +1954,9 @@ int calcular_cambio_optimo(const BigInt *monto, const BigIntArray *denominacione
     /* if: comprueba dp != DP_NO_APLICA antes de ejecutar esta rama. */
     if (dp != DP_NO_APLICA)
         return dp == DP_OK;
+
+    if (testigo_corto_bigint(monto,denominaciones,NULL,0,4,solucion)==1)
+        return 1;
 
     /* if: comprueba !bigint_array_create(solucion, denominaciones->len) antes de ejecutar esta rama. */
     if (!bigint_array_create(solucion, denominaciones->len))
@@ -1933,6 +2009,9 @@ int calcular_cambio_optimo_stock(const BigInt *monto,
     /* if: comprueba dp != DP_NO_APLICA antes de ejecutar esta rama. */
     if (dp != DP_NO_APLICA)
         return dp == DP_OK;
+
+    if (testigo_corto_bigint(monto,denominaciones,stock,0,4,solucion)==1)
+        return 1;
 
     /* if: comprueba !bigint_array_create(solucion, denominaciones->len) antes de ejecutar esta rama. */
     if (!bigint_array_create(solucion, denominaciones->len))
@@ -2040,6 +2119,9 @@ int calcular_cambio_optimo_con_rango(const BigInt *monto,
     if (dp != DP_NO_APLICA)
         return dp == DP_OK;
 
+    if (testigo_corto_bigint(monto,denominaciones,NULL,min_monedas,max_monedas,solucion)==1)
+        return 1;
+
     /*
      * Para montos BigInt fuera del tope DP mantenemos una ruta compatible con el
      * comportamiento previo: solo se soporta restriccion de maximo (min=0).
@@ -2096,6 +2178,9 @@ int calcular_cambio_optimo_stock_con_rango(const BigInt *monto,
     /* if: comprueba dp != DP_NO_APLICA antes de ejecutar esta rama. */
     if (dp != DP_NO_APLICA)
         return dp == DP_OK;
+
+    if (testigo_corto_bigint(monto,denominaciones,stock,min_monedas,max_monedas,solucion)==1)
+        return 1;
 
     /* if: comprueba min_monedas == 0 antes de ejecutar esta rama. */
     if (min_monedas == 0)
