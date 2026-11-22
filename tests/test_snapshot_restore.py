@@ -15,6 +15,8 @@ INVALID = [
     "euro\n2\n3\n",
     "euro\n2\n3\ndolar\n5\n6\nunknown\n1\n",
     "euro\n2\n3\ndolar\ninvalid\n6\n",
+    "euro\n2\n3\neuro\n99\n99\ndolar\n5\n6\n",
+    "euro\n2\n3\ndolar\n5\n6\ndolar\n0\n0\n",
 ]
 with tempfile.TemporaryDirectory(prefix="snapshot-atomic-") as temp:
     root = Path(temp)

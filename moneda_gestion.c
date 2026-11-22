@@ -818,9 +818,13 @@ static int cargar_claves_monedas_archivo(const char *archivo,
             }
         }
 
-        /* if: comprueba repetida antes de ejecutar esta rama. */
+        /* Duplicate currency sections make a stock snapshot ambiguous.
+         * Never silently coalesce them when validating a restoration. */
         if (repetida)
-            continue;
+        {
+            fclose(fp);
+            return 0;
+        }
 
         /* if: comprueba *cantidad >= max_claves antes de ejecutar esta rama. */
         if (*cantidad >= max_claves)
