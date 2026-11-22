@@ -242,8 +242,11 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
     }
 
     /* if: comprueba rutaLog antes de ejecutar esta rama. */
-    if (rutaLog)
-        logger_init(rutaLog);
+    if (rutaLog && !logger_init(rutaLog))
+    {
+        fprintf(stderr, "No se pudo abrir el archivo de registro.\n");
+        return 0;
+    }
 
     in = fopen(rutaEntrada, "r");
     /* if: comprueba !in antes de ejecutar esta rama. */
@@ -450,8 +453,11 @@ int batch_process_stream(const char *rutaLog)
         fprintf(stderr, "Ruta de registro reservada para datos operativos.\n");
         return 0;
     }
-    if (rutaLog)
-        logger_init(rutaLog);
+    if (rutaLog && !logger_init(rutaLog))
+    {
+        fprintf(stderr, "No se pudo abrir el archivo de registro.\n");
+        return 0;
+    }
 
     /* Cabecera CSV de salida */
     write_csv_header(stdout);
