@@ -44,7 +44,7 @@ def main():
         assert backup.read_bytes() == data, "existing backup destroyed by failed copy"
         (d / "stock-disabled.txt").rename(live)
         assert not list(d.glob("backup.txt.tmp.*")), "orphan staging files"
-        newer=b"euro\\n9\\n11\\n"
+        newer = b"euro" + bytes([10]) + b"9" + bytes([10]) + b"11" + bytes([10])
         live.write_bytes(newer)
         p=subprocess.run([str(executable), "snapshot", str(backup)],
                          cwd=d, capture_output=True, timeout=20)
