@@ -30,6 +30,9 @@ int run_http_server(const char *port)
 #include <errno.h>
 #include <limits.h>
 #include <ctype.h>
+#include <poll.h>
+#include <time.h>
+#include <stdint.h>
 
 /* funcion write_all: contiene la logica principal de esta operacion. */
 static int write_all(int fd, const void *buf, size_t len)
@@ -73,24 +76,82 @@ static int write_socket_all(int fd, const void *buf, size_t len)
 }
 
 /* funcion read_until_header_end: contiene la logica principal de esta operacion. */
-static int read_until_header_end(int fd, char *buf, size_t buflen, size_t *out_len)
+/*
+ * One slow or stalled client must not monopolize the sequential HTTP server.
+ * Use a wall-clock deadline, not only SO_RCVTIMEO (a trickling client could
+ * reset an inactivity timeout indefinitely).
+ */
+static int read_with_deadline(int fd, char *destination, size_t length,
+                              size_t *received, int deadline_ms)
 {
+    struct timespec start;
+    if (clock_gettime(CLOCK_MONOTONIC, &start) != 0)
+        return -1;
     size_t total = 0;
-    /* while: repite el bloque mientras se cumpla total + 1 < buflen. */
-    while (total + 1 < buflen)
+    while (total < length)
     {
-        ssize_t n = read(fd, buf + total, 1);
-        /* if: comprueba n <= 0 antes de ejecutar esta rama. */
+        struct timespec now;
+        if (clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+            return -1;
+        int64_t elapsed = (int64_t)(now.tv_sec - start.tv_sec) * 1000 +
+                          ((int64_t)now.tv_nsec - start.tv_nsec) / 1000000;
+        if (elapsed >= deadline_ms)
+            return -1;
+        struct pollfd client = { .fd = fd, .events = POLLIN, .revents = 0 };
+        int ready = poll(&client, 1, (int)(deadline_ms - elapsed));
+        if (ready < 0 && errno == EINTR)
+            continue;
+        if (ready <= 0 || (client.revents & (POLLERR | POLLNVAL)))
+            return -1;
+        ssize_t n = read(fd, destination + total, length - total);
+        if (n < 0 && errno == EINTR)
+            continue;
         if (n <= 0)
             return -1;
-        total += n;
-        buf[total] = '\0';
-        /* if: comprueba total >= 4 && strstr(buf, "\r\n\r\n") != NULL antes de ejecutar esta rama. */
-        if (total >= 4 && strstr(buf, "\r\n\r\n") != NULL)
-            break;
+        total += (size_t)n;
     }
-    *out_len = total;
+    if (received) *received = total;
     return 0;
+}
+
+/* Bound both header size and total processing time, checking CRLFCRLF
+ * incrementally instead of repeatedly scanning the whole header. */
+static int read_until_header_end(int fd, char *buf, size_t buflen, size_t *out_len)
+{
+    struct timespec start;
+    size_t total = 0;
+    if (!buf || buflen < 5 || !out_len ||
+        clock_gettime(CLOCK_MONOTONIC, &start) != 0)
+        return -1;
+    while (total + 1 < buflen)
+    {
+        struct timespec now;
+        if (clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+            return -1;
+        int64_t elapsed = (int64_t)(now.tv_sec - start.tv_sec) * 1000 +
+                          ((int64_t)now.tv_nsec - start.tv_nsec) / 1000000;
+        if (elapsed >= 5000)
+            return -1;
+        struct pollfd client = { .fd = fd, .events = POLLIN, .revents = 0 };
+        int ready = poll(&client, 1, (int)(5000 - elapsed));
+        if (ready < 0 && errno == EINTR)
+            continue;
+        if (ready <= 0 || (client.revents & (POLLERR | POLLNVAL)))
+            return -1;
+        ssize_t n = read(fd, buf + total, 1);
+        if (n < 0 && errno == EINTR)
+            continue;
+        if (n <= 0)
+            return -1;
+        total += (size_t)n;
+        buf[total] = '\0';
+        if (total >= 4 && memcmp(buf + total - 4, "\r\n\r\n", 4) == 0)
+        {
+            *out_len = total;
+            return 0;
+        }
+    }
+    return -1;
 }
 
 /* funcion run_http_server: contiene la logica principal de esta operacion. */
@@ -125,7 +186,10 @@ int run_http_server(const char *port)
 
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY;
+    /* Local endpoint by default. Remote exposure requires explicit opt-in. */
+    const char *bind_all = getenv("PROGVORAZ_HTTP_BIND_ALL");
+    addr.sin_addr.s_addr = htonl(bind_all && strcmp(bind_all, "1") == 0
+                                ? INADDR_ANY : INADDR_LOOPBACK);
     addr.sin_port = htons((uint16_t)portnum);
 
     /* if: comprueba bind(listen_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0 antes de ejecutar esta rama. */
@@ -252,22 +316,15 @@ int run_http_server(const char *port)
                 close(client);
                 continue;
             }
-            /* if: comprueba body_in_buf > 0 antes de ejecutar esta rama. */
-            if (body_in_buf > 0)
-                memcpy(body, body_start, body_in_buf);
-            size_t need = content_length - body_in_buf;
-            size_t off = body_in_buf;
-            /* while: repite el bloque mientras se cumpla need > 0. */
-            while (need > 0)
-            {
-                ssize_t r = read(client, body + off, need);
-                /* if: comprueba r <= 0 antes de ejecutar esta rama. */
-                if (r <= 0)
-                    break;
-                need -= (size_t)r;
-                off += (size_t)r;
-            }
-            if (need > 0)
+            /* Defense in depth: never copy beyond advertised body length,
+             * even if header parsing is later optimized to buffer the body. */
+            size_t in_buffer = body_in_buf < content_length
+                             ? body_in_buf : content_length;
+            if (in_buffer)
+                memcpy(body, body_start, in_buffer);
+            size_t need = content_length - in_buffer;
+            if (need > 0 &&
+                read_with_deadline(client, body + in_buffer, need, NULL, 10000) < 0)
             {
                 free(body);
                 close(client);
