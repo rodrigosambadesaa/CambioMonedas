@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <stdint.h>
 #ifndef _WIN32
 #include <sys/stat.h>
 #endif
@@ -653,8 +654,46 @@ int destino_exportacion_seguro(const char *ruta)
 int crear_snapshot_stock(const char *rutaSnapshot)
 {
     const char *ruta = ruta_o_default(rutaSnapshot, "stock_snapshot.txt");
+    int ok = 0;
     if (!destino_exportacion_seguro(ruta)) return 0;
-    return copiar_archivo_binario("stock.txt", ruta);
+
+#ifdef _WIN32
+    char staging[MAX_PATH] = {0};
+    char directory[MAX_PATH] = ".";
+    const char *slash = strrchr(ruta, '/');
+    const char *backslash = strrchr(ruta, '\\');
+    if (backslash && (!slash || backslash > slash)) slash = backslash;
+    if (slash)
+    {
+        size_t len = (size_t)(slash - ruta);
+        if (len == 0 || len >= sizeof(directory)) return 0;
+        memcpy(directory, ruta, len);
+        directory[len] = '\0';
+    }
+    if (!GetTempFileNameA(directory, "snp", 0, staging)) return 0;
+    if (copiar_archivo_binario("stock.txt", staging) &&
+        MoveFileExA(staging, ruta,
+                    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+        ok = 1;
+    if (!ok) remove(staging);
+#else
+    size_t len = strlen(ruta);
+    if (len > SIZE_MAX - 12) return 0;
+    char *staging = (char *)malloc(len + 12);
+    if (staging == NULL) return 0;
+    snprintf(staging, len + 12, "%s.tmp.XXXXXX", ruta);
+    int fd = mkstemp(staging);
+    if (fd >= 0)
+    {
+        close(fd);
+        if (copiar_archivo_binario("stock.txt", staging) &&
+            rename(staging, ruta) == 0)
+            ok = 1;
+        if (!ok) remove(staging);
+    }
+    free(staging);
+#endif
+    return ok;
 }
 
 /* Restore must use the very same interprocess lock and atomic-swap
