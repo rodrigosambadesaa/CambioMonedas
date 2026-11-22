@@ -75,6 +75,42 @@ static int write_socket_all(int fd, const void *buf, size_t len)
     return 0;
 }
 
+/*
+ * After rejecting a request the TCP receive queue may still contain its
+ * body. close() with unread data can send RST, discarding the HTTP error
+ * response already written. Half-close our write side and drain a small,
+ * time-bounded amount before close. Never allow abusive clients to stall
+ * the single-threaded listener indefinitely.
+ */
+static void finish_rejected_request(int fd)
+{
+    char discard[1024];
+    size_t budget = 8192;
+    struct timespec start;
+    (void)shutdown(fd, SHUT_WR);
+    if (clock_gettime(CLOCK_MONOTONIC, &start) != 0)
+        return;
+    while (budget > 0)
+    {
+        struct timespec now;
+        if (clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+            break;
+        int64_t elapsed = (int64_t)(now.tv_sec - start.tv_sec) * 1000 +
+                          ((int64_t)now.tv_nsec - start.tv_nsec) / 1000000;
+        if (elapsed >= 100)
+            break;
+        struct pollfd pfd = { .fd = fd, .events = POLLIN, .revents = 0 };
+        int ready = poll(&pfd, 1, (int)(100 - elapsed));
+        if (ready <= 0 || (pfd.revents & (POLLERR | POLLNVAL)))
+            break;
+        size_t requested = budget < sizeof(discard) ? budget : sizeof(discard);
+        ssize_t received = read(fd, discard, requested);
+        if (received <= 0)
+            break;
+        budget -= (size_t)received;
+    }
+}
+
 /* funcion read_until_header_end: contiene la logica principal de esta operacion. */
 /*
  * One slow or stalled client must not monopolize the sequential HTTP server.
@@ -329,6 +365,7 @@ int run_http_server(const char *port)
         {
             const char *resp = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
             write_socket_all(client, resp, strlen(resp));
+            finish_rejected_request(client);
             close(client);
             continue;
         }
@@ -336,6 +373,7 @@ int run_http_server(const char *port)
         {
             const char *resp = "HTTP/1.1 413 Payload Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
             write_socket_all(client, resp, strlen(resp));
+            finish_rejected_request(client);
             close(client);
             continue;
         }
@@ -344,6 +382,7 @@ int run_http_server(const char *port)
         {
             const char *resp = "HTTP/1.1 411 Length Required\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
             write_socket_all(client, resp, strlen(resp));
+            finish_rejected_request(client);
             close(client);
             continue;
         }
