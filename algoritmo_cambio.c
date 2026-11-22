@@ -1706,7 +1706,10 @@ static int testigo_corto_rec(const BigInt *remaining, const BigIntArray *denom,
             if (counts[i]>=limit) continue;
         }
         if (!bigint_subtract(remaining,&denom->items[i],&next))
+        {
+            bigint_free(&next);
             return -1;
+        }
         counts[i]++;
         rc=testigo_corto_rec(&next,denom,stock,i,depth-1,counts);
         /* Keep the successful path for result reconstruction. */
