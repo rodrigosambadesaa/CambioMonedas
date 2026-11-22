@@ -1,0 +1,25 @@
+name: C exhaustive bounded-stock DP regression
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  oracle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - name: Compile 14000 deterministic independent-oracle cases with sanitizers
+        run: |
+          gcc -std=c2x -O1 -g -Wall -Wextra -Wpedantic -Werror \
+            -fsanitize=address,undefined,leak -fno-omit-frame-pointer \
+            -I. tests/test_stock_dp_exhaustive_oracle.c \
+            algoritmo_cambio.c bigint.c vector_dinamico.c \
+            -o /tmp/stock-dp-oracle
+      - name: Check all optimal, bounded, restricted and nearest cases
+        run: |
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1:abort_on_error=1 \
+          UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+          /tmp/stock-dp-oracle

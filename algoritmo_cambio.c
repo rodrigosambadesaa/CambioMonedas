@@ -364,19 +364,31 @@ static int calcular_dp_stock(const BigInt *monto,
         goto cleanup;
     }
 
-    /* for: itera segun i = denom->len; i > 0; i-- para recorrer el bloque. */
-    for (i = denom->len; i > 0; i--)
+    /*
+     * The DP choice table has a fixed row stride of original_amount + 1.
+     * Reconstruction changes the remaining amount, not the table stride.
+     */
     {
-        size_t idx = i - 1;
-        size_t usos = choice[idx * (amount + 1) + amount];
+        const size_t stride = amount + 1;
+        size_t remaining = amount;
 
-        cantidades[idx] = usos;
-        amount -= usos * valores[idx];
+        for (i = denom->len; i > 0; i--)
+        {
+            size_t idx = i - 1;
+            size_t uses = choice[idx * stride + remaining];
+
+            /* Reject corrupt predecessors rather than underflowing remaining. */
+            if ((valores[idx] == 0 && uses != 0) ||
+                (valores[idx] != 0 && uses > remaining / valores[idx]))
+                goto cleanup;
+
+            cantidades[idx] = uses;
+            remaining -= uses * valores[idx];
+        }
+
+        if (remaining != 0)
+            goto cleanup;
     }
-
-    /* if: comprueba amount != 0 antes de ejecutar esta rama. */
-    if (amount != 0)
-        goto cleanup;
 
     resultado = cargar_solucion_size(cantidades, denom->len, solucion) ? DP_OK : DP_NO_APLICA;
 
