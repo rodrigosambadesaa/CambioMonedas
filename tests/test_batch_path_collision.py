@@ -104,6 +104,29 @@ def main():
             if sensitive_alias.exists() or sensitive_alias.is_symlink():
                 sensitive_alias.unlink()
 
+        # Missing diagnostic directories must be errors, not silent success.
+        missing_log = root / "missing-directory" / "batch.log"
+        outcome = subprocess.run(
+            command + ["--input", "batch.csv", "--log", str(missing_log)],
+            cwd=root, capture_output=True, text=True, timeout=30)
+        assert outcome.returncode != 0, ("invalid log silently ignored", outcome.stdout)
+        assert source.read_bytes() == original
+
+        # A path longer than the former fixed 1024-byte logger buffer must
+        # not be silently truncated to a different filename.
+        if native:
+            parent = root
+            for depth in range(8):
+                parent = parent / ("nested" + str(depth) + "-" + "x" * 143)
+                parent.mkdir()
+            log_path = parent / "audit.log"
+            outcome = subprocess.run(
+                command + ["--input", "batch.csv", "--log", str(log_path)],
+                cwd=root, capture_output=True, text=True, timeout=30)
+            assert outcome.returncode == 0, (
+                "long audit log path rejected", outcome.stderr)
+            assert log_path.is_file(), "full-length audit log path was not created"
+
         result = subprocess.run(command + ["--input", "batch.csv", "--output", "out.csv"],
                                 cwd=root, capture_output=True, text=True, timeout=30)
         assert result.returncode == 0, (result.stdout, result.stderr)
