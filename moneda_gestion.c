@@ -599,6 +599,12 @@ static int copiar_archivo_binario(const char *origen, const char *destino)
     return ok;
 }
 
+/* Used by atomic snapshot restore; implementation follows below. */
+static int cargar_claves_monedas_archivo(const char *archivo,
+                                         char claves[][MAX_TOKEN],
+                                         size_t max_claves,
+                                         size_t *cantidad);
+
 /* funcion crear_snapshot_stock: contiene la logica principal de esta operacion. */
 int crear_snapshot_stock(const char *rutaSnapshot)
 {
@@ -606,11 +612,86 @@ int crear_snapshot_stock(const char *rutaSnapshot)
     return copiar_archivo_binario("stock.txt", ruta);
 }
 
-/* funcion restaurar_snapshot_stock: contiene la logica principal de esta operacion. */
+/* Restore must use the very same interprocess lock and atomic-swap
+ * protocol as normal stock mutations. A corrupt or truncated snapshot must
+ * never replace the live inventory. */
 int restaurar_snapshot_stock(const char *rutaSnapshot)
 {
     const char *ruta = ruta_o_default(rutaSnapshot, "stock_snapshot.txt");
-    return copiar_archivo_binario(ruta, "stock.txt");
+    StockWriteLock lock;
+    char temporal[1024] = {0};
+    char nombres[MAX_LINEAS_STOCK][MAX_TOKEN];
+    char nombres_snapshot[MAX_LINEAS_STOCK][MAX_TOKEN];
+    size_t cantidad = 0, candidatos = 0;
+    int ok = 0;
+
+    if (!ruta || !*ruta || !acquire_stock_write_lock(&lock))
+        return 0;
+
+#ifdef _WIN32
+    if (GetTempFileNameA(".", "rst", 0, temporal) == 0)
+        goto cleanup;
+#else
+    snprintf(temporal, sizeof(temporal), "stock.txt.tmp.XXXXXX");
+    int fd = mkstemp(temporal);
+    if (fd < 0)
+        goto cleanup;
+    close(fd);
+#endif
+
+    if (!copiar_archivo_binario(ruta, temporal) ||
+        !cargar_claves_monedas_archivo("monedas.txt", nombres,
+                                       MAX_LINEAS_STOCK, &cantidad) ||
+        !cargar_claves_monedas_archivo(temporal, nombres_snapshot,
+                                       MAX_LINEAS_STOCK, &candidatos) ||
+        cantidad == 0 || cantidad != candidatos)
+        goto cleanup;
+
+    /* Reject currencies that are missing, renamed or unexpectedly added.
+     * Validate each exact denomination count before replacing anything. */
+    for (size_t i = 0; i < cantidad; ++i)
+    {
+        int present = 0;
+        BigIntArray denoms = {0}, stock = {0};
+        for (size_t j = 0; j < candidatos; ++j)
+            if (strcmp(nombres[i], nombres_snapshot[j]) == 0)
+                present = 1;
+        if (!present ||
+            !cargar_denominaciones_moneda(nombres[i], &denoms) ||
+            !cargar_datos_moneda(temporal, nombres[i], 1, &stock) ||
+            denoms.len != stock.len)
+        {
+            bigint_array_free(&denoms);
+            bigint_array_free(&stock);
+            goto cleanup;
+        }
+        bigint_array_free(&denoms);
+        bigint_array_free(&stock);
+    }
+
+#ifdef _WIN32
+    for (int attempt = 0; attempt < 200; ++attempt)
+    {
+        if (MoveFileExA(temporal, "stock.txt",
+                        MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+        {
+            ok = 1;
+            break;
+        }
+        DWORD err = GetLastError();
+        if (err != ERROR_SHARING_VIOLATION && err != ERROR_ACCESS_DENIED &&
+            err != ERROR_LOCK_VIOLATION) break;
+        Sleep(10);
+    }
+#else
+    ok = rename(temporal, "stock.txt") == 0;
+#endif
+
+cleanup:
+    if (!ok && temporal[0])
+        remove(temporal);
+    release_stock_write_lock(&lock);
+    return ok;
 }
 
 /* funcion cargar_claves_monedas_archivo: contiene la logica principal de esta operacion. */

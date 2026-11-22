@@ -1,0 +1,23 @@
+name: C atomic snapshot restore and rollback
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  restore-atomic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Compile snapshot harness with sanitizers
+        run: |
+          gcc -std=c2x -O1 -g -Wall -Wextra -Wpedantic \
+            -fsanitize=address,undefined,leak -fno-omit-frame-pointer \
+            -I. tests/snapshot_cli.c moneda_gestion.c bigint.c vector_dinamico.c \
+            -o snapshot_cli
+      - name: Exercise corrupt snapshots and locked atomic restore
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:abort_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: python3 tests/test_snapshot_restore.py
