@@ -1,0 +1,26 @@
+name: C batch data-loss regression
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  path:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build with ASan UBSan
+        run: |
+          gcc -std=c2x -Wall -Wextra -Wpedantic -Werror -O1 -g \
+            -fsanitize=address,undefined -fno-omit-frame-pointer \
+            main.c app_console.c server_http.c vector_dinamico.c moneda_gestion.c \
+            bigint.c algoritmo_cambio.c csv_io.c logger.c json_io.c batch_cli.c \
+            exchange_api.c gui_launcher.c progvoraz_locale.c \
+            -o /tmp/progvoraz-batch-safety
+      - name: Protect data from input/output aliases
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1
+        run: python3 tests/test_batch_path_collision.py --native /tmp/progvoraz-batch-safety

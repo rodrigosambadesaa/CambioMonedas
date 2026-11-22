@@ -5,7 +5,6 @@
 #include <string.h>
 
 static FILE *g_log = NULL;
-static char g_path[1024];
 
 /* funcion logger_init: contiene la logica principal de esta operacion. */
 int logger_init(const char *path)
@@ -13,9 +12,12 @@ int logger_init(const char *path)
     /* if: comprueba path == NULL antes de ejecutar esta rama. */
     if (path == NULL)
         return 0;
-    strncpy(g_path, path, sizeof(g_path) - 1);
-    g_path[sizeof(g_path) - 1] = '\0';
-    g_log = fopen(g_path, "a");
+    if (g_log != NULL)
+    {
+        fclose(g_log);
+        g_log = NULL;
+    }
+    g_log = fopen(path, "a");
     return g_log != NULL;
 }
 

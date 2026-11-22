@@ -9,6 +9,11 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <sys/stat.h>
+#endif
 
 /* funcion trim: contiene la logica principal de esta operacion. */
 static char *trim(char *s)
@@ -178,6 +183,60 @@ static void batch_build_result_summary(const BigIntArray *sol, char *resultado_b
     bigint_free(&total);
 }
 
+/* Prevent a write-mode output stream from truncating its CSV input.
+ * Identity is checked before opening output, including hard links/symlinks.
+ * On Windows file IDs are checked rather than relying on path spelling. */
+static int batch_is_same_existing_file(const char *input, const char *output)
+{
+    if (input == NULL || output == NULL) return 0;
+    while (input[0] == '.' && (input[1] == '/' || input[1] == '\\'))
+        input += 2;
+    while (output[0] == '.' && (output[1] == '/' || output[1] == '\\'))
+        output += 2;
+#ifdef _WIN32
+    if (_stricmp(input, output) == 0) return 1;
+#else
+    if (strcmp(input, output) == 0) return 1;
+#endif
+#ifdef _WIN32
+    HANDLE first=CreateFileA(input,FILE_READ_ATTRIBUTES,
+        FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
+        NULL,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS,NULL);
+    HANDLE second=CreateFileA(output,FILE_READ_ATTRIBUTES,
+        FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
+        NULL,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS,NULL);
+    int same=0;
+    BY_HANDLE_FILE_INFORMATION a,b;
+    if(first!=INVALID_HANDLE_VALUE && second!=INVALID_HANDLE_VALUE &&
+       GetFileInformationByHandle(first,&a) &&
+       GetFileInformationByHandle(second,&b))
+        same=a.dwVolumeSerialNumber==b.dwVolumeSerialNumber &&
+             a.nFileIndexHigh==b.nFileIndexHigh &&
+             a.nFileIndexLow==b.nFileIndexLow;
+    if(first!=INVALID_HANDLE_VALUE) CloseHandle(first);
+    if(second!=INVALID_HANDLE_VALUE) CloseHandle(second);
+    return same;
+#else
+    struct stat a,b;
+    if(stat(input,&a)!=0 || stat(output,&b)!=0) return 0;
+    return a.st_dev==b.st_dev && a.st_ino==b.st_ino;
+#endif
+}
+
+/* Batch reports and diagnostics may not modify the persistent tables
+ * even when the input CSV is an unrelated file. */
+static int batch_safe_output_target(const char *path)
+{
+    if (path == NULL) return 1;
+    static const char *protected_data[] = {
+        "stock.txt", "monedas.txt", "historial.txt", "stock.txt.lock"
+    };
+    for (size_t i=0;i<sizeof(protected_data)/sizeof(protected_data[0]);++i)
+        if (batch_is_same_existing_file(path,protected_data[i]))
+            return 0;
+    return 1;
+}
+
 /* funcion batch_process_file: contiene la logica principal de esta operacion. */
 int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const char *rutaLog)
 {
@@ -187,10 +246,22 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
     /* if: comprueba rutaEntrada == NULL antes de ejecutar esta rama. */
     if (rutaEntrada == NULL)
         return 0;
+    if (!batch_safe_output_target(rutaSalida) ||
+        !batch_safe_output_target(rutaLog) ||
+        batch_is_same_existing_file(rutaEntrada, rutaSalida) ||
+        batch_is_same_existing_file(rutaEntrada, rutaLog) ||
+        batch_is_same_existing_file(rutaSalida, rutaLog))
+    {
+        fprintf(stderr, "Entrada, salida y registro deben usar archivos diferentes.\n");
+        return 0;
+    }
 
     /* if: comprueba rutaLog antes de ejecutar esta rama. */
-    if (rutaLog)
-        logger_init(rutaLog);
+    if (rutaLog && !logger_init(rutaLog))
+    {
+        fprintf(stderr, "No se pudo abrir el archivo de registro.\n");
+        return 0;
+    }
 
     in = fopen(rutaEntrada, "r");
     /* if: comprueba !in antes de ejecutar esta rama. */
@@ -399,8 +470,16 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
 int batch_process_stream(const char *rutaLog)
 {
     /* if: comprueba rutaLog antes de ejecutar esta rama. */
-    if (rutaLog)
-        logger_init(rutaLog);
+    if (!batch_safe_output_target(rutaLog))
+    {
+        fprintf(stderr, "Ruta de registro reservada para datos operativos.\n");
+        return 0;
+    }
+    if (rutaLog && !logger_init(rutaLog))
+    {
+        fprintf(stderr, "No se pudo abrir el archivo de registro.\n");
+        return 0;
+    }
 
     /* Cabecera CSV de salida */
     write_csv_header(stdout);
