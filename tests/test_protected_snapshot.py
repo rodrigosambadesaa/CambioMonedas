@@ -34,6 +34,22 @@ def main():
         p=subprocess.run([str(executable), "snapshot", str(backup)],
                          cwd=d, capture_output=True, timeout=20)
         assert p.returncode==0 and backup.read_bytes()==data
+        # Atomic replacement: an existing valid backup must remain intact if
+        # the source becomes unreadable/missing midway through a new backup.
+        live = d / "stock.txt"
+        live.rename(d / "stock-disabled.txt")
+        p = subprocess.run([str(executable), "snapshot", str(backup)],
+                           cwd=d, capture_output=True, timeout=20)
+        assert p.returncode != 0, (p.returncode, p.stderr)
+        assert backup.read_bytes() == data, "existing backup destroyed by failed copy"
+        (d / "stock-disabled.txt").rename(live)
+        assert not list(d.glob("backup.txt.tmp.*")), "orphan staging files"
+        newer=b"euro\\n9\\n11\\n"
+        live.write_bytes(newer)
+        p=subprocess.run([str(executable), "snapshot", str(backup)],
+                         cwd=d, capture_output=True, timeout=20)
+        assert p.returncode==0 and backup.read_bytes()==newer
+        assert not list(d.glob("backup.txt.tmp.*")), "orphan staging after atomic update"
         print("PASS: snapshot source protected against same path, relative aliases and hardlinks")
 
 if __name__ == "__main__":
