@@ -1,6 +1,7 @@
 #include "algoritmo_cambio.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 #define DP_MONTO_MAX ((size_t)50000)
 #define DP_NO_APLICA (-1)
