@@ -204,6 +204,11 @@ int main(int argc, char **argv)
     /* if: comprueba export_stock_json_path antes de ejecutar esta rama. */
     if (export_stock_json_path)
     {
+        if (!destino_exportacion_seguro(export_stock_json_path))
+        {
+            fprintf(stderr, "Destino de exportacion reservado para archivos operativos.\n");
+            return 2;
+        }
         /* if: comprueba export_stock_json(export_stock_json_path) antes de ejecutar esta rama. */
         if (export_stock_json(export_stock_json_path))
         {

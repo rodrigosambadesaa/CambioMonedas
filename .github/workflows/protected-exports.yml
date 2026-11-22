@@ -1,0 +1,34 @@
+name: C exports preserve operational files
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  protected-paths:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v5
+      - name: Compile C CLI and backup test harness
+        run: |
+          gcc -std=c2x -Wall -Wextra -Wpedantic -Werror -O1 -g \
+            -fsanitize=address,undefined -fno-omit-frame-pointer \
+            main.c app_console.c server_http.c vector_dinamico.c moneda_gestion.c \
+            bigint.c algoritmo_cambio.c csv_io.c logger.c json_io.c batch_cli.c \
+            exchange_api.c gui_launcher.c progvoraz_locale.c -o /tmp/progvoraz-export-safe
+          gcc -std=c2x -Wall -Wextra -Wpedantic -Werror -O1 -g \
+            -fsanitize=address,undefined -fno-omit-frame-pointer -I. \
+            tests/snapshot_cli.c moneda_gestion.c bigint.c vector_dinamico.c \
+            -o /tmp/progvoraz-snapshot-safe
+      - name: Test CLI reports and JSON
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1
+        run: python3 tests/test_protected_exports.py /tmp/progvoraz-export-safe
+      - name: Test backup C function including aliases
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1
+        run: python3 tests/test_protected_snapshot.py /tmp/progvoraz-snapshot-safe

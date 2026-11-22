@@ -12,6 +12,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <stdint.h>
+#ifndef _WIN32
+#include <sys/stat.h>
+#endif
 #ifdef _WIN32
 #include <io.h>
 #include <windows.h>
@@ -605,11 +609,91 @@ static int cargar_claves_monedas_archivo(const char *archivo,
                                          size_t max_claves,
                                          size_t *cantidad);
 
+/* A report/backup destination must never replace the live ledger, the
+ * currency table, history or sidecar interprocess lock. Resolve existing
+ * aliases by file identity, not merely the path spelling. */
+int destino_exportacion_seguro(const char *ruta)
+{
+    static const char *protected_paths[] = {
+        "stock.txt", "monedas.txt", "historial.txt", "stock.txt.lock"
+    };
+    if (ruta == NULL || ruta[0] == '\0') return 0;
+    for (size_t i = 0; i < sizeof(protected_paths)/sizeof(protected_paths[0]); ++i)
+    {
+        const char *known=protected_paths[i];
+        if (strcmp(ruta,known)==0) return 0;
+#ifdef _WIN32
+        HANDLE a=CreateFileA(ruta,FILE_READ_ATTRIBUTES,
+            FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
+            NULL,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS,NULL);
+        HANDLE b=CreateFileA(known,FILE_READ_ATTRIBUTES,
+            FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
+            NULL,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS,NULL);
+        BY_HANDLE_FILE_INFORMATION ia,ib;
+        int same=0;
+        if(a!=INVALID_HANDLE_VALUE && b!=INVALID_HANDLE_VALUE &&
+           GetFileInformationByHandle(a,&ia) &&
+           GetFileInformationByHandle(b,&ib))
+            same=ia.dwVolumeSerialNumber==ib.dwVolumeSerialNumber &&
+                 ia.nFileIndexHigh==ib.nFileIndexHigh &&
+                 ia.nFileIndexLow==ib.nFileIndexLow;
+        if(a!=INVALID_HANDLE_VALUE) CloseHandle(a);
+        if(b!=INVALID_HANDLE_VALUE) CloseHandle(b);
+        if(same) return 0;
+#else
+        struct stat a,b;
+        if(stat(ruta,&a)==0 && stat(known,&b)==0 &&
+           a.st_dev==b.st_dev && a.st_ino==b.st_ino)
+            return 0;
+#endif
+    }
+    return 1;
+}
+
 /* funcion crear_snapshot_stock: contiene la logica principal de esta operacion. */
 int crear_snapshot_stock(const char *rutaSnapshot)
 {
     const char *ruta = ruta_o_default(rutaSnapshot, "stock_snapshot.txt");
-    return copiar_archivo_binario("stock.txt", ruta);
+    int ok = 0;
+    if (!destino_exportacion_seguro(ruta)) return 0;
+
+#ifdef _WIN32
+    char staging[MAX_PATH] = {0};
+    char directory[MAX_PATH] = ".";
+    const char *slash = strrchr(ruta, '/');
+    const char *backslash = strrchr(ruta, '\\');
+    if (backslash && (!slash || backslash > slash)) slash = backslash;
+    if (slash)
+    {
+        size_t len = (size_t)(slash - ruta);
+        if (len == 0 || len >= sizeof(directory)) return 0;
+        memcpy(directory, ruta, len);
+        directory[len] = '\0';
+    }
+    if (!GetTempFileNameA(directory, "snp", 0, staging)) return 0;
+    if (copiar_archivo_binario("stock.txt", staging) &&
+        MoveFileExA(staging, ruta,
+                    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+        ok = 1;
+    if (!ok) remove(staging);
+#else
+    size_t len = strlen(ruta);
+    if (len > SIZE_MAX - 12) return 0;
+    char *staging = (char *)malloc(len + 12);
+    if (staging == NULL) return 0;
+    snprintf(staging, len + 12, "%s.tmp.XXXXXX", ruta);
+    int fd = mkstemp(staging);
+    if (fd >= 0)
+    {
+        close(fd);
+        if (copiar_archivo_binario("stock.txt", staging) &&
+            rename(staging, ruta) == 0)
+            ok = 1;
+        if (!ok) remove(staging);
+    }
+    free(staging);
+#endif
+    return ok;
 }
 
 /* Restore must use the very same interprocess lock and atomic-swap
@@ -757,6 +841,7 @@ static int cargar_claves_monedas_archivo(const char *archivo,
 int exportar_reporte_global(const char *rutaReporte)
 {
     const char *ruta = ruta_o_default(rutaReporte, "reporte_global.txt");
+    if (!destino_exportacion_seguro(ruta)) return 0;
     FILE *fp = NULL;
     char monedas[128][MAX_TOKEN];
     size_t cantidad_monedas = 0;

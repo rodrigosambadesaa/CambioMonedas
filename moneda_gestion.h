@@ -52,4 +52,7 @@ int restaurar_snapshot_stock(const char *rutaSnapshot);
  */
 int exportar_reporte_global(const char *rutaReporte);
 
+/* Reject destination aliases of operational data, including hardlinks. */
+int destino_exportacion_seguro(const char *ruta);
+
 #endif
