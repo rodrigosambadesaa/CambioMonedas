@@ -54,11 +54,26 @@ static int parse_coin_range(const char *text, size_t *minimum, size_t *maximum)
     *maximum = (size_t)-1;
     if (!text || !*text) return 1;
     const char *end = text + strlen(text);
+    if (text[0] == '=')
+    {
+        if (!range_decimal(text + 1, end, minimum)) return 0;
+        *maximum = *minimum;
+        return 1;
+    }
     const char *dash = strchr(text, '-');
     if (!dash) return range_decimal(text, end, maximum);
     return range_decimal(text, dash, minimum) &&
            range_decimal(dash + 1, end, maximum) &&
            *minimum <= *maximum;
+}
+
+/* CSV inputs must never silently turn a typo into a stock operation. */
+static int valid_batch_mode(const char *text)
+{
+    if (text == NULL || *text == '\0') return 1;
+    if (text[1] != '\0') return 0;
+    int mode = tolower((unsigned char)text[0]);
+    return mode == 'a' || mode == 'b' || mode == 'c';
 }
 
 static const char *batch_note_invalid_range(void)
@@ -231,7 +246,7 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
                 }
             }
 
-            char modo = cols[0] && cols[0][0] ? cols[0][0] : 'a';
+            char modo = cols[0] && cols[0][0] ? (char)tolower((unsigned char)cols[0][0]) : 'a';
             char *moneda = cols[1] ? cols[1] : "";
             char *monto_txt = cols[2] ? cols[2] : "0";
             size_t min_m = 0, max_m = (size_t)-1;
@@ -256,6 +271,13 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
             }
 
             /* Normal flow: cargar denominaciones (y stock si modo b/c). */
+            if (!valid_batch_mode(cols[0]))
+            {
+                const char *row[] = {"", "", monto_txt, "ERROR", progvoraz_tr("modo invalido", "invalid mode")};
+                csv_write_row(out, row, 5);
+                free(linea);
+                continue;
+            }
             if (!parse_coin_range(cols[3], &min_m, &max_m))
             {
                 const char *row[] = {"", "", monto_txt, "ERROR", batch_note_invalid_range()};
@@ -408,7 +430,7 @@ int batch_process_stream(const char *rutaLog)
             }
         }
 
-        char modo = cols[0] && cols[0][0] ? cols[0][0] : 'a';
+        char modo = cols[0] && cols[0][0] ? (char)tolower((unsigned char)cols[0][0]) : 'a';
         char *moneda = cols[1] ? cols[1] : "";
         char *monto_txt = cols[2] ? cols[2] : "0";
         size_t min_m = 0, max_m = (size_t)-1;
@@ -431,6 +453,13 @@ int batch_process_stream(const char *rutaLog)
             }
         }
 
+        if (!valid_batch_mode(cols[0]))
+        {
+            const char *row[] = {"", "", monto_txt, "ERROR", progvoraz_tr("modo invalido", "invalid mode")};
+            csv_write_row(stdout, row, 5);
+            free(linea);
+            continue;
+        }
         if (!parse_coin_range(cols[3], &min_m, &max_m))
         {
             const char *row[] = {"", "", monto_txt, "ERROR", batch_note_invalid_range()};
