@@ -1,0 +1,17 @@
+name: C HTTP Content-Length header contract
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  headers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Compile with memory and undefined behavior sanitizers
+        run: make debug-sanitize
+      - name: Test Content-Length header boundaries and malformed requests
+        run: python3 tests/test_http_content_length.py ./progvoraz
