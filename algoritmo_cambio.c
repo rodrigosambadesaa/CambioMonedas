@@ -1892,6 +1892,64 @@ int calcular_cambio_optimo_stock_con_rango(const BigInt *monto,
     return 0;
 }
 
+/*
+ * One-denomination nearest change is solvable exactly with arbitrary-size
+ * integers. This route prevents the large-amount fallback from ignoring
+ * min/max coin limits or rejecting legitimate partial coverage.
+ */
+static int calcular_cercano_una_denominacion_bigint(
+    const BigInt *monto, const BigIntArray *denom, const BigIntArray *stock,
+    size_t min_monedas, size_t max_monedas,
+    BigInt *monto_cubierto, BigIntArray *solucion)
+{
+    BigInt cantidad = {0}, resto = {0}, minimo = {0};
+    BigInt maximo = {0}, cubierto = {0};
+    int ok = 0;
+
+    if (!monto || !denom || !denom->items || denom->len != 1 ||
+        !denom->items[0].digits || bigint_is_zero(&denom->items[0]) ||
+        !monto_cubierto || !solucion ||
+        (stock && (!stock->items || stock->len != 1)))
+        return 0;
+
+    if (!bigint_divmod(monto, &denom->items[0], &cantidad, &resto))
+        goto cleanup;
+    if (stock && bigint_compare(&cantidad, &stock->items[0]) > 0 &&
+        !bigint_set(&cantidad, &stock->items[0]))
+        goto cleanup;
+    if (max_monedas != (size_t)-1)
+    {
+        if (!size_a_bigint(max_monedas, &maximo))
+            goto cleanup;
+        if (bigint_compare(&cantidad, &maximo) > 0 &&
+            !bigint_set(&cantidad, &maximo))
+            goto cleanup;
+    }
+    if (!size_a_bigint(min_monedas, &minimo) ||
+        bigint_is_zero(&cantidad) ||
+        bigint_compare(&cantidad, &minimo) < 0 ||
+        !bigint_multiply(&cantidad, &denom->items[0], &cubierto))
+        goto cleanup;
+
+    if (!bigint_array_create(solucion, 1))
+        goto cleanup;
+    if (!bigint_array_set(solucion, 0, &cantidad) ||
+        !bigint_set(monto_cubierto, &cubierto))
+    {
+        bigint_array_free(solucion);
+        goto cleanup;
+    }
+    ok = 1;
+
+cleanup:
+    bigint_free(&cantidad);
+    bigint_free(&resto);
+    bigint_free(&minimo);
+    bigint_free(&maximo);
+    bigint_free(&cubierto);
+    return ok;
+}
+
 /* funcion calcular_cambio_cercano_con_rango: contiene la logica principal de esta operacion. */
 int calcular_cambio_cercano_con_rango(const BigInt *monto,
                                       const BigIntArray *denominaciones,
@@ -1909,6 +1967,15 @@ int calcular_cambio_cercano_con_rango(const BigInt *monto,
     /* if: comprueba min_monedas > max_monedas antes de ejecutar esta rama. */
     if (min_monedas > max_monedas)
         return 0;
+
+    if (denominaciones->len == 1)
+    {
+        size_t small_amount = 0;
+        if (!bigint_a_size_limitado(monto, DP_MONTO_MAX, &small_amount))
+            return calcular_cercano_una_denominacion_bigint(
+                monto, denominaciones, NULL, min_monedas, max_monedas,
+                monto_cubierto, solucion);
+    }
 
     dp = calcular_dp_ilimitado_cercano_rango(monto, denominaciones, min_monedas, max_monedas, &cubierto_size, solucion);
     /* if: comprueba dp != DP_NO_APLICA antes de ejecutar esta rama. */
@@ -1955,6 +2022,15 @@ int calcular_cambio_cercano_stock_con_rango(const BigInt *monto,
     /* if: comprueba min_monedas > max_monedas antes de ejecutar esta rama. */
     if (min_monedas > max_monedas)
         return 0;
+
+    if (denominaciones->len == 1)
+    {
+        size_t small_amount = 0;
+        if (!bigint_a_size_limitado(monto, DP_MONTO_MAX, &small_amount))
+            return calcular_cercano_una_denominacion_bigint(
+                monto, denominaciones, stock, min_monedas, max_monedas,
+                monto_cubierto, solucion);
+    }
 
     dp = calcular_dp_stock_cercano_rango(monto, denominaciones, stock, min_monedas, max_monedas, &cubierto_size, solucion);
     /* if: comprueba dp != DP_NO_APLICA antes de ejecutar esta rama. */
