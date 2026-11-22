@@ -1411,6 +1411,83 @@ static int copiar_bigint(BigInt *dest, const BigInt *src)
     return bigint_init(dest, src->digits);
 }
 
+/*
+ * Closest amount with two unlimited positive denominations <=50,000.
+ * Let a>b and g=gcd(a,b). Every minimum-piece representation can use
+ * fewer than a/g coins of value b: a/g small coins can always be replaced
+ * with b/g large coins of equal value and strictly fewer total pieces.
+ * For each such count y, take x=floor((amount-b*y)/a). The residual amount
+ * is <a and can be compared using size_t without truncating BigInt.
+ * Thus at most 50,000 integer iterations and a handful of BigInt operations
+ * prove both maximum reachable coverage and minimum piece count.
+ * Return -1 when outside this proven special case, 0 on runtime failure.
+ */
+static int cercano_dos_denominaciones_bigint(const BigInt *monto,
+        const BigIntArray *denom, BigInt *monto_cubierto, BigIntArray *solucion)
+{
+    size_t d[2], high, low, a, b, g, max_y, cap, clipped = 0;
+    size_t remaining_mod = 0, best_rem = SIZE_MAX, best_y = 0;
+    BigInt large = {0}, big_q = {0}, big_r = {0};
+    BigInt paid = {0}, left = {0}, high_count = {0}, residual = {0};
+    BigInt partial = {0}, low_count = {0};
+    int outcome = 0;
+    if (!monto || !monto->digits || !denom || !denom->items ||
+        denom->len != 2 || !monto_cubierto || !solucion)
+        return -1;
+    if (!bigint_a_size_limitado(&denom->items[0],50000,&d[0]) ||
+        !bigint_a_size_limitado(&denom->items[1],50000,&d[1]) ||
+        d[0] == 0 || d[1] == 0 || d[0] == d[1]) return -1;
+
+    high = d[0] > d[1] ? 0 : 1;
+    low = 1-high;
+    a = d[high];
+    b = d[low];
+    g = a;
+    { size_t t=b;
+      while (t != 0) { size_t r=g%t;g=t;t=r; }
+    }
+    max_y = a/g;
+    if (b != 0 && max_y-1 > SIZE_MAX/b) return -1;
+    cap = (max_y-1)*b;
+    if (!bigint_a_size_con_tope(monto,cap,&clipped) ||
+        !size_a_bigint(a,&large) ||
+        !bigint_divmod(monto,&large,&big_q,&big_r) ||
+        !bigint_a_size_limitado(&big_r,a-1,&remaining_mod))
+        goto cleanup;
+
+    for (size_t y=0; y<max_y; ++y)
+    {
+        size_t y_value=y*b;
+        if (y_value>clipped) break;
+        size_t rem=(remaining_mod+a-(y_value%a))%a;
+        if (rem<best_rem) {best_rem=rem;best_y=y;}
+    }
+    if (best_rem==SIZE_MAX) goto cleanup;
+    if (!size_a_bigint(best_y*b,&paid) ||
+        !bigint_subtract(monto,&paid,&left) ||
+        !bigint_divmod(&left,&large,&high_count,&residual) ||
+        !bigint_subtract(monto,&residual,&partial) ||
+        !size_a_bigint(best_y,&low_count))
+        goto cleanup;
+    if (bigint_is_zero(&partial)) goto cleanup;
+
+    if (!bigint_array_create(solucion,2)) goto cleanup;
+    if (!bigint_array_set(solucion,high,&high_count) ||
+        !bigint_array_set(solucion,low,&low_count) ||
+        !copiar_bigint(monto_cubierto,&partial))
+    {
+        bigint_array_free(solucion);
+        goto cleanup;
+    }
+    outcome = 1;
+
+cleanup:
+    bigint_free(&large);bigint_free(&big_q);bigint_free(&big_r);
+    bigint_free(&paid);bigint_free(&left);bigint_free(&high_count);
+    bigint_free(&residual);bigint_free(&partial);bigint_free(&low_count);
+    return outcome;
+}
+
 /* funcion construir_sufijos_stock: contiene la logica principal de esta operacion. */
 static int construir_sufijos_stock(const BigIntArray *denom,
                                    const BigIntArray *stock,
@@ -1975,6 +2052,18 @@ int calcular_cambio_cercano_con_rango(const BigInt *monto,
             return calcular_cercano_una_denominacion_bigint(
                 monto, denominaciones, NULL, min_monedas, max_monedas,
                 monto_cubierto, solucion);
+    }
+
+    if (denominaciones->len == 2 && min_monedas == 0 &&
+        max_monedas == SIZE_MAX)
+    {
+        size_t small_amount=0;
+        if (!bigint_a_size_limitado(monto,DP_MONTO_MAX,&small_amount))
+        {
+            int two=cercano_dos_denominaciones_bigint(monto,denominaciones,
+                                                      monto_cubierto,solucion);
+            if (two>=0) return two;
+        }
     }
 
     dp = calcular_dp_ilimitado_cercano_rango(monto, denominaciones, min_monedas, max_monedas, &cubierto_size, solucion);

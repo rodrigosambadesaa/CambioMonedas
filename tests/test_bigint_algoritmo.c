@@ -389,8 +389,34 @@ static void test_cercano_bigint_un_tipo(void)
     bigint_free(&monto); bigint_array_free(&denom); bigint_array_free(&stock);
 }
 
+static void test_cercano_bigint_dos_tipos(void)
+{
+    const char *d[]={"50000","30000"};
+    const char *first[]={"1","0"};
+    const char *second[]={"11","2"};
+    BigIntArray denom={0},solucion={0};
+    BigInt monto={0},cubierto={0};
+
+    check_int(crear_arreglo(&denom,d,2),"cercano dos denom inicializadas");
+    check_int(bigint_init(&monto,"50001"),"cercano dos monto fuera DP");
+    check_int(calcular_cambio_cercano_con_rango(&monto,&denom,0,
+        SIZE_MAX,&cubierto,&solucion),"cercano dos cubre parcial grande");
+    check_bigint_texto(&cubierto,"50000","cercano dos monto correcto");
+    check_arreglo_texto(&solucion,first,2,"cercano dos piezas minimas");
+    bigint_array_free(&solucion);bigint_free(&cubierto);bigint_free(&monto);
+
+    check_int(bigint_init(&monto,"610001"),"cercano dos monto no canonico");
+    check_int(calcular_cambio_cercano_con_rango(&monto,&denom,0,
+        SIZE_MAX,&cubierto,&solucion),"cercano dos soluciona no canonico");
+    check_bigint_texto(&cubierto,"610000","cercano dos mejor monto mixto");
+    check_arreglo_texto(&solucion,second,2,"cercano dos usa minimo de piezas");
+    bigint_array_free(&solucion);bigint_free(&cubierto);bigint_free(&monto);
+    bigint_array_free(&denom);
+}
+
 int main(void)
 {
+    test_cercano_bigint_dos_tipos();
     test_cercano_bigint_un_tipo();
     test_bigint_basico();
     test_cambio_no_canonico_ilimitado();
