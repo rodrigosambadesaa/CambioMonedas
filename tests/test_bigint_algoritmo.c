@@ -447,8 +447,43 @@ static void test_cercano_bigint_dos_tipos(void)
     bigint_array_free(&denom);
 }
 
+static void test_cercano_bigint_dos_tipos_stock_mas_512(void)
+{
+    const char *coins[]={"50000","29999"};
+    const char *s1[]={"1000","1000"},*s2[]={"1","513"},*s3[]={"0","513"};
+    const char *e1[]={"10","0"},*e2[]={"1","15"},*e3[]={"0","16"};
+    BigInt amount={0},covered={0};
+    BigIntArray denom={0},stock={0},answer={0};
+
+    check_int(bigint_init(&amount,"500001"),"dos tipos stock monto > limite DP");
+    check_int(crear_arreglo(&denom,coins,2),"dos tipos stock denominaciones");
+    check_int(crear_arreglo(&stock,s1,2),"dos tipos stock 2000 unidades");
+    check_int(calcular_cambio_cercano_stock_con_rango(&amount,&denom,&stock,
+        0,SIZE_MAX,&covered,&answer),"stock >512 closest");
+    check_bigint_texto(&covered,"500000","stock >512 importe correcto");
+    check_arreglo_texto(&answer,e1,2,"stock >512 cuenta minima");
+    bigint_array_free(&answer);bigint_array_free(&stock);bigint_free(&covered);
+
+    check_int(crear_arreglo(&stock,s2,2),"moneda mayor limitada stock");
+    check_int(calcular_cambio_cercano_stock_con_rango(&amount,&denom,&stock,
+        0,SIZE_MAX,&covered,&answer),"stock >512 mayor limitada");
+    check_bigint_texto(&covered,"499985","stock mayor limitada importe correcto");
+    check_arreglo_texto(&answer,e2,2,"stock mayor limitada cuenta minima");
+    bigint_array_free(&answer);bigint_array_free(&stock);bigint_free(&covered);
+
+    check_int(crear_arreglo(&stock,s3,2),"moneda mayor agotada stock");
+    check_int(calcular_cambio_cercano_stock_con_rango(&amount,&denom,&stock,
+        0,SIZE_MAX,&covered,&answer),"stock >512 mayor agotada");
+    check_bigint_texto(&covered,"479984","stock mayor agotada importe correcto");
+    check_arreglo_texto(&answer,e3,2,"stock mayor agotada cuenta minima");
+    bigint_array_free(&answer);bigint_array_free(&stock);bigint_free(&covered);
+
+    bigint_array_free(&denom);bigint_free(&amount);
+}
+
 int main(void)
 {
+    test_cercano_bigint_dos_tipos_stock_mas_512();
     test_cercano_bigint_dos_tipos();
     test_cercano_bigint_un_tipo();
     test_bigint_rango_exacto_un_tipo();
