@@ -1,0 +1,29 @@
+name: C strict batch CSV contract
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  csv:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build C CLI with ASan and UBSan
+        run: |
+          gcc -std=c2x -O1 -g -Wall -Wextra -Wpedantic \
+            -fsanitize=address,undefined -fno-omit-frame-pointer \
+            main.c app_console.c server_http.c vector_dinamico.c moneda_gestion.c \
+            bigint.c algoritmo_cambio.c csv_io.c logger.c json_io.c batch_cli.c \
+            exchange_api.c gui_launcher.c progvoraz_locale.c \
+            -fsanitize=address,undefined -o /tmp/progvoraz-batch
+      - name: Check CSV validation under sanitizers
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: python tests/test_batch_validation.py /tmp/progvoraz-batch
