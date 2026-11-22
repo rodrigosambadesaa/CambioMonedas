@@ -208,6 +208,20 @@ static int batch_is_same_existing_file(const char *input, const char *output)
 #endif
 }
 
+/* Batch reports and diagnostics may not modify the persistent tables
+ * even when the input CSV is an unrelated file. */
+static int batch_safe_output_target(const char *path)
+{
+    if (path == NULL) return 1;
+    static const char *protected_data[] = {
+        "stock.txt", "monedas.txt", "historial.txt", "stock.txt.lock"
+    };
+    for (size_t i=0;i<sizeof(protected_data)/sizeof(protected_data[0]);++i)
+        if (batch_is_same_existing_file(path,protected_data[i]))
+            return 0;
+    return 1;
+}
+
 /* funcion batch_process_file: contiene la logica principal de esta operacion. */
 int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const char *rutaLog)
 {
@@ -217,7 +231,9 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
     /* if: comprueba rutaEntrada == NULL antes de ejecutar esta rama. */
     if (rutaEntrada == NULL)
         return 0;
-    if (batch_is_same_existing_file(rutaEntrada, rutaSalida) ||
+    if (!batch_safe_output_target(rutaSalida) ||
+        !batch_safe_output_target(rutaLog) ||
+        batch_is_same_existing_file(rutaEntrada, rutaSalida) ||
         batch_is_same_existing_file(rutaEntrada, rutaLog) ||
         batch_is_same_existing_file(rutaSalida, rutaLog))
     {
@@ -429,6 +445,11 @@ int batch_process_file(const char *rutaEntrada, const char *rutaSalida, const ch
 int batch_process_stream(const char *rutaLog)
 {
     /* if: comprueba rutaLog antes de ejecutar esta rama. */
+    if (!batch_safe_output_target(rutaLog))
+    {
+        fprintf(stderr, "Ruta de registro reservada para datos operativos.\n");
+        return 0;
+    }
     if (rutaLog)
         logger_init(rutaLog);
 
