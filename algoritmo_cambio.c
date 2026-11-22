@@ -1880,6 +1880,29 @@ int calcular_cambio_optimo_con_limite(const BigInt *monto, const BigIntArray *de
     return calcular_cambio_optimo_con_rango(monto, denominaciones, 0, limite_monedas, solucion);
 }
 
+static int calcular_cercano_una_denominacion_bigint(
+    const BigInt *monto, const BigIntArray *denom, const BigIntArray *stock,
+    size_t min_monedas, size_t max_monedas,
+    BigInt *monto_cubierto, BigIntArray *solucion);
+
+/* A single denomination permits an exact large-range decision in constant
+ * auxiliary space, unlike the general BigInt fallback with min>0. */
+static int calcular_exacto_una_denominacion_bigint(
+    const BigInt *monto, const BigIntArray *denom, const BigIntArray *stock,
+    size_t min_monedas, size_t max_monedas, BigIntArray *solucion)
+{
+    BigInt cubierto = {0};
+    int ok = calcular_cercano_una_denominacion_bigint(
+        monto, denom, stock, min_monedas, max_monedas, &cubierto, solucion);
+    if (ok && bigint_compare(&cubierto, monto) != 0)
+    {
+        bigint_array_free(solucion);
+        ok = 0;
+    }
+    bigint_free(&cubierto);
+    return ok;
+}
+
 /* funcion calcular_cambio_optimo_con_rango: contiene la logica principal de esta operacion. */
 int calcular_cambio_optimo_con_rango(const BigInt *monto,
                                      const BigIntArray *denominaciones,
@@ -1895,6 +1918,14 @@ int calcular_cambio_optimo_con_rango(const BigInt *monto,
     /* if: comprueba min_monedas > max_monedas antes de ejecutar esta rama. */
     if (min_monedas > max_monedas)
         return 0;
+
+    if (denominaciones->len == 1)
+    {
+        size_t small = 0;
+        if (!bigint_a_size_limitado(monto, DP_MONTO_MAX, &small))
+            return calcular_exacto_una_denominacion_bigint(
+                monto, denominaciones, NULL, min_monedas, max_monedas, solucion);
+    }
 
     dp = calcular_dp_ilimitado_rango(monto, denominaciones, min_monedas, max_monedas, solucion);
     /* if: comprueba dp != DP_NO_APLICA antes de ejecutar esta rama. */
@@ -1944,6 +1975,14 @@ int calcular_cambio_optimo_stock_con_rango(const BigInt *monto,
     /* if: comprueba min_monedas > max_monedas antes de ejecutar esta rama. */
     if (min_monedas > max_monedas)
         return 0;
+
+    if (denominaciones->len == 1)
+    {
+        size_t small = 0;
+        if (!bigint_a_size_limitado(monto, DP_MONTO_MAX, &small))
+            return calcular_exacto_una_denominacion_bigint(
+                monto, denominaciones, stock, min_monedas, max_monedas, solucion);
+    }
 
     dp = calcular_dp_stock_rango(monto, denominaciones, stock, min_monedas, max_monedas, solucion);
     /* if: comprueba dp != DP_NO_APLICA antes de ejecutar esta rama. */
