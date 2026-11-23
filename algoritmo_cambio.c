@@ -2421,6 +2421,95 @@ cleanup:
     return ok;
 }
 
+/*
+ * Certified nearest change with at most two pieces. O(n^2) denomination
+ * combinations and no allocation proportional to the requested BigInt.
+ * For equal covered sums, one coin wins over two coins.
+ */
+static int calcular_cercano_hasta_dos_bigint(
+    const BigInt *monto, const BigIntArray *denom, const BigIntArray *stock,
+    size_t minimo, BigInt *cubierto, BigIntArray *solucion)
+{
+    BigInt cero={0},uno={0},dos={0},mejor={0};
+    size_t i,j,primero,segundo;
+    int ok=0,creado=0;
+    if (!monto || !monto->digits || !denom || !denom->items ||
+        !denom->len || denom->len>256 || !cubierto || !solucion ||
+        minimo>2 || (stock && (!stock->items || stock->len!=denom->len)))
+        return 0;
+    primero=segundo=denom->len;
+    if (!bigint_init(&cero,"0") || !bigint_init(&uno,"1") ||
+        !bigint_init(&dos,"2") || !bigint_init(&mejor,"0"))
+        goto fin;
+
+    if (minimo<=1)
+    {
+        for (i=0;i<denom->len;++i)
+        {
+            if (!denom->items[i].digits ||
+                bigint_is_zero(&denom->items[i]) ||
+                (stock && (!stock->items[i].digits ||
+                  bigint_compare(&stock->items[i],&uno)<0)) ||
+                bigint_compare(&denom->items[i],monto)>0 ||
+                bigint_compare(&denom->items[i],&mejor)<=0)
+                continue;
+            if (!bigint_set(&mejor,&denom->items[i])) goto fin;
+            primero=i;segundo=denom->len;
+        }
+    }
+
+    for (i=0;i<denom->len;++i)
+    {
+        if (!denom->items[i].digits ||
+            bigint_is_zero(&denom->items[i]) ||
+            (stock && (!stock->items[i].digits ||
+              bigint_compare(&stock->items[i],&uno)<0)))
+            continue;
+        for (j=i;j<denom->len;++j)
+        {
+            BigInt suma={0};
+            if (!denom->items[j].digits ||
+                bigint_is_zero(&denom->items[j]) ||
+                (stock && (!stock->items[j].digits ||
+                    bigint_compare(&stock->items[j],i==j?&dos:&uno)<0)))
+                continue;
+            if (!bigint_add(&denom->items[i],&denom->items[j],&suma))
+                goto fin;
+            if (bigint_compare(&suma,monto)<=0 &&
+                bigint_compare(&suma,&mejor)>0)
+            {
+                if (!bigint_set(&mejor,&suma))
+                {
+                    bigint_free(&suma);
+                    goto fin;
+                }
+                primero=i;segundo=j;
+            }
+            bigint_free(&suma);
+        }
+    }
+
+    if (primero==denom->len || !bigint_array_create(solucion,denom->len))
+        goto fin;
+    creado=1;
+    for (i=0;i<denom->len;++i)
+    {
+        const BigInt *cantidad=(i==primero && i==segundo)?&dos:
+            (i==primero || i==segundo)?&uno:&cero;
+        if (!bigint_array_set(solucion,i,cantidad))
+            goto fin;
+    }
+    if (!bigint_set(cubierto,&mejor)) goto fin;
+    ok=1;
+fin:
+    if (!ok && creado) bigint_array_free(solucion);
+    bigint_free(&cero);
+    bigint_free(&uno);
+    bigint_free(&dos);
+    bigint_free(&mejor);
+    return ok;
+}
+
 /* funcion calcular_cambio_cercano_con_rango: contiene la logica principal de esta operacion. */
 int calcular_cambio_cercano_con_rango(const BigInt *monto,
                                       const BigIntArray *denominaciones,
@@ -2441,6 +2530,10 @@ int calcular_cambio_cercano_con_rango(const BigInt *monto,
 
     if (min_monedas <= 1 && max_monedas == 1)
         return calcular_cambio_una_moneda(monto,denominaciones,NULL,1,monto_cubierto,solucion);
+
+    if (max_monedas==2 && denominaciones->len<=256)
+        return calcular_cercano_hasta_dos_bigint(monto,denominaciones,NULL,
+                                                min_monedas,monto_cubierto,solucion);
 
     if (denominaciones->len == 1)
     {
@@ -2518,6 +2611,10 @@ int calcular_cambio_cercano_stock_con_rango(const BigInt *monto,
 
     if (min_monedas <= 1 && max_monedas == 1)
         return calcular_cambio_una_moneda(monto,denominaciones,stock,1,monto_cubierto,solucion);
+
+    if (max_monedas==2 && denominaciones->len<=256)
+        return calcular_cercano_hasta_dos_bigint(monto,denominaciones,stock,
+                                                min_monedas,monto_cubierto,solucion);
 
     if (denominaciones->len == 1)
     {
