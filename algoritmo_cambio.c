@@ -1421,6 +1421,60 @@ static int copiar_bigint(BigInt *dest, const BigInt *src)
 }
 
 /*
+ * For y small coins in a fixed residue class, the largest-coin count x
+ * can be decreased by b/g while y grows by a/g, without changing
+ * the covered amount. Each step increases the piece count by (a-b)/g.
+ * Determine the minimum number of such steps needed to satisfy a
+ * lower piece-count bound; all arithmetic that may exceed size_t is BigInt.
+ * Returns 1 when feasible, 0 when impossible in this class, -1 on error.
+ */
+static int pasos_residuo_minimo(const BigInt *quotient, size_t high_loss,
+        size_t y, size_t minimum, size_t high_step, size_t delta,
+        size_t *out_steps)
+{
+    BigInt loss={0},x={0},small={0},total={0},bound={0};
+    BigInt deficit={0},steps_big={0},step_big={0},needed={0};
+    size_t missing=0,steps=0;
+    int rc=-1;
+    if (!out_steps || !delta || !quotient || !quotient->digits)
+        return -1;
+    if (minimum==0) { *out_steps=0; return 1; }
+    if (!size_a_bigint(high_loss,&loss) ||
+        !bigint_subtract(quotient,&loss,&x) ||
+        !size_a_bigint(y,&small) ||
+        !bigint_add(&x,&small,&total) ||
+        !size_a_bigint(minimum,&bound))
+        goto end;
+    if (bigint_compare(&total,&bound)>=0)
+    {
+        *out_steps=0;
+        rc=1;
+        goto end;
+    }
+    if (!bigint_subtract(&bound,&total,&deficit) ||
+        !bigint_a_size_limitado(&deficit,minimum,&missing) ||
+        missing==0)
+        goto end;
+    steps=1+(missing-1)/delta;
+    if (!size_a_bigint(steps,&steps_big) ||
+        !size_a_bigint(high_step,&step_big) ||
+        !bigint_multiply(&steps_big,&step_big,&needed))
+        goto end;
+    if (bigint_compare(&x,&needed)<0)
+    {
+        rc=0;
+        goto end;
+    }
+    *out_steps=steps;
+    rc=1;
+end:
+    bigint_free(&loss);bigint_free(&x);bigint_free(&small);
+    bigint_free(&total);bigint_free(&bound);bigint_free(&deficit);
+    bigint_free(&steps_big);bigint_free(&step_big);bigint_free(&needed);
+    return rc;
+}
+
+/*
  * Closest amount with two unlimited positive denominations <=50,000.
  * Let a>b and g=gcd(a,b). Every minimum-piece representation can use
  * fewer than a/g coins of value b: a/g small coins can always be replaced
@@ -1432,10 +1486,11 @@ static int copiar_bigint(BigInt *dest, const BigInt *src)
  * Return -1 when outside this proven special case, 0 on runtime failure.
  */
 static int cercano_dos_denominaciones_bigint(const BigInt *monto,
-        const BigIntArray *denom, BigInt *monto_cubierto, BigIntArray *solucion)
+        const BigIntArray *denom, size_t min_monedas,
+        BigInt *monto_cubierto, BigIntArray *solucion)
 {
     size_t d[2], high, low, a, b, g, max_y, cap, clipped = 0;
-    size_t remaining_mod = 0, best_rem = SIZE_MAX, best_y = 0;
+    size_t remaining_mod = 0, best_rem = SIZE_MAX, best_y = 0, best_steps = 0;
     BigInt large = {0}, big_q = {0}, big_r = {0};
     BigInt paid = {0}, left = {0}, high_count = {0}, residual = {0};
     BigInt partial = {0}, low_count = {0};
@@ -1469,7 +1524,20 @@ static int cercano_dos_denominaciones_bigint(const BigInt *monto,
         size_t y_value=y*b;
         if (y_value>clipped) break;
         size_t rem=(remaining_mod+a-(y_value%a))%a;
-        if (rem<best_rem) {best_rem=rem;best_y=y;}
+        if (rem<best_rem)
+        {
+            size_t steps=0;
+            size_t high_loss=y_value/a + (y_value%a>remaining_mod ? 1 : 0);
+            int feasible=pasos_residuo_minimo(&big_q,high_loss,y,
+                        min_monedas,b/g,(a-b)/g,&steps);
+            if (feasible<0) goto cleanup;
+            if (feasible==1)
+            {
+                best_rem=rem;
+                best_y=y;
+                best_steps=steps;
+            }
+        }
     }
     if (best_rem==SIZE_MAX) goto cleanup;
     if (!size_a_bigint(best_y*b,&paid) ||
@@ -1479,6 +1547,24 @@ static int cercano_dos_denominaciones_bigint(const BigInt *monto,
         !size_a_bigint(best_y,&low_count))
         goto cleanup;
     if (bigint_is_zero(&partial)) goto cleanup;
+    if (best_steps)
+    {
+        BigInt steps={0},hi_unit={0},lo_unit={0};
+        BigInt hi_take={0},lo_add={0},adjusted_hi={0},adjusted_lo={0};
+        int adjusted=size_a_bigint(best_steps,&steps) &&
+            size_a_bigint(b/g,&hi_unit) &&
+            size_a_bigint(a/g,&lo_unit) &&
+            bigint_multiply(&steps,&hi_unit,&hi_take) &&
+            bigint_multiply(&steps,&lo_unit,&lo_add) &&
+            bigint_subtract(&high_count,&hi_take,&adjusted_hi) &&
+            bigint_add(&low_count,&lo_add,&adjusted_lo) &&
+            bigint_set(&high_count,&adjusted_hi) &&
+            bigint_set(&low_count,&adjusted_lo);
+        bigint_free(&steps);bigint_free(&hi_unit);bigint_free(&lo_unit);
+        bigint_free(&hi_take);bigint_free(&lo_add);
+        bigint_free(&adjusted_hi);bigint_free(&adjusted_lo);
+        if (!adjusted) goto cleanup;
+    }
 
     if (!bigint_array_create(solucion,2)) goto cleanup;
     if (!bigint_array_set(solucion,high,&high_count) ||
@@ -2544,14 +2630,13 @@ int calcular_cambio_cercano_con_rango(const BigInt *monto,
                 monto_cubierto, solucion);
     }
 
-    if (denominaciones->len == 2 && min_monedas == 0 &&
-        max_monedas == SIZE_MAX)
+    if (denominaciones->len == 2 && max_monedas == SIZE_MAX)
     {
         size_t small_amount=0;
         if (!bigint_a_size_limitado(monto,DP_MONTO_MAX,&small_amount))
         {
             int two=cercano_dos_denominaciones_bigint(monto,denominaciones,
-                                                      monto_cubierto,solucion);
+                    min_monedas,monto_cubierto,solucion);
             if (two>=0) return two;
         }
     }
