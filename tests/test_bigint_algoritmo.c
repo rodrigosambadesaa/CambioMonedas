@@ -693,8 +693,37 @@ static void test_cercano_bigint_hasta_dos_monedas(void)
     }
 }
 
+static void test_cercano_bigint_minimo_dos_denominaciones(void)
+{
+    const char *d[]={"50000","49999"};
+    const char *expect[]={"5","0"};
+    BigInt amount={0},covered={0};
+    BigIntArray denoms={0},out={0};
+    check_int(crear_arreglo(&denoms,d,2),"nearest minimum types");
+    check_int(bigint_init(&amount,"250001"),"nearest minimum amount");
+    check_int(calcular_cambio_cercano_con_rango(&amount,&denoms,5,SIZE_MAX,
+              &covered,&out),"nearest five-piece valid smaller sum");
+    check_int(covered.digits && strcmp(covered.digits,"250000")==0,
+              "nearest five-piece covered");
+    check_arreglo_texto(&out,expect,2,"nearest five-piece counts");
+    bigint_array_free(&out);bigint_free(&covered);bigint_free(&amount);
+    check_int(bigint_init(&amount,"200001"),"nearest impossible min amount");
+    check_int(!calcular_cambio_cercano_con_rango(&amount,&denoms,5,SIZE_MAX,
+              &covered,&out),"nearest minimum impossible under five small coins");
+    bigint_free(&amount);
+    check_int(bigint_init(&amount,"250000"),"nearest exact min amount");
+    check_int(calcular_cambio_cercano_con_rango(&amount,&denoms,5,SIZE_MAX,
+              &covered,&out),"nearest five-piece exact sum");
+    check_int(covered.digits && strcmp(covered.digits,"250000")==0,
+              "nearest exact five-piece covered");
+    check_arreglo_texto(&out,expect,2,"nearest exact five-piece counts");
+    bigint_array_free(&out);bigint_free(&covered);bigint_free(&amount);
+    bigint_array_free(&denoms);
+}
+
 int main(void)
 {
+    test_cercano_bigint_minimo_dos_denominaciones();
     test_cercano_bigint_hasta_dos_monedas();
     test_gcd1_bigint_trece_y_veinte_piezas();
     test_gcd1_bigint_nueve_y_doce_piezas();
