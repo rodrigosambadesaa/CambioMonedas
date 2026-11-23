@@ -1928,6 +1928,29 @@ static int testigo_corto_bigint(const BigInt *amount,const BigIntArray *denom,
     if(min<1)min=1;
     if(max>(denom->len<=4 ? 20 : denom->len<=5 ? 12 : denom->len<=8 ? 8 : 4))
         max=(denom->len<=4 ? 20 : denom->len<=5 ? 12 : denom->len<=8 ? 8 : 4);
+
+    /* Rigorous early cutoff: even 'max' copies of the largest coin
+       cannot cover the amount. Avoid exploring thousands of BigInt
+       branches for astronomically large, unattainable targets. */
+    {
+        const BigInt *largest=&denom->items[0];
+        BigInt copies={0},max_possible={0};
+        int ok,too_large;
+        for(i=0;i<denom->len;++i)
+        {
+            if(!denom->items[i].digits)
+                return -1;
+            if(bigint_compare(&denom->items[i],largest)>0)
+                largest=&denom->items[i];
+        }
+        ok=size_a_bigint(max,&copies) &&
+           bigint_multiply(largest,&copies,&max_possible);
+        too_large=ok && bigint_compare(amount,&max_possible)>0;
+        bigint_free(&copies);
+        bigint_free(&max_possible);
+        if(!ok) return -1;
+        if(too_large) return 0;
+    }
     for(depth=min;depth<=max;++depth)
     {
         rc=testigo_corto_rec(amount,denom,stock,0,depth,counts);
