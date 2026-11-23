@@ -638,8 +638,64 @@ static void test_gcd1_bigint_trece_y_veinte_piezas(void)
     bigint_array_free(&stock);
 }
 
+static void test_cercano_bigint_hasta_dos_monedas(void)
+{
+    const char *d[]={"800000","700000","400000"};
+    const char *st[]={"0","1","2"};
+    const char *expect[]={"1","0","1"};
+    const char *expectStock[]={"0","1","1"};
+    BigInt amount={0},covered={0};
+    BigIntArray denom={0},stock={0},out={0};
+    check_int(bigint_init(&amount,"1200001"),"near two amount");
+    check_int(crear_arreglo(&denom,d,3),"near two denominations");
+    check_int(calcular_cambio_cercano_con_rango(&amount,&denom,0,2,&covered,&out),
+              "nearest two non-exact large amount");
+    check_int(covered.digits && strcmp(covered.digits,"1200000")==0,
+              "nearest two covered 1200000");
+    check_arreglo_texto(&out,expect,3,"nearest two counts");
+    bigint_array_free(&out);bigint_free(&covered);
+    check_int(crear_arreglo(&stock,st,3),"near two stock");
+    check_int(calcular_cambio_cercano_stock_con_rango(&amount,&denom,&stock,
+              0,2,&covered,&out),"nearest two with finite stock");
+    check_int(covered.digits && strcmp(covered.digits,"1100000")==0,
+              "nearest two stock covered 1100000");
+    check_arreglo_texto(&out,expectStock,3,"nearest two stock counts");
+    bigint_array_free(&out);bigint_free(&covered);
+    bigint_array_free(&denom);bigint_array_free(&stock);bigint_free(&amount);
+
+    {
+        const char *d2[]={"600000","350000","200000"};
+        const char *s2[]={"0","1","1"};
+        const char *expect2[]={"0","1","1"};
+        check_int(bigint_init(&amount,"700001"),"near no double amount");
+        check_int(crear_arreglo(&denom,d2,3),"near no double denominations");
+        check_int(crear_arreglo(&stock,s2,3),"near no double stock");
+        check_int(calcular_cambio_cercano_stock_con_rango(&amount,&denom,&stock,
+                  0,2,&covered,&out),"near no duplicate inventory");
+        check_int(covered.digits && strcmp(covered.digits,"550000")==0,
+                  "near no double must cover 550000");
+        check_arreglo_texto(&out,expect2,3,"near no double counts");
+        bigint_array_free(&out);bigint_free(&covered);
+        bigint_array_free(&denom);bigint_array_free(&stock);bigint_free(&amount);
+    }
+    {
+        const char *d3[]={"800000","400000","200000"};
+        const char *expect3[]={"0","2","0"};
+        check_int(bigint_init(&amount,"800001"),"near minimum amount");
+        check_int(crear_arreglo(&denom,d3,3),"near minimum denominations");
+        check_int(calcular_cambio_cercano_con_rango(&amount,&denom,2,2,&covered,&out),
+                  "near exactly two required");
+        check_int(covered.digits && strcmp(covered.digits,"800000")==0,
+                  "near exactly two covered");
+        check_arreglo_texto(&out,expect3,3,"near exactly two pieces");
+        bigint_array_free(&out);bigint_free(&covered);
+        bigint_array_free(&denom);bigint_free(&amount);
+    }
+}
+
 int main(void)
 {
+    test_cercano_bigint_hasta_dos_monedas();
     test_gcd1_bigint_trece_y_veinte_piezas();
     test_gcd1_bigint_nueve_y_doce_piezas();
     test_gcd1_bigint_cinco_piezas();
