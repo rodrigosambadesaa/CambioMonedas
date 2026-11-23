@@ -593,8 +593,54 @@ static void test_gcd1_bigint_nueve_y_doce_piezas(void)
     bigint_array_free(&stock);
 }
 
+static void test_gcd1_bigint_trece_y_veinte_piezas(void)
+{
+    /* All non-700000 denominations equal 1 modulo 100000.
+       With at most twenty pieces a multiple of 100000 must use
+       only 700000 pieces; this certifies both global optima. */
+    const char *den[]={"800001","700000","100001","1"};
+    const char *stockv[]={"100","20","100","100000"};
+    const char *expected13[]={"0","13","0","0"};
+    const char *expected20[]={"0","20","0","0"};
+    BigInt amount={0};
+    BigIntArray denom={0},stock={0},out={0};
+    check_int(crear_arreglo(&denom,den,4),"thirteen-piece denominations");
+    check_int(crear_arreglo(&stock,stockv,4),"thirteen-piece inventory");
+    check_int(bigint_init(&amount,"9100000"),"thirteen-piece amount");
+    check_int(calcular_cambio_optimo(&amount,&denom,&out),
+              "thirteen-piece optimum unlimited");
+    check_arreglo_texto(&out,expected13,4,"thirteen-piece certified minimum");
+    bigint_array_free(&out);
+    check_int(calcular_cambio_optimo_stock(&amount,&denom,&stock,&out),
+              "thirteen-piece optimum with stock");
+    check_arreglo_texto(&out,expected13,4,"thirteen-piece stock minimum");
+    bigint_array_free(&out);
+    check_int(calcular_cambio_optimo_con_rango(&amount,&denom,13,13,&out),
+              "thirteen-piece exact range");
+    check_arreglo_texto(&out,expected13,4,"thirteen-piece exact range counts");
+    bigint_array_free(&out);
+    bigint_free(&amount);
+    check_int(bigint_init(&amount,"14000000"),"twenty-piece amount");
+    check_int(calcular_cambio_optimo(&amount,&denom,&out),
+              "twenty-piece optimum unlimited");
+    check_arreglo_texto(&out,expected20,4,"twenty-piece certified minimum");
+    bigint_array_free(&out);
+    check_int(calcular_cambio_optimo_stock(&amount,&denom,&stock,&out),
+              "twenty-piece optimum with stock");
+    check_arreglo_texto(&out,expected20,4,"twenty-piece stock minimum");
+    bigint_array_free(&out);
+    check_int(calcular_cambio_optimo_con_rango(&amount,&denom,20,20,&out),
+              "twenty-piece exact range");
+    check_arreglo_texto(&out,expected20,4,"twenty-piece exact range counts");
+    bigint_array_free(&out);
+    bigint_free(&amount);
+    bigint_array_free(&denom);
+    bigint_array_free(&stock);
+}
+
 int main(void)
 {
+    test_gcd1_bigint_trece_y_veinte_piezas();
     test_gcd1_bigint_nueve_y_doce_piezas();
     test_gcd1_bigint_cinco_piezas();
     test_gcd1_bigint_cuatro_piezas();
