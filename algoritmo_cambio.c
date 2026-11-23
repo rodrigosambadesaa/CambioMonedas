@@ -1865,8 +1865,8 @@ cleanup:
 }
 
 /*
- * Certifies optimal BigInt change with at most four pieces. Tries counts
- * 1,2,3,4 (or the requested interval) in ascending order, and enumerates
+ * Certifies optimal BigInt change up to 8 pieces for <=8 types
+ * (up to four for larger alphabets). Tries counts in ascending order and enumerates
  * nondecreasing denomination indices. This never scales memory with amount.
  * A missing witness is inconclusive, not proof of infeasibility.
  */
@@ -1887,7 +1887,7 @@ static int testigo_corto_rec(const BigInt *remaining, const BigIntArray *denom,
             continue;
         if (stock)
         {
-            if (!bigint_a_size_con_tope(&stock->items[i],4,&limit))
+            if (!bigint_a_size_con_tope(&stock->items[i],8,&limit))
                 return -1;
             if (counts[i]>=limit) continue;
         }
@@ -1913,11 +1913,13 @@ static int testigo_corto_bigint(const BigInt *amount,const BigIntArray *denom,
     size_t counts[24]={0},depth,i;
     int rc=0;
     if (!amount || !amount->digits || !denom || !denom->items || !out ||
-        !denom->len || denom->len>24 || min>max || min>4 ||
+        !denom->len || denom->len>24 || min>max ||
+        min>(denom->len<=8 ? 8 : 4) ||
         (stock && (!stock->items || stock->len!=denom->len)))
         return 0;
     if(min<1)min=1;
-    if(max>4)max=4;
+    if(max>(denom->len<=8 ? 8 : 4))
+        max=(denom->len<=8 ? 8 : 4);
     for(depth=min;depth<=max;++depth)
     {
         rc=testigo_corto_rec(amount,denom,stock,0,depth,counts);
@@ -1956,6 +1958,11 @@ int calcular_cambio_optimo(const BigInt *monto, const BigIntArray *denominacione
         return dp == DP_OK;
 
     if (testigo_corto_bigint(monto,denominaciones,NULL,0,4,solucion)==1)
+        return 1;
+
+    /* A 5..8 piece witness remains exact for at most eight types. */
+    if (denominaciones->len<=8 &&
+        testigo_corto_bigint(monto,denominaciones,NULL,5,8,solucion)==1)
         return 1;
 
     /* if: comprueba !bigint_array_create(solucion, denominaciones->len) antes de ejecutar esta rama. */
@@ -2011,6 +2018,11 @@ int calcular_cambio_optimo_stock(const BigInt *monto,
         return dp == DP_OK;
 
     if (testigo_corto_bigint(monto,denominaciones,stock,0,4,solucion)==1)
+        return 1;
+
+    /* A 5..8 piece witness remains exact for at most eight types. */
+    if (denominaciones->len<=8 &&
+        testigo_corto_bigint(monto,denominaciones,stock,5,8,solucion)==1)
         return 1;
 
     /* if: comprueba !bigint_array_create(solucion, denominaciones->len) antes de ejecutar esta rama. */
@@ -2187,6 +2199,11 @@ int calcular_cambio_optimo_con_rango(const BigInt *monto,
     if (testigo_corto_bigint(monto,denominaciones,NULL,min_monedas,max_monedas,solucion)==1)
         return 1;
 
+    /* A 5..8 piece witness remains exact for at most eight types. */
+    if (denominaciones->len<=8 &&
+        testigo_corto_bigint(monto,denominaciones,NULL,(min_monedas>5 ? min_monedas : 5),(max_monedas<8 ? max_monedas : 8),solucion)==1)
+        return 1;
+
     /*
      * Para montos BigInt fuera del tope DP mantenemos una ruta compatible con el
      * comportamiento previo: solo se soporta restriccion de maximo (min=0).
@@ -2248,6 +2265,11 @@ int calcular_cambio_optimo_stock_con_rango(const BigInt *monto,
         return dp == DP_OK;
 
     if (testigo_corto_bigint(monto,denominaciones,stock,min_monedas,max_monedas,solucion)==1)
+        return 1;
+
+    /* A 5..8 piece witness remains exact for at most eight types. */
+    if (denominaciones->len<=8 &&
+        testigo_corto_bigint(monto,denominaciones,stock,(min_monedas>5 ? min_monedas : 5),(max_monedas<8 ? max_monedas : 8),solucion)==1)
         return 1;
 
     /* if: comprueba min_monedas == 0 antes de ejecutar esta rama. */

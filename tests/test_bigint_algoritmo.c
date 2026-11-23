@@ -525,8 +525,39 @@ static void test_gcd1_bigint_cuatro_piezas(void)
 }
 
 
+static void test_gcd1_bigint_cinco_piezas(void)
+{
+    /* A four-piece change cannot reach 3500000 (4*800001<3500000).
+       The optimum therefore uses five coins of 700000 each. */
+    const char *den[]={"800001","700000","100001","1"};
+    const char *stockv[]={"100","5","100","1000000"};
+    const char *expect[]={"0","5","0","0"};
+    BigInt amount={0};
+    BigIntArray denom={0},stock={0},out={0};
+    check_int(crear_arreglo(&denom,den,4),"five-piece gcd1 denom");
+    check_int(bigint_init(&amount,"3500000"),"five-piece gcd1 amount");
+    check_int(calcular_cambio_optimo(&amount,&denom,&out),
+              "five-piece gcd1 unlimited amount");
+    check_arreglo_texto(&out,expect,4,
+                        "five-piece global minimum beats greedy");
+    bigint_array_free(&out);
+    check_int(crear_arreglo(&stock,stockv,4),"five-piece stock");
+    check_int(calcular_cambio_optimo_stock(&amount,&denom,&stock,&out),
+              "five-piece gcd1 finite stock");
+    check_arreglo_texto(&out,expect,4,"five-piece stock exact optimum");
+    bigint_array_free(&out);
+    check_int(calcular_cambio_optimo_con_rango(&amount,&denom,0,5,&out),
+              "five-piece max-5");
+    check_arreglo_texto(&out,expect,4,"five-piece max bound");
+    bigint_array_free(&out);
+    bigint_free(&amount);
+    bigint_array_free(&denom);
+    bigint_array_free(&stock);
+}
+
 int main(void)
 {
+    test_gcd1_bigint_cinco_piezas();
     test_gcd1_bigint_cuatro_piezas();
     test_cercano_bigint_dos_tipos_stock_mas_512();
     test_cercano_bigint_dos_tipos();
