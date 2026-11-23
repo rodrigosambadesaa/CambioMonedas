@@ -555,8 +555,47 @@ static void test_gcd1_bigint_cinco_piezas(void)
     bigint_array_free(&stock);
 }
 
+static void test_gcd1_bigint_nueve_y_doce_piezas(void)
+{
+    const char *den[]={"800001","700000","100001","1"};
+    const char *stockv[]={"100","12","100","100000"};
+    const char *expected9[]={"0","9","0","0"};
+    const char *expected12[]={"0","12","0","0"};
+    BigInt amount={0};
+    BigIntArray denom={0},stock={0},out={0};
+    check_int(crear_arreglo(&denom,den,4),"nine-piece denominations");
+    check_int(crear_arreglo(&stock,stockv,4),"nine-piece inventory");
+    check_int(bigint_init(&amount,"6300000"),"nine-piece amount");
+    check_int(calcular_cambio_optimo(&amount,&denom,&out),
+              "nine-piece optimum, unlimited");
+    check_arreglo_texto(&out,expected9,4,"nine-piece minimum, unlimited");
+    bigint_array_free(&out);
+    check_int(calcular_cambio_optimo_stock(&amount,&denom,&stock,&out),
+              "nine-piece optimum, stock");
+    check_arreglo_texto(&out,expected9,4,"nine-piece minimum, stock");
+    bigint_array_free(&out);
+    check_int(calcular_cambio_optimo_con_rango(&amount,&denom,9,9,&out),
+              "nine-piece exact range");
+    check_arreglo_texto(&out,expected9,4,"nine-piece exact range counts");
+    bigint_array_free(&out);
+    bigint_free(&amount);
+    check_int(bigint_init(&amount,"8400000"),"twelve-piece amount");
+    check_int(calcular_cambio_optimo(&amount,&denom,&out),
+              "twelve-piece optimum, unlimited");
+    check_arreglo_texto(&out,expected12,4,"twelve-piece minimum, unlimited");
+    bigint_array_free(&out);
+    check_int(calcular_cambio_optimo_stock(&amount,&denom,&stock,&out),
+              "twelve-piece optimum, stock");
+    check_arreglo_texto(&out,expected12,4,"twelve-piece minimum, stock");
+    bigint_array_free(&out);
+    bigint_free(&amount);
+    bigint_array_free(&denom);
+    bigint_array_free(&stock);
+}
+
 int main(void)
 {
+    test_gcd1_bigint_nueve_y_doce_piezas();
     test_gcd1_bigint_cinco_piezas();
     test_gcd1_bigint_cuatro_piezas();
     test_cercano_bigint_dos_tipos_stock_mas_512();
