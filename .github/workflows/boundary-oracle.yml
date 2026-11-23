@@ -1,0 +1,25 @@
+name: C change-algorithm exhaustive oracle and BigInt boundary audit
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  oracle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - name: Compile boundary and exhaustive independent oracle with sanitizers
+        run: |
+          gcc -std=c2x -O1 -g -Wall -Wextra -Wpedantic -Werror \
+            -fsanitize=address,undefined,leak -fno-omit-frame-pointer \
+            -I. tests/test_algorithm_boundary_oracle.c \
+            algoritmo_cambio.c bigint.c vector_dinamico.c \
+            -o /tmp/change-boundary-oracle
+      - name: Exhaustive 3-denomination cases and upper-bound regressions
+        run: |
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1:abort_on_error=1 \
+          UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+          /tmp/change-boundary-oracle
