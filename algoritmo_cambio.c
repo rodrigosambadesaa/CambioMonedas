@@ -1895,7 +1895,7 @@ static int testigo_corto_rec(const BigInt *remaining, const BigIntArray *denom,
             continue;
         if (stock)
         {
-            if (!bigint_a_size_con_tope(&stock->items[i],12,&limit))
+            if (!bigint_a_size_con_tope(&stock->items[i],20,&limit))
                 return -1;
             if (counts[i]>=limit) continue;
         }
@@ -1922,12 +1922,12 @@ static int testigo_corto_bigint(const BigInt *amount,const BigIntArray *denom,
     int rc=0;
     if (!amount || !amount->digits || !denom || !denom->items || !out ||
         !denom->len || denom->len>24 || min>max ||
-        min>(denom->len<=5 ? 12 : denom->len<=8 ? 8 : 4) ||
+        min>(denom->len<=4 ? 20 : denom->len<=5 ? 12 : denom->len<=8 ? 8 : 4) ||
         (stock && (!stock->items || stock->len!=denom->len)))
         return 0;
     if(min<1)min=1;
-    if(max>(denom->len<=5 ? 12 : denom->len<=8 ? 8 : 4))
-        max=(denom->len<=5 ? 12 : denom->len<=8 ? 8 : 4);
+    if(max>(denom->len<=4 ? 20 : denom->len<=5 ? 12 : denom->len<=8 ? 8 : 4))
+        max=(denom->len<=4 ? 20 : denom->len<=5 ? 12 : denom->len<=8 ? 8 : 4);
     for(depth=min;depth<=max;++depth)
     {
         rc=testigo_corto_rec(amount,denom,stock,0,depth,counts);
@@ -1976,6 +1976,11 @@ int calcular_cambio_optimo(const BigInt *monto, const BigIntArray *denominacione
     /* 9..12 coins: only a small denomination alphabet is affordable. */
     if (denominaciones->len<=5 &&
         testigo_corto_bigint(monto,denominaciones,NULL,9,12,solucion)==1)
+        return 1;
+
+    /* Check 13..20 pieces only for at most four denominations. */
+    if (denominaciones->len<=4 &&
+        testigo_corto_bigint(monto,denominaciones,NULL,13,20,solucion)==1)
         return 1;
 
     /* if: comprueba !bigint_array_create(solucion, denominaciones->len) antes de ejecutar esta rama. */
@@ -2041,6 +2046,11 @@ int calcular_cambio_optimo_stock(const BigInt *monto,
     /* 9..12 coins: only a small denomination alphabet is affordable. */
     if (denominaciones->len<=5 &&
         testigo_corto_bigint(monto,denominaciones,stock,9,12,solucion)==1)
+        return 1;
+
+    /* Check 13..20 pieces only for at most four denominations. */
+    if (denominaciones->len<=4 &&
+        testigo_corto_bigint(monto,denominaciones,stock,13,20,solucion)==1)
         return 1;
 
     /* if: comprueba !bigint_array_create(solucion, denominaciones->len) antes de ejecutar esta rama. */
@@ -2227,6 +2237,11 @@ int calcular_cambio_optimo_con_rango(const BigInt *monto,
         testigo_corto_bigint(monto,denominaciones,NULL,(min_monedas>9 ? min_monedas : 9),(max_monedas<12 ? max_monedas : 12),solucion)==1)
         return 1;
 
+    /* Check 13..20 pieces only for at most four denominations. */
+    if (denominaciones->len<=4 &&
+        testigo_corto_bigint(monto,denominaciones,NULL,(min_monedas>13 ? min_monedas : 13),(max_monedas<20 ? max_monedas : 20),solucion)==1)
+        return 1;
+
     /*
      * Para montos BigInt fuera del tope DP mantenemos una ruta compatible con el
      * comportamiento previo: solo se soporta restriccion de maximo (min=0).
@@ -2298,6 +2313,11 @@ int calcular_cambio_optimo_stock_con_rango(const BigInt *monto,
     /* 9..12 coins: only a small denomination alphabet is affordable. */
     if (denominaciones->len<=5 &&
         testigo_corto_bigint(monto,denominaciones,stock,(min_monedas>9 ? min_monedas : 9),(max_monedas<12 ? max_monedas : 12),solucion)==1)
+        return 1;
+
+    /* Check 13..20 pieces only for at most four denominations. */
+    if (denominaciones->len<=4 &&
+        testigo_corto_bigint(monto,denominaciones,stock,(min_monedas>13 ? min_monedas : 13),(max_monedas<20 ? max_monedas : 20),solucion)==1)
         return 1;
 
     /* if: comprueba min_monedas == 0 antes de ejecutar esta rama. */
