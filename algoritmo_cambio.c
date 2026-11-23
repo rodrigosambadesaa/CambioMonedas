@@ -4,6 +4,8 @@
 #include <stdint.h>
 
 #define DP_MONTO_MAX ((size_t)50000)
+/* With <=8 types the bounded-stock DP choice table remains <=12.8 MiB. */
+#define DP_MONTO_MAX_SMALL_ALPHABET ((size_t)200000)
 #define DP_NO_APLICA (-1)
 #define DP_SIN_SOLUCION 0
 #define DP_OK 1
@@ -133,7 +135,10 @@ static int calcular_dp_ilimitado(const BigInt *monto, const BigIntArray *denom, 
     int resultado = DP_NO_APLICA;
 
     /* if: comprueba !bigint_a_size_limitado(monto, DP_MONTO_MAX, &amount) antes de ejecutar esta rama. */
-    if (!bigint_a_size_limitado(monto, DP_MONTO_MAX, &amount))
+    const size_t max_dp_amount =
+        (denom != NULL && denom->len <= 8)
+            ? DP_MONTO_MAX_SMALL_ALPHABET : DP_MONTO_MAX;
+    if (!bigint_a_size_limitado(monto, max_dp_amount, &amount))
         return DP_NO_APLICA;
 
     valores = (size_t *)calloc(denom->len, sizeof(size_t));
@@ -240,7 +245,10 @@ static int calcular_dp_stock(const BigInt *monto,
     int resultado = DP_NO_APLICA;
 
     /* if: comprueba !bigint_a_size_limitado(monto, DP_MONTO_MAX, &amount) antes de ejecutar esta rama. */
-    if (!bigint_a_size_limitado(monto, DP_MONTO_MAX, &amount))
+    const size_t max_dp_amount =
+        (denom != NULL && denom->len <= 8)
+            ? DP_MONTO_MAX_SMALL_ALPHABET : DP_MONTO_MAX;
+    if (!bigint_a_size_limitado(monto, max_dp_amount, &amount))
         return DP_NO_APLICA;
 
     /* if: comprueba denom->len > ((size_t)-1) / (amount + 1) antes de ejecutar esta rama. */
