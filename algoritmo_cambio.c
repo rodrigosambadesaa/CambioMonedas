@@ -2090,6 +2090,68 @@ static int calcular_exacto_una_denominacion_bigint(
     return ok;
 }
 
+/*
+ * Exact O(n) solver for a single-coin constraint. Also computes the closest
+ * nonzero amount representable with exactly one coin, without allocating
+ * proportional to the BigInt amount.
+ */
+static int calcular_cambio_una_moneda(const BigInt *monto,
+                                     const BigIntArray *denom,
+                                     const BigIntArray *stock,
+                                     int cercano,
+                                     BigInt *cubierto,
+                                     BigIntArray *solucion)
+{
+    size_t mejor;
+    size_t i;
+    BigInt uno = {0};
+    BigInt cero = {0};
+
+    if (monto == NULL || denom == NULL || denom->items == NULL ||
+        denom->len == 0 || solucion == NULL ||
+        (stock != NULL && (stock->items == NULL || stock->len != denom->len)))
+        return 0;
+
+    mejor = denom->len;
+    for (i = 0; i < denom->len; ++i)
+    {
+        int cmp;
+        if (bigint_is_zero(&denom->items[i]) ||
+            (stock != NULL && bigint_is_zero(&stock->items[i])))
+            continue;
+        cmp = bigint_compare(&denom->items[i], monto);
+        if (cmp > 0 || (!cercano && cmp != 0))
+            continue;
+        if (mejor == denom->len ||
+            bigint_compare(&denom->items[i], &denom->items[mejor]) > 0)
+            mejor = i;
+    }
+
+    if (mejor == denom->len ||
+        !bigint_init(&uno, "1") || !bigint_init(&cero, "0") ||
+        !bigint_array_create(solucion, denom->len))
+        goto fallo;
+
+    for (i = 0; i < denom->len; ++i)
+    {
+        if (!bigint_array_set(solucion, i, i == mejor ? &uno : &cero))
+            goto fallo;
+    }
+    if (cubierto != NULL && !copiar_bigint(cubierto, &denom->items[mejor]))
+        goto fallo;
+
+    bigint_free(&uno);
+    bigint_free(&cero);
+    return 1;
+
+fallo:
+    bigint_free(&uno);
+    bigint_free(&cero);
+    bigint_array_free(solucion);
+    return 0;
+}
+
+
 /* funcion calcular_cambio_optimo_con_rango: contiene la logica principal de esta operacion. */
 int calcular_cambio_optimo_con_rango(const BigInt *monto,
                                      const BigIntArray *denominaciones,
@@ -2105,6 +2167,9 @@ int calcular_cambio_optimo_con_rango(const BigInt *monto,
     /* if: comprueba min_monedas > max_monedas antes de ejecutar esta rama. */
     if (min_monedas > max_monedas)
         return 0;
+
+    if (min_monedas <= 1 && max_monedas == 1 && !bigint_is_zero(monto))
+        return calcular_cambio_una_moneda(monto,denominaciones,NULL,0,NULL,solucion);
 
     if (denominaciones->len == 1)
     {
@@ -2165,6 +2230,9 @@ int calcular_cambio_optimo_stock_con_rango(const BigInt *monto,
     /* if: comprueba min_monedas > max_monedas antes de ejecutar esta rama. */
     if (min_monedas > max_monedas)
         return 0;
+
+    if (min_monedas <= 1 && max_monedas == 1 && !bigint_is_zero(monto))
+        return calcular_cambio_una_moneda(monto,denominaciones,stock,0,NULL,solucion);
 
     if (denominaciones->len == 1)
     {
@@ -2278,6 +2346,9 @@ int calcular_cambio_cercano_con_rango(const BigInt *monto,
     if (min_monedas > max_monedas)
         return 0;
 
+    if (min_monedas <= 1 && max_monedas == 1)
+        return calcular_cambio_una_moneda(monto,denominaciones,NULL,1,monto_cubierto,solucion);
+
     if (denominaciones->len == 1)
     {
         size_t small_amount = 0;
@@ -2317,7 +2388,14 @@ int calcular_cambio_cercano_con_rango(const BigInt *monto,
         if (!calcular_cambio_optimo(monto, denominaciones, solucion))
             return 0;
 
-        return copiar_bigint(monto_cubierto, monto);
+        // A BigInt fallback must not violate the requested maximum.
+        if (!solucion_cumple_max_monedas(solucion, max_monedas) ||
+            !copiar_bigint(monto_cubierto, monto))
+        {
+            bigint_array_free(solucion);
+            return 0;
+        }
+        return 1;
     }
 
     return 0;
@@ -2344,6 +2422,9 @@ int calcular_cambio_cercano_stock_con_rango(const BigInt *monto,
     /* if: comprueba min_monedas > max_monedas antes de ejecutar esta rama. */
     if (min_monedas > max_monedas)
         return 0;
+
+    if (min_monedas <= 1 && max_monedas == 1)
+        return calcular_cambio_una_moneda(monto,denominaciones,stock,1,monto_cubierto,solucion);
 
     if (denominaciones->len == 1)
     {
@@ -2385,7 +2466,14 @@ int calcular_cambio_cercano_stock_con_rango(const BigInt *monto,
         if (!calcular_cambio_optimo_stock(monto, denominaciones, stock, solucion))
             return 0;
 
-        return copiar_bigint(monto_cubierto, monto);
+        // A BigInt fallback must not violate the requested maximum.
+        if (!solucion_cumple_max_monedas(solucion, max_monedas) ||
+            !copiar_bigint(monto_cubierto, monto))
+        {
+            bigint_array_free(solucion);
+            return 0;
+        }
+        return 1;
     }
 
     return 0;
